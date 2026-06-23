@@ -1,6 +1,7 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { destroySocket } from '../lib/socket'
+import { destroySocket, getSocket, initSocket } from '../lib/socket'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: '📋' },
@@ -12,6 +13,14 @@ const NAV_ITEMS = [
 export default function Shell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+
+  // Ensure the Socket.IO connection is alive for the duration of the session.
+  // initSocket() is idempotent; destroySocket() is called on logout below.
+  useEffect(() => {
+    if (!getSocket()) initSocket()
+    // Do not destroy on unmount — Shell is the persistent auth wrapper.
+    // Destruction happens explicitly in handleLogout.
+  }, [])
 
   function handleLogout() {
     destroySocket()
