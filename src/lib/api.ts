@@ -36,13 +36,20 @@ function getToken(): string | null {
 // ─── Base client ─────────────────────────────────────────────────────────────
 
 /**
- * Raw axios instance — base URL is the Vite dev proxy (same origin).
- * For production builds the app is served behind the same backend origin.
+ * API origin. In production the SPA is hosted on a different origin than the API
+ * (e.g. Vercel frontend → Render backend), so it needs the backend's ABSOLUTE URL.
+ * Set `VITE_API_URL` (preferred) or `VITE_API_PROXY_TARGET` at build time to the backend
+ * origin, e.g. `https://ckitchenbackend.onrender.com`. In dev both are usually empty →
+ * baseURL stays relative `/api/v1`, which the Vite dev proxy forwards to the local backend.
+ * NOTE: Vite bakes env vars at BUILD time — you must redeploy after changing them.
  */
+const env = import.meta.env as unknown as Record<string, string | undefined>
+const API_ORIGIN = String(env.VITE_API_URL || env.VITE_API_PROXY_TARGET || '').replace(/\/+$/, '')
+
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: `${API_ORIGIN}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 15_000,
+  timeout: 20_000,
 })
 
 // Attach stored JWT on every request (unless the caller already set one)

@@ -1,5 +1,10 @@
 import { io, type Socket } from 'socket.io-client'
 
+// Same origin resolution as api.ts: absolute backend URL in production (Vercel → Render),
+// empty (same-origin, Vite-proxied) in dev. Set VITE_API_URL / VITE_API_PROXY_TARGET at build.
+const _env = import.meta.env as unknown as Record<string, string | undefined>
+const SOCKET_ORIGIN = String(_env.VITE_API_URL || _env.VITE_API_PROXY_TARGET || '').replace(/\/+$/, '')
+
 // ─── Event payload types ──────────────────────────────────────────────────────
 //
 // NOTE: verified directly against the live backend source
@@ -89,8 +94,8 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
     _socket = null
   }
 
-  _socket = io('/', {
-    // Same-origin — Vite proxies /socket.io to the backend in dev
+  _socket = io(SOCKET_ORIGIN || '/', {
+    // Dev: same-origin (Vite proxies /socket.io). Prod: absolute backend origin.
     path: '/socket.io',
     auth: { locationId },
     transports: ['websocket', 'polling'],
