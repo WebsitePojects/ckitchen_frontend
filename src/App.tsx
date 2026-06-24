@@ -5,7 +5,6 @@ import {
   ReceiptText,
   Settings,
   Tags,
-  UtensilsCrossed,
   Users,
 } from 'lucide-react'
 import { AuthProvider } from './auth/AuthContext'
@@ -18,6 +17,7 @@ import Inventory from './pages/Inventory'
 import Analytics from './pages/Analytics'
 import ComingSoon from './pages/ComingSoon'
 import Merchants from './pages/Merchants'
+import Menu from './pages/Menu'
 
 export default function App() {
   return (
@@ -46,12 +46,7 @@ export default function App() {
                 path="printers"
                 element={<ComingSoon title="Printers" subtitle="Print queue & printer status" icon={Printer} />}
               />
-              <Route
-                path="menu"
-                element={
-                  <ComingSoon title="Menu Management" subtitle="Items & availability" icon={UtensilsCrossed} />
-                }
-              />
+              <Route path="menu" element={<Menu />} />
               <Route path="inventory" element={<Inventory />} />
               <Route
                 path="users"
