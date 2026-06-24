@@ -4,7 +4,6 @@ import {
   ReceiptText,
   Settings,
   Tags,
-  Users,
 } from 'lucide-react'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
@@ -18,6 +17,7 @@ import ComingSoon from './pages/ComingSoon'
 import Merchants from './pages/Merchants'
 import Menu from './pages/Menu'
 import Printers from './pages/Printers'
+import UsersPage from './pages/Users'
 
 export default function App() {
   return (
@@ -45,10 +45,7 @@ export default function App() {
               <Route path="printers" element={<Printers />} />
               <Route path="menu" element={<Menu />} />
               <Route path="inventory" element={<Inventory />} />
-              <Route
-                path="users"
-                element={<ComingSoon title="Users & Roles" subtitle="Accounts & permissions" icon={Users} />}
-              />
+              <Route path="users" element={<UsersPage />} />
               <Route path="reports" element={<Analytics />} />
               <Route
                 path="settings"
