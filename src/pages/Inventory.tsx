@@ -14,13 +14,56 @@
  *   #4  ITO stock moves are atomic — backend enforces; UI shows both tiers post-confirm
  *   #8  Low-stock alerts are non-negotiable — prominent red toast, 10 s TTL
  *   #10 RBAC enforced server-side; UI hides/disables unreachable actions
+ *
+ * Reskin: dark theme, design tokens from ui-reskin-plan.md
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Boxes,
+  CheckCircle2,
+  Package,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { get, post } from '../lib/api'
 import { onSocketEvent } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
+import { Button } from '../components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
+import { Input } from '../components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table'
+import PageHeader from '../components/common/PageHeader'
+import KpiCard from '../components/common/KpiCard'
+import KpiRibbon from '../components/common/KpiRibbon'
+import EmptyState from '../components/common/EmptyState'
 
 // ─── Role helpers ──────────────────────────────────────────────────────────────
 
@@ -85,14 +128,6 @@ interface Ito {
   items?: ItoItem[]
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
-
-interface Toast {
-  id: string
-  kind: 'lowstock' | 'success' | 'error' | 'info'
-  message: string
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatQty(qty: number | string, unit: string): string {
@@ -109,6 +144,24 @@ function formatTime(iso: string): string {
   })
 }
 
+// ─── ITO status badge ─────────────────────────────────────────────────────────
+
+const ITO_STATUS_CLASSES: Record<ItoStatus, string> = {
+  REQUESTED: 'bg-amber-500/15 text-amber-400 ring-1 ring-inset ring-amber-500/30',
+  CONFIRMED: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30',
+  CANCELLED: 'bg-zinc-500/15 text-zinc-400 ring-1 ring-inset ring-zinc-500/30',
+}
+
+function ItoStatusBadge({ status }: { status: ItoStatus }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${ITO_STATUS_CLASSES[status]}`}
+    >
+      {status}
+    </span>
+  )
+}
+
 // ─── Stock table ──────────────────────────────────────────────────────────────
 
 interface StockTableProps {
@@ -122,96 +175,124 @@ interface StockTableProps {
 }
 
 function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTableProps) {
-  const tierColor = tier === 'MAIN'
-    ? { header: 'bg-slate-700', badge: 'bg-slate-100 text-slate-700' }
-    : { header: 'bg-teal-700',  badge: 'bg-teal-100 text-teal-700' }
+  const lowCount = rows.filter(r => r.below_threshold || alertedIds.has(r.ingredientId)).length
 
   return (
-    <section className="flex flex-col rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden min-w-0">
-      {/* Header */}
-      <div className={`${tierColor.header} px-4 py-3 flex items-center justify-between`}>
-        <h2 className="text-base font-bold text-white tracking-wide">{title}</h2>
-        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tierColor.badge} tabular-nums`}>
-          {loading ? '…' : `${rows.length} items`}
-        </span>
-      </div>
+    <Card className="border-[#1F2A24] bg-[#121A17] overflow-hidden">
+      <CardHeader className="px-4 py-3 border-b border-[#1F2A24] flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <Boxes className="h-4 w-4 text-emerald-500" aria-hidden />
+          {title}
+        </CardTitle>
+        <div className="flex items-center gap-2">
+          {lowCount > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400 ring-1 ring-inset ring-red-500/30 tabular-nums">
+              <AlertTriangle className="h-3 w-3" aria-hidden />
+              {lowCount} low
+            </span>
+          )}
+          {!loading && (
+            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-400 tabular-nums">
+              {rows.length} items
+            </span>
+          )}
+        </div>
+      </CardHeader>
 
-      {/* Body */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-          <div className="mb-3 h-7 w-7 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
-          <p className="text-sm">Loading stock…</p>
-        </div>
-      ) : error ? (
-        <div className="p-6 text-center">
-          <p className="text-sm font-medium text-red-700">{error}</p>
-          <p className="mt-1 text-xs text-red-400">Check backend connection.</p>
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-gray-300">
-          <p className="text-3xl" aria-hidden>📦</p>
-          <p className="mt-2 text-xs font-medium text-gray-400">No stock recorded</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ingredient</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Qty</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Threshold</th>
-                <th className="px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+            <p className="text-xs text-zinc-500">Loading stock…</p>
+          </div>
+        ) : error ? (
+          <div className="p-6 text-center">
+            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-red-400" aria-hidden />
+            <p className="text-sm font-medium text-red-400">{error}</p>
+            <p className="mt-1 text-xs text-zinc-500">Check backend connection.</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title="No stock recorded"
+            description={
+              tier === 'MAIN'
+                ? 'Receive a delivery to add items.'
+                : 'Request a transfer to stock the kitchen.'
+            }
+            className="border-0 rounded-none bg-transparent"
+          />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-[#1F2A24] hover:bg-transparent">
+                <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Ingredient
+                </TableHead>
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Qty
+                </TableHead>
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Threshold
+                </TableHead>
+                <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Status
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {rows.map(row => {
                 const isAlert = row.below_threshold || alertedIds.has(row.ingredientId)
                 return (
-                  <tr
+                  <TableRow
                     key={row.ingredientId}
                     className={[
-                      'transition-colors duration-300',
+                      'transition-colors duration-300 border-[#1F2A24]',
                       isAlert
-                        ? 'bg-red-50 hover:bg-red-100'
-                        : 'hover:bg-gray-50',
+                        ? 'bg-red-500/5 hover:bg-red-500/10'
+                        : 'hover:bg-zinc-800/30',
                     ].join(' ')}
                   >
-                    <td className="px-4 py-2.5 font-medium text-gray-900">
-                      {row.ingredient.name}
-                      {isAlert && (
-                        <span className="ml-2 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 uppercase">
+                    <TableCell className="px-4 py-2.5">
+                      <span
+                        className={`font-medium text-sm ${isAlert ? 'text-red-300' : 'text-zinc-100'}`}
+                      >
+                        {row.ingredient.name}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-right">
+                      <span
+                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : 'text-zinc-200'}`}
+                      >
+                        {formatQty(row.quantity, row.ingredient.unit)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-right">
+                      <span className="font-mono tabular-nums text-xs text-zinc-500">
+                        {row.ingredient.lowStockThreshold} {row.ingredient.unit}
+                      </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-center">
+                      {isAlert ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400 ring-1 ring-inset ring-red-500/30">
+                          <AlertTriangle className="h-3 w-3" aria-hidden />
                           Low
                         </span>
-                      )}
-                    </td>
-                    <td className={[
-                      'px-4 py-2.5 text-right font-mono tabular-nums font-semibold',
-                      isAlert ? 'text-red-700' : 'text-gray-800',
-                    ].join(' ')}>
-                      {formatQty(row.quantity, row.ingredient.unit)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-gray-400 text-xs">
-                      {row.ingredient.lowStockThreshold} {row.ingredient.unit}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      {isAlert ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
-                          ⚠ Below threshold
-                        </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/30">
+                          <CheckCircle2 className="h-3 w-3" aria-hidden />
                           OK
                         </span>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -225,10 +306,10 @@ interface ReceiveItem {
 interface ReceiveFormProps {
   ingredients: Ingredient[]
   onSuccess: () => void
-  onToast: (kind: Toast['kind'], message: string) => void
+  onClose: () => void
 }
 
-function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
+function ReceiveForm({ ingredients, onSuccess, onClose }: ReceiveFormProps) {
   const [items, setItems] = useState<ReceiveItem[]>([{ ingredientId: '', quantity: '' }])
   const [submitting, setSubmitting] = useState(false)
 
@@ -244,11 +325,11 @@ function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
     if (valid.length === 0) {
-      onToast('error', 'Add at least one ingredient with a quantity > 0.')
+      toast.error('Add at least one ingredient with a quantity > 0.')
       return
     }
     setSubmitting(true)
@@ -261,79 +342,99 @@ function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
           quantity: Number(it.quantity),
         })),
       })
-      onToast('success', `Received ${valid.length} ingredient(s) into MAIN warehouse.`)
+      toast.success(`Received ${valid.length} ingredient(s) into MAIN warehouse.`)
       setItems([{ ingredientId: '', quantity: '' }])
       onSuccess()
+      onClose()
     } catch (e) {
-      onToast('error', e instanceof Error ? e.message : 'Failed to receive stock.')
+      toast.error(e instanceof Error ? e.message : 'Failed to receive stock.')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={e => void handleSubmit(e)} className="space-y-3">
-      {items.map((item, idx) => (
-        <div key={idx} className="flex gap-2 items-end">
-          <div className="flex-1 min-w-0">
-            {idx === 0 && (
-              <label className="mb-1 block text-xs font-medium text-gray-600">Ingredient</label>
+    <form onSubmit={e => void handleSubmit(e)} className="space-y-4">
+      <div className="space-y-3">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex gap-2 items-end">
+            <div className="flex-1 min-w-0">
+              {idx === 0 && (
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Ingredient
+                </label>
+              )}
+              <Select
+                value={item.ingredientId || '_none'}
+                onValueChange={v => setField(idx, 'ingredientId', v === '_none' ? '' : v)}
+              >
+                <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+                  <SelectValue placeholder="Select ingredient…" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#121A17] border-[#1F2A24]">
+                  <SelectItem value="_none" className="text-zinc-400">
+                    Select ingredient…
+                  </SelectItem>
+                  {ingredients.map(ing => (
+                    <SelectItem key={ing.id} value={ing.id} className="text-zinc-200">
+                      {ing.name} ({ing.unit})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-28">
+              {idx === 0 && (
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Quantity
+                </label>
+              )}
+              <Input
+                type="number"
+                min="0.01"
+                step="any"
+                value={item.quantity}
+                onChange={e => setField(idx, 'quantity', e.target.value)}
+                required
+                placeholder="0"
+                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+              />
+            </div>
+            {items.length > 1 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeRow(idx)}
+                aria-label="Remove row"
+                className="h-9 w-9 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
-            <select
-              value={item.ingredientId}
-              onChange={e => setField(idx, 'ingredientId', e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">Select ingredient…</option>
-              {ingredients.map(ing => (
-                <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
-              ))}
-            </select>
           </div>
-          <div className="w-28">
-            {idx === 0 && (
-              <label className="mb-1 block text-xs font-medium text-gray-600">Quantity</label>
-            )}
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              value={item.quantity}
-              onChange={e => setField(idx, 'quantity', e.target.value)}
-              required
-              placeholder="0"
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-          {items.length > 1 && (
-            <button
-              type="button"
-              onClick={() => removeRow(idx)}
-              aria-label="Remove row"
-              className="mb-0 flex-none rounded-lg border border-gray-200 px-2 py-2 text-gray-400 hover:text-red-600 hover:border-red-200 transition text-sm"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
 
       <div className="flex gap-2 pt-1">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={addRow}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+          className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
         >
-          + Add row
-        </button>
-        <button
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Add row
+        </Button>
+        <Button
           type="submit"
           disabled={submitting}
-          className="ml-auto rounded-lg bg-slate-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition disabled:opacity-60"
+          size="sm"
+          className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
         >
           {submitting ? 'Receiving…' : 'Receive into MAIN'}
-        </button>
+        </Button>
       </div>
     </form>
   )
@@ -349,10 +450,10 @@ interface ItoRequestItem {
 interface ItoRequestFormProps {
   ingredients: Ingredient[]
   onSuccess: () => void
-  onToast: (kind: Toast['kind'], message: string) => void
+  onClose: () => void
 }
 
-function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps) {
+function ItoRequestForm({ ingredients, onSuccess, onClose }: ItoRequestFormProps) {
   const [items, setItems] = useState<ItoRequestItem[]>([{ ingredientId: '', quantity: '' }])
   const [submitting, setSubmitting] = useState(false)
 
@@ -368,11 +469,11 @@ function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps
     setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
     if (valid.length === 0) {
-      onToast('error', 'Add at least one ingredient with a quantity > 0.')
+      toast.error('Add at least one ingredient with a quantity > 0.')
       return
     }
     setSubmitting(true)
@@ -387,91 +488,107 @@ function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps
           quantity: Number(it.quantity),
         })),
       })
-      onToast('success', `ITO requested for ${valid.length} ingredient(s). Awaiting warehouse confirmation.`)
+      toast.success(
+        `ITO requested for ${valid.length} ingredient(s). Awaiting warehouse confirmation.`,
+      )
       setItems([{ ingredientId: '', quantity: '' }])
       onSuccess()
+      onClose()
     } catch (e) {
-      onToast('error', e instanceof Error ? e.message : 'Failed to request ITO.')
+      toast.error(e instanceof Error ? e.message : 'Failed to request ITO.')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={e => void handleSubmit(e)} className="space-y-3">
-      {items.map((item, idx) => (
-        <div key={idx} className="flex gap-2 items-end">
-          <div className="flex-1 min-w-0">
-            {idx === 0 && (
-              <label className="mb-1 block text-xs font-medium text-gray-600">Ingredient</label>
+    <form onSubmit={e => void handleSubmit(e)} className="space-y-4">
+      <div className="space-y-3">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex gap-2 items-end">
+            <div className="flex-1 min-w-0">
+              {idx === 0 && (
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Ingredient
+                </label>
+              )}
+              <Select
+                value={item.ingredientId || '_none'}
+                onValueChange={v => setField(idx, 'ingredientId', v === '_none' ? '' : v)}
+              >
+                <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+                  <SelectValue placeholder="Select ingredient…" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#121A17] border-[#1F2A24]">
+                  <SelectItem value="_none" className="text-zinc-400">
+                    Select ingredient…
+                  </SelectItem>
+                  {ingredients.map(ing => (
+                    <SelectItem key={ing.id} value={ing.id} className="text-zinc-200">
+                      {ing.name} ({ing.unit})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-28">
+              {idx === 0 && (
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+                  Quantity
+                </label>
+              )}
+              <Input
+                type="number"
+                min="0.01"
+                step="any"
+                value={item.quantity}
+                onChange={e => setField(idx, 'quantity', e.target.value)}
+                required
+                placeholder="0"
+                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+              />
+            </div>
+            {items.length > 1 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => removeRow(idx)}
+                aria-label="Remove row"
+                className="h-9 w-9 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
-            <select
-              value={item.ingredientId}
-              onChange={e => setField(idx, 'ingredientId', e.target.value)}
-              required
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">Select ingredient…</option>
-              {ingredients.map(ing => (
-                <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
-              ))}
-            </select>
           </div>
-          <div className="w-28">
-            {idx === 0 && (
-              <label className="mb-1 block text-xs font-medium text-gray-600">Quantity</label>
-            )}
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              value={item.quantity}
-              onChange={e => setField(idx, 'quantity', e.target.value)}
-              required
-              placeholder="0"
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-          {items.length > 1 && (
-            <button
-              type="button"
-              onClick={() => removeRow(idx)}
-              aria-label="Remove row"
-              className="flex-none rounded-lg border border-gray-200 px-2 py-2 text-gray-400 hover:text-red-600 hover:border-red-200 transition text-sm"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
 
       <div className="flex gap-2 pt-1">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={addRow}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+          className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
         >
-          + Add row
-        </button>
-        <button
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          Add row
+        </Button>
+        <Button
           type="submit"
           disabled={submitting}
-          className="ml-auto rounded-lg bg-teal-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-teal-800 transition disabled:opacity-60"
+          size="sm"
+          className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
         >
-          {submitting ? 'Requesting…' : 'Request Transfer (ITO)'}
-        </button>
+          {submitting ? 'Requesting…' : 'Request Transfer'}
+        </Button>
       </div>
     </form>
   )
 }
 
 // ─── ITO List ─────────────────────────────────────────────────────────────────
-
-const ITO_STATUS_STYLES: Record<ItoStatus, string> = {
-  REQUESTED:  'bg-amber-100 text-amber-800 border border-amber-200',
-  CONFIRMED:  'bg-emerald-100 text-emerald-800 border border-emerald-200',
-  CANCELLED:  'bg-gray-100 text-gray-500 border border-gray-200',
-}
 
 interface ItoListProps {
   itos: Ito[]
@@ -484,31 +601,40 @@ interface ItoListProps {
   ingredientsById: Map<string, Ingredient>
 }
 
-function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm, ingredientsById }: ItoListProps) {
+function ItoList({
+  itos,
+  loading,
+  error,
+  canConfirm,
+  confirming,
+  onConfirm,
+  ingredientsById,
+}: ItoListProps) {
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-        <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
-        <p className="text-sm">Loading ITOs…</p>
+      <div className="flex flex-col items-center justify-center py-10">
+        <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+        <p className="text-xs text-zinc-500">Loading ITOs…</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center">
-        <p className="text-sm font-medium text-red-700">{error}</p>
+      <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
+        <p className="text-sm font-medium text-red-400">{error}</p>
       </div>
     )
   }
 
   if (itos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 text-gray-300">
-        <p className="text-3xl" aria-hidden>↔</p>
-        <p className="mt-2 text-xs font-medium text-gray-400">No transfer orders</p>
-        <p className="mt-1 text-[11px] text-gray-300">Request a transfer to move stock MAIN → KITCHEN.</p>
-      </div>
+      <EmptyState
+        icon={ArrowLeftRight}
+        title="No transfer orders"
+        description="Request a transfer to move stock MAIN → KITCHEN."
+        className="border-dashed border-[#1F2A24] bg-transparent"
+      />
     )
   }
 
@@ -522,19 +648,17 @@ function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm, ingr
             className={[
               'rounded-xl border p-3 transition-colors',
               ito.status === 'REQUESTED'
-                ? 'border-amber-200 bg-amber-50'
+                ? 'border-amber-500/30 bg-amber-500/5'
                 : ito.status === 'CONFIRMED'
-                  ? 'border-emerald-200 bg-emerald-50'
-                  : 'border-gray-200 bg-gray-50',
+                  ? 'border-emerald-500/30 bg-emerald-500/5'
+                  : 'border-[#1F2A24] bg-zinc-800/30',
             ].join(' ')}
           >
             {/* ITO header */}
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="font-mono text-[10px] text-gray-400">{ito.id.slice(0, 8)}…</span>
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${ITO_STATUS_STYLES[ito.status]}`}>
-                {ito.status}
-              </span>
-              <span className="ml-auto text-[11px] text-gray-400">
+              <span className="font-mono text-[10px] text-zinc-500">{ito.id.slice(0, 8)}…</span>
+              <ItoStatusBadge status={ito.status} />
+              <span className="ml-auto text-[11px] text-zinc-500">
                 {formatTime(ito.createdAt)}
               </span>
             </div>
@@ -542,12 +666,12 @@ function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm, ingr
             {/* Items — GET /itos doesn't join line items; resolve names via ingredientsById */}
             {ito.items && ito.items.length > 0 ? (
               <ul className="mb-2 space-y-0.5">
-                {ito.items.map((it) => {
+                {ito.items.map(it => {
                   const ing = ingredientsById.get(it.ingredientId)
                   return (
-                    <li key={it.id} className="flex items-center gap-2 text-sm text-gray-700">
+                    <li key={it.id} className="flex items-center gap-2 text-sm text-zinc-300">
                       <span className="font-medium">{ing?.name ?? it.ingredientId}</span>
-                      <span className="ml-auto font-mono tabular-nums text-xs text-gray-500">
+                      <span className="ml-auto font-mono tabular-nums text-xs text-zinc-500">
                         {formatQty(it.quantity, ing?.unit ?? '')}
                       </span>
                     </li>
@@ -555,73 +679,32 @@ function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm, ingr
                 })}
               </ul>
             ) : (
-              <p className="mb-2 text-[11px] italic text-gray-400">
+              <p className="mb-2 text-[11px] italic text-zinc-600">
                 Item detail unavailable from the list view.
               </p>
             )}
 
             {/* Confirm button — only for REQUESTED ITOs and allowed roles */}
             {ito.status === 'REQUESTED' && canConfirm && (
-              <button
+              <Button
+                size="sm"
                 onClick={() => onConfirm(ito.id)}
                 disabled={isConfirming}
-                className={[
-                  'w-full rounded-lg px-3 py-2 text-sm font-bold transition',
-                  'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800',
-                  'disabled:opacity-60 disabled:cursor-not-allowed',
-                ].join(' ')}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
               >
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" aria-hidden />
                 {isConfirming ? 'Confirming…' : 'Confirm Transfer'}
-              </button>
+              </Button>
             )}
 
             {ito.status === 'CONFIRMED' && ito.confirmedAt && (
-              <p className="text-[11px] text-emerald-700 mt-1">
+              <p className="text-[11px] text-emerald-400 mt-1">
                 Confirmed {formatTime(ito.confirmedAt)}
               </p>
             )}
           </div>
         )
       })}
-    </div>
-  )
-}
-
-// ─── ToastBanner ──────────────────────────────────────────────────────────────
-
-interface ToastBannerProps {
-  toasts: Toast[]
-  onDismiss: (id: string) => void
-}
-
-function ToastBanner({ toasts, onDismiss }: ToastBannerProps) {
-  if (toasts.length === 0) return null
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs w-full pointer-events-none">
-      {toasts.map(t => (
-        <div
-          key={t.id}
-          className={[
-            'pointer-events-auto flex items-start gap-2 rounded-xl px-4 py-3 shadow-lg text-sm font-medium',
-            t.kind === 'lowstock'
-              ? 'bg-red-600 text-white'
-              : t.kind === 'error'
-                ? 'bg-red-100 text-red-800 border border-red-300'
-                : t.kind === 'success'
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-800 text-white',
-          ].join(' ')}
-        >
-          <span className="flex-1 leading-snug">{t.message}</span>
-          <button
-            onClick={() => onDismiss(t.id)}
-            aria-label="Dismiss"
-            className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none"
-          >
-            ×
-          </button>
-        </div>
-      ))}
     </div>
   )
 }
@@ -633,11 +716,11 @@ export default function Inventory() {
   const role = user?.role
 
   // — Stock tiers
-  const [mainStock,    setMainStock]    = useState<StockLine[]>([])
+  const [mainStock, setMainStock] = useState<StockLine[]>([])
   const [kitchenStock, setKitchenStock] = useState<StockLine[]>([])
-  const [mainLoading,    setMainLoading]    = useState(true)
+  const [mainLoading, setMainLoading] = useState(true)
   const [kitchenLoading, setKitchenLoading] = useState(true)
-  const [mainError,    setMainError]    = useState<string | null>(null)
+  const [mainError, setMainError] = useState<string | null>(null)
   const [kitchenError, setKitchenError] = useState<string | null>(null)
 
   // — Ingredients list (for receive + ITO forms)
@@ -649,34 +732,17 @@ export default function Inventory() {
   )
 
   // — ITOs
-  const [itos,       setItos]       = useState<Ito[]>([])
+  const [itos, setItos] = useState<Ito[]>([])
   const [itosLoading, setItosLoading] = useState(true)
-  const [itosError,  setItosError]  = useState<string | null>(null)
+  const [itosError, setItosError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<Set<string>>(new Set())
-
-  // — Toasts
-  const [toasts, setToasts] = useState<Toast[]>([])
 
   // — Low-stock alert ingredient IDs (for extra row highlight beyond API flag)
   const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set())
 
-  // — Panel visibility
-  const [showReceive,     setShowReceive]     = useState(false)
-  const [showRequestIto,  setShowRequestIto]  = useState(false)
-
-  // ── Toast helper ────────────────────────────────────────────────────────────
-
-  const addToast = useCallback((kind: Toast['kind'], message: string, ttl = 5000) => {
-    const id = `${Date.now()}-${Math.random()}`
-    setToasts(prev => [...prev.slice(-4), { id, kind, message }])
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-    }, ttl)
-  }, [])
-
-  function dismissToast(id: string) {
-    setToasts(prev => prev.filter(t => t.id !== id))
-  }
+  // — Dialog visibility
+  const [showReceive, setShowReceive] = useState(false)
+  const [showRequestIto, setShowRequestIto] = useState(false)
 
   // ── Fetch helpers ───────────────────────────────────────────────────────────
 
@@ -753,12 +819,11 @@ export default function Inventory() {
       }
     })
 
-    // lowstock.alert — Business Rule #8 — non-negotiable alert
+    // lowstock.alert — Business Rule #8 — non-negotiable alert, 10 s TTL
     const unsubLowstock = onSocketEvent('lowstock.alert', (alert: LowStockAlert) => {
-      addToast(
-        'lowstock',
+      toast.error(
         `LOW STOCK: ${alert.ingredientName} — ${alert.quantity} remaining (threshold: ${alert.threshold})`,
-        10_000,
+        { duration: 10_000 },
       )
       // Also highlight the row on the table
       setAlertedIds(prev => new Set(prev).add(alert.ingredientId))
@@ -768,7 +833,7 @@ export default function Inventory() {
       unsubStock()
       unsubLowstock()
     }
-  }, [fetchMainStock, fetchKitchenStock, addToast])
+  }, [fetchMainStock, fetchKitchenStock])
 
   // ── ITO confirm handler ──────────────────────────────────────────────────────
 
@@ -776,11 +841,11 @@ export default function Inventory() {
     setConfirming(prev => new Set(prev).add(itoId))
     try {
       await post(`/itos/${itoId}/confirm`)
-      addToast('success', 'ITO confirmed — stock moved MAIN → KITCHEN.')
+      toast.success('ITO confirmed — stock moved MAIN → KITCHEN.')
       // Refresh both tiers + ITO list (atomic move per Business Rule #4)
       await Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])
     } catch (e) {
-      addToast('error', e instanceof Error ? e.message : 'Failed to confirm ITO.')
+      toast.error(e instanceof Error ? e.message : 'Failed to confirm ITO.')
     } finally {
       setConfirming(prev => {
         const next = new Set(prev)
@@ -792,123 +857,106 @@ export default function Inventory() {
 
   // ── Role flags ───────────────────────────────────────────────────────────────
 
-  const canReceive    = hasRole(role, CAN_RECEIVE)
+  const canReceive = hasRole(role, CAN_RECEIVE)
   const canRequestIto = hasRole(role, CAN_REQUEST_ITO)
   const canConfirmIto = hasRole(role, CAN_CONFIRM_ITO)
 
   // ── Summary counts ───────────────────────────────────────────────────────────
 
-  const lowMain    = mainStock.filter(r => r.below_threshold).length
+  const lowMain = mainStock.filter(r => r.below_threshold).length
   const lowKitchen = kitchenStock.filter(r => r.below_threshold).length
+  const totalBelowThreshold = lowMain + lowKitchen
   const pendingItos = itos.filter(i => i.status === 'REQUESTED').length
+  const totalSkus = mainStock.length + kitchenStock.length
+
+  // KITCHEN items below threshold or recently alerted (for the alerts panel)
+  const kitchenAlerts = kitchenStock.filter(
+    r => r.below_threshold || alertedIds.has(r.ingredientId),
+  )
+
+  // ── Refresh handler ───────────────────────────────────────────────────────────
+
+  function refreshAll() {
+    void Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-gray-50">
+    <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
 
       {/* ── Page header ── */}
-      <header className="shrink-0 flex flex-wrap items-center gap-3 justify-between border-b border-gray-200 bg-white px-5 py-3 sm:px-6">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 sm:text-xl">Inventory</h1>
-          <p className="text-[11px] text-gray-400">Two-tier warehouse · MAIN + KITCHEN · Real-time</p>
-        </div>
-
-        {/* Summary pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {lowMain > 0 && (
-            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700 tabular-nums">
-              {lowMain} Low in MAIN
-            </span>
-          )}
-          {lowKitchen > 0 && (
-            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white tabular-nums animate-pulse">
-              {lowKitchen} Low in KITCHEN
-            </span>
-          )}
-          {pendingItos > 0 && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 tabular-nums">
-              {pendingItos} ITO pending
-            </span>
-          )}
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
-          {canRequestIto && (
-            <button
-              onClick={() => { setShowRequestIto(v => !v); setShowReceive(false) }}
-              className={[
-                'rounded-lg px-3 py-1.5 text-xs font-bold transition border',
-                showRequestIto
-                  ? 'bg-teal-700 text-white border-teal-700'
-                  : 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100',
-              ].join(' ')}
+      <PageHeader
+        title="Inventory"
+        subtitle="Two-tier warehouse · transfers · low-stock"
+        actions={
+          <div className="flex items-center gap-2">
+            {canRequestIto && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRequestIto(true)}
+                className="border-amber-500/40 text-amber-400 hover:border-amber-500/70 hover:text-amber-300 hover:bg-amber-500/10"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />
+                Request Transfer
+              </Button>
+            )}
+            {canReceive && (
+              <Button
+                size="sm"
+                onClick={() => setShowReceive(true)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+              >
+                <Package className="h-3.5 w-3.5 mr-1.5" />
+                Receive into MAIN
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={refreshAll}
+              title="Refresh all"
+              className="h-8 w-8 text-zinc-500 hover:text-zinc-200"
             >
-              {showRequestIto ? 'Close ITO Form' : '+ Request Transfer'}
-            </button>
-          )}
-          {canReceive && (
-            <button
-              onClick={() => { setShowReceive(v => !v); setShowRequestIto(false) }}
-              className={[
-                'rounded-lg px-3 py-1.5 text-xs font-bold transition border',
-                showReceive
-                  ? 'bg-slate-700 text-white border-slate-700'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100',
-              ].join(' ')}
-            >
-              {showReceive ? 'Close Receive Form' : '+ Receive into MAIN'}
-            </button>
-          )}
-          <button
-            onClick={() => void Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])}
-            title="Refresh all"
-            className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition"
-          >
-            ↻ Refresh
-          </button>
-        </div>
-      </header>
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="sr-only">Refresh</span>
+            </Button>
+          </div>
+        }
+      />
 
-      {/* ── Sliding action panels ── */}
-      {showReceive && canReceive && (
-        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-          <h2 className="mb-3 text-sm font-bold text-slate-800">
-            Receive Supplier Delivery into MAIN Warehouse (FR-IV-08)
-          </h2>
-          <ReceiveForm
-            ingredients={ingredients}
-            onSuccess={() => {
-              void fetchMainStock()
-              setShowReceive(false)
-            }}
-            onToast={addToast}
-          />
-        </div>
-      )}
+      {/* ── KPI ribbon ── */}
+      <KpiRibbon>
+        <KpiCard
+          icon={Package}
+          label="Ingredients"
+          value={ingredients.length}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          label="Below Threshold"
+          value={totalBelowThreshold}
+          className={totalBelowThreshold > 0 ? 'border-red-500/30 bg-red-500/5' : undefined}
+        />
+        <KpiCard
+          icon={ArrowLeftRight}
+          label="Pending ITOs"
+          value={pendingItos}
+        />
+        <KpiCard
+          icon={Boxes}
+          label="Total SKUs"
+          value={totalSkus}
+        />
+      </KpiRibbon>
 
-      {showRequestIto && canRequestIto && (
-        <div className="shrink-0 border-b border-teal-200 bg-teal-50 px-5 py-4 sm:px-6">
-          <h2 className="mb-3 text-sm font-bold text-teal-800">
-            Request Internal Transfer Order — MAIN → KITCHEN (FR-IV-03)
-          </h2>
-          <ItoRequestForm
-            ingredients={ingredients}
-            onSuccess={() => {
-              void fetchItos()
-              setShowRequestIto(false)
-            }}
-            onToast={addToast}
-          />
-        </div>
-      )}
-
-      {/* ── Main body ── */}
-      <div className="flex flex-1 overflow-hidden flex-col xl:flex-row gap-0">
+      {/* ── Main content ── */}
+      <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
 
         {/* ── Left: two-tier stock tables ── */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-5 min-w-0">
+        <section className="flex min-w-0 flex-1 flex-col gap-4">
+
           {/* Two-tier tables: side-by-side on lg+, stacked on smaller */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <StockTable
@@ -930,65 +978,140 @@ export default function Inventory() {
           </div>
 
           {/* Legend */}
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-gray-400">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-sm bg-red-100 border border-red-300" />
+              <span className="inline-block h-3 w-3 rounded-sm bg-red-500/15 border border-red-500/30" />
               Below threshold — repurchase or ITO required
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-sm bg-emerald-100 border border-emerald-300" />
+              <span className="inline-block h-3 w-3 rounded-sm bg-emerald-500/15 border border-emerald-500/30" />
               Stock OK
             </span>
-            <span className="ml-auto text-[11px] italic">Real-time via stock.updated</span>
+            <span className="ml-auto text-[11px] italic text-zinc-600">
+              Real-time via stock.updated
+            </span>
           </div>
-        </main>
+        </section>
 
-        {/* ── Right: ITO panel ── */}
-        <aside className="w-full shrink-0 border-t border-gray-200 bg-gray-50 xl:w-80 xl:border-t-0 xl:border-l overflow-y-auto">
-          <div className="p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-gray-800">
+        {/* ── Right: alerts + ITO panel ── */}
+        <aside className="w-full shrink-0 xl:w-80 flex flex-col gap-4">
+
+          {/* Stock Alerts panel — KITCHEN items below threshold */}
+          {kitchenAlerts.length > 0 && (
+            <Card className="border-red-500/30 bg-red-500/5">
+              <CardHeader className="px-4 py-3 border-b border-red-500/20 flex-row items-center gap-2 space-y-0">
+                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" aria-hidden />
+                <CardTitle className="text-sm font-semibold text-red-400">
+                  Kitchen Stock Alerts
+                </CardTitle>
+                <span className="ml-auto rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400 tabular-nums">
+                  {kitchenAlerts.length}
+                </span>
+              </CardHeader>
+              <CardContent className="p-3 space-y-2">
+                {kitchenAlerts.map(row => (
+                  <div
+                    key={row.ingredientId}
+                    className="flex items-center justify-between rounded-lg bg-red-500/10 px-3 py-2 border border-red-500/20"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-red-300 truncate">
+                        {row.ingredient.name}
+                      </p>
+                      <p className="text-[11px] text-red-400/70 tabular-nums">
+                        {formatQty(row.quantity, row.ingredient.unit)} / threshold:{' '}
+                        {row.ingredient.lowStockThreshold}
+                      </p>
+                    </div>
+                    <AlertTriangle className="ml-2 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ITO panel */}
+          <Card className="border-[#1F2A24] bg-[#121A17]">
+            <CardHeader className="px-4 py-3 border-b border-[#1F2A24] flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4 text-emerald-500" aria-hidden />
                 Transfer Orders (ITO)
-              </h2>
+              </CardTitle>
               {pendingItos > 0 && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 tabular-nums">
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400 ring-1 ring-inset ring-amber-500/30 tabular-nums">
                   {pendingItos} pending
                 </span>
               )}
-            </div>
+            </CardHeader>
+            <CardContent className="p-3">
+              {/* Role hint */}
+              {!canConfirmIto && !canRequestIto && (
+                <p className="mb-3 text-xs text-zinc-500 italic">
+                  View only — your role cannot request or confirm ITOs.
+                </p>
+              )}
+              {canRequestIto && !canConfirmIto && (
+                <p className="mb-3 text-xs text-zinc-500 italic">
+                  You can request ITOs. Warehouse personnel confirm them.
+                </p>
+              )}
+              {canConfirmIto && (
+                <p className="mb-3 text-xs text-zinc-500 italic">
+                  Confirming an ITO atomically moves stock MAIN → KITCHEN.
+                </p>
+              )}
 
-            {/* Role hint */}
-            {!canConfirmIto && !canRequestIto && (
-              <p className="mb-3 text-xs text-gray-400 italic">
-                View only — your role cannot request or confirm ITOs.
-              </p>
-            )}
-            {canRequestIto && !canConfirmIto && (
-              <p className="mb-3 text-xs text-gray-400 italic">
-                You can request ITOs. Warehouse personnel confirm them.
-              </p>
-            )}
-            {canConfirmIto && (
-              <p className="mb-3 text-xs text-gray-400 italic">
-                Confirming an ITO atomically moves stock MAIN → KITCHEN.
-              </p>
-            )}
-
-            <ItoList
-              itos={itos}
-              loading={itosLoading}
-              error={itosError}
-              canConfirm={canConfirmIto}
-              confirming={confirming}
-              onConfirm={id => void handleConfirmIto(id)}
-              ingredientsById={ingredientsById}
-            />
-          </div>
+              <ItoList
+                itos={itos}
+                loading={itosLoading}
+                error={itosError}
+                canConfirm={canConfirmIto}
+                confirming={confirming}
+                onConfirm={id => void handleConfirmIto(id)}
+                ingredientsById={ingredientsById}
+              />
+            </CardContent>
+          </Card>
         </aside>
       </div>
 
-      {/* ── Toast notifications ── */}
-      <ToastBanner toasts={toasts} onDismiss={dismissToast} />
+      {/* ── Receive into MAIN dialog ── */}
+      <Dialog open={showReceive} onOpenChange={setShowReceive}>
+        <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">
+              Receive into MAIN Warehouse
+            </DialogTitle>
+            <DialogDescription className="text-zinc-500">
+              Log a supplier delivery into the MAIN warehouse (FR-IV-08).
+            </DialogDescription>
+          </DialogHeader>
+          <ReceiveForm
+            ingredients={ingredients}
+            onSuccess={() => void fetchMainStock()}
+            onClose={() => setShowReceive(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Request Transfer (ITO) dialog ── */}
+      <Dialog open={showRequestIto} onOpenChange={setShowRequestIto}>
+        <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">
+              Request Transfer — MAIN to KITCHEN
+            </DialogTitle>
+            <DialogDescription className="text-zinc-500">
+              Create an Internal Transfer Order (FR-IV-03). Warehouse staff will confirm.
+            </DialogDescription>
+          </DialogHeader>
+          <ItoRequestForm
+            ingredients={ingredients}
+            onSuccess={() => void fetchItos()}
+            onClose={() => setShowRequestIto(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
