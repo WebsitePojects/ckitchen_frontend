@@ -61,11 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     apiClient
-      .get<AuthUser>('/auth/me', {
+      .get<{ user: AuthUser }>('/auth/me', {
         headers: { Authorization: `Bearer ${state.token}` },
       })
       .then(({ data }) => {
-        setState({ token: state.token, user: data, loading: false })
+        // /auth/me returns { user: {...} } — unwrap it (login returns it nested too).
+        setState({ token: state.token, user: data.user, loading: false })
       })
       .catch(() => {
         // Token invalid or expired — clear it

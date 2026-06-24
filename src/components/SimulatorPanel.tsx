@@ -21,7 +21,7 @@ interface Props {
 
 export default function SimulatorPanel({ brands }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [rate, setRate]               = useState<number>(2)
+  const [rate, setRate]               = useState<number>(20)
   const [running, setRunning]         = useState(false)
   const [loading, setLoading]         = useState(false)
   const [error, setError]             = useState<string | null>(null)
