@@ -1,17 +1,20 @@
 /**
- * Analytics — FR-AN-01..05
+ * Analytics — FR-AN-01..05  (Reskin: M8 Sales & Performance — dark)
  *
  * FR-AN-01  Per-brand revenue + order volume for a selectable date range
- * FR-AN-02  Brand ranking top→weak; weakest brand flagged "scale or cut"
+ * FR-AN-02  Brand ranking top→weak; weakest brand flagged "Scale or Cut"
  * FR-AN-03  Orders-by-hour peak-load chart (single-date picker)
- * FR-AN-04  Aggregator split: FoodPanda / GrabFood / Other
+ * FR-AN-04  Aggregator split: foodpanda / GrabFood
  * FR-AN-05  Brand-specific margin using shared-ingredient recipe costing
  *
- * API endpoints (CK1-API-003 §9):
- *   GET /analytics/brands?from&to
- *   GET /analytics/orders-by-hour?date
- *   GET /analytics/aggregators?from&to
- *   GET /analytics/margins?from&to
+ * API endpoints (CK1-API-003 §9) — NOTE: all fields are snake_case:
+ *   GET /analytics/brands?from&to        → { brand_id, name, revenue, order_count, avg_order_value, is_weakest }
+ *   GET /analytics/orders-by-hour?date   → { hour (0-23), order_count }
+ *   GET /analytics/aggregators?from&to   → { aggregator, order_count, revenue }
+ *   GET /analytics/margins?from&to       → { brand_id, name, revenue, recipe_cost_total, margin }
+ *
+ * Chart library: recharts (already installed) — dark-styled.
+ * All numeric renders: (v ?? 0).toLocaleString() — no raw .toLocaleString() on unknown.
  */
 import { useCallback, useEffect, useState } from 'react'
 import {
@@ -27,55 +30,67 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { Formatter } from 'recharts/types/component/DefaultTooltipContent'
+import {
+  AlertTriangle,
+  BarChart3,
+  CalendarDays,
+  DollarSign,
+  ReceiptText,
+  Star,
+  TrendingUp,
+} from 'lucide-react'
 import { get } from '../lib/api'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
+import { Skeleton } from '../components/ui/skeleton'
+import PageHeader from '../components/common/PageHeader'
+import KpiCard from '../components/common/KpiCard'
+import KpiRibbon from '../components/common/KpiRibbon'
+import EmptyState from '../components/common/EmptyState'
+import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE } from '../lib/theme'
 
-// ─── API response types (CK1-API-003 §9) ─────────────────────────────────────
+// ─── API response types (snake_case — as the backend sends them) ───────────────
 
-interface BrandPerf {
-  brandId: string
-  brandName: string
-  revenue: number        // decimal from API, parsed to number
-  orderCount: number
-  avgOrderValue: number
-  rank: number
+interface ApiBrandPerf {
+  brand_id: string
+  name: string
+  revenue: number | null | undefined
+  order_count: number | null | undefined
+  avg_order_value: number | null | undefined
+  is_weakest: boolean
 }
 
-interface HourBucket {
-  hour: number           // 0–23
-  orderCount: number
+interface ApiHourBucket {
+  hour: number
+  order_count: number | null | undefined
 }
 
-interface AggregatorSplit {
-  aggregator: string     // "FOODPANDA" | "GRABFOOD" | "OTHER"
-  orderCount: number
-  revenue: number
+interface ApiAggregatorSplit {
+  aggregator: string
+  order_count: number | null | undefined
+  revenue: number | null | undefined
 }
 
-interface BrandMargin {
-  brandId: string
-  brandName: string
-  revenue: number
-  recipeCost: number
-  margin: number         // revenue − recipeCost
-  marginPct: number      // margin / revenue * 100 (may be provided or derived)
+interface ApiMargin {
+  brand_id: string
+  name: string
+  revenue: number | null | undefined
+  recipe_cost_total: number | null | undefined
+  margin: number | null | undefined
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtCurrency(v: number) {
-  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(v)
-}
-
-function fmtPct(v: number) {
-  return `${v.toFixed(1)}%`
-}
+// ─── Date helpers ──────────────────────────────────────────────────────────────
 
 function isoDate(d: Date): string {
   return d.toISOString().split('T')[0]
 }
 
-/** Default "from" = 30 days ago; "to" = today */
 function defaultRange() {
   const to   = new Date()
   const from = new Date()
@@ -83,694 +98,781 @@ function defaultRange() {
   return { from: isoDate(from), to: isoDate(to) }
 }
 
-/** AGGREGATOR display name */
-const AGG_LABEL: Record<string, string> = {
-  FOODPANDA: 'FoodPanda',
-  GRABFOOD:  'GrabFood',
-  OTHER:     'Other',
+// ─── Currency formatter ────────────────────────────────────────────────────────
+
+function fmtPHP(v: number | null | undefined): string {
+  const n = v ?? 0
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    maximumFractionDigits: 0,
+  }).format(n)
 }
 
-const AGG_COLOR: Record<string, string> = {
-  FOODPANDA: '#e91e8c',
-  GRABFOOD:  '#00b14f',
-  OTHER:     '#6366f1',
+function fmtNum(v: number | null | undefined): string {
+  return (v ?? 0).toLocaleString()
 }
 
-// Contrasting palette for brand charts
-const BRAND_COLORS = [
-  '#0ea5e9', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444',
-  '#f97316', '#06b6d4', '#84cc16', '#ec4899', '#14b8a6',
-]
-
-function brandColor(index: number): string {
-  return BRAND_COLORS[index % BRAND_COLORS.length]
+function fmtPct(v: number | null | undefined): string {
+  return `${(v ?? 0).toFixed(1)}%`
 }
 
-// ─── Recharts tooltip formatters (typed via Formatter cast) ──────────────────
+// ─── Chart shared styles ───────────────────────────────────────────────────────
 
-/** Revenue formatter for BarChart tooltips */
-const fmtRevTooltip: Formatter = (v) =>
-  [fmtCurrency(Number(v ?? 0)), 'Revenue']
+const CHART_GRID   = '#27332C'
+const CHART_TICK   = '#71717A'
+const TOOLTIP_STYLE: React.CSSProperties = {
+  backgroundColor: '#121A17',
+  border: '1px solid #27332C',
+  borderRadius: 8,
+  fontSize: 12,
+  color: '#F4F4F5',
+}
+const CURSOR_FILL  = 'rgba(16,185,129,0.06)'
 
-/** Order-count formatter for by-hour BarChart tooltip */
-const fmtOrderCountTooltip: Formatter = (v) =>
-  [Number(v ?? 0), 'Orders']
+// ─── Hour label helper ─────────────────────────────────────────────────────────
 
-/** Margin components formatter (Revenue / Recipe Cost / Margin) */
-const fmtMarginTooltip: Formatter = (v, name) => {
-  const labels: Record<string, string> = {
-    revenue:    'Revenue',
-    recipeCost: 'Recipe Cost',
-    margin:     'Margin',
+function hourLabel(h: number): string {
+  if (h === 0)  return '12am'
+  if (h < 12)   return `${h}am`
+  if (h === 12) return '12pm'
+  return `${h - 12}pm`
+}
+
+// ─── Date-range presets ────────────────────────────────────────────────────────
+
+type RangePreset = '7d' | '30d' | '90d'
+
+function presetRange(p: RangePreset): { from: string; to: string } {
+  const to   = new Date()
+  const from = new Date()
+  const days = p === '7d' ? 7 : p === '30d' ? 30 : 90
+  from.setDate(from.getDate() - days)
+  return { from: isoDate(from), to: isoDate(to) }
+}
+
+// ─── Loading skeleton ──────────────────────────────────────────────────────────
+
+function ChartSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-[200px] w-full rounded-xl" />
+    </div>
+  )
+}
+
+// ─── Section: KPI Ribbon ──────────────────────────────────────────────────────
+
+interface KpiData {
+  totalRevenue:   number
+  totalOrders:    number
+  avgOrderValue:  number
+  topBrand:       string
+}
+
+function AnalyticsKpiRibbon({ data, loading }: { data: KpiData | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-[90px] rounded-xl" />
+        ))}
+      </div>
+    )
   }
-  return [fmtCurrency(Number(v ?? 0)), labels[String(name)] ?? String(name)]
-}
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function LoadingSpinner() {
   return (
-    <div className="flex items-center justify-center py-16 text-gray-400">
-      <div className="mr-3 h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
-      <span className="text-sm">Loading…</span>
-    </div>
-  )
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-      <p className="text-sm font-medium text-red-700">{message}</p>
-      <p className="mt-1 text-xs text-red-400">
-        Make sure the backend is running and you are logged in.
-      </p>
-    </div>
-  )
-}
-
-function EmptyBox({ label }: { label: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
-      <p className="text-3xl mb-2" aria-hidden>📊</p>
-      <p className="text-sm font-medium text-gray-600">{label}</p>
-      <p className="mt-1 text-xs text-gray-400">
-        Analytics surface after orders are ingested and processed.
-      </p>
-    </div>
+    <KpiRibbon className="grid-cols-2 sm:grid-cols-4 xl:grid-cols-4">
+      <KpiCard
+        icon={DollarSign}
+        label="Total Revenue"
+        value={fmtPHP(data?.totalRevenue)}
+      />
+      <KpiCard
+        icon={ReceiptText}
+        label="Total Orders"
+        value={fmtNum(data?.totalOrders)}
+      />
+      <KpiCard
+        icon={TrendingUp}
+        label="Avg Order Value"
+        value={fmtPHP(data?.avgOrderValue)}
+      />
+      <KpiCard
+        icon={Star}
+        label="Top Brand"
+        value={data?.topBrand ?? '—'}
+      />
+    </KpiRibbon>
   )
 }
 
 // ─── Section: Per-Brand Performance (FR-AN-01, FR-AN-02) ─────────────────────
 
 function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<BrandPerf[]>([])
-  const [loading, setLoading] = useState(false)
+  const [data, setData]       = useState<ApiBrandPerf[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await get<BrandPerf[]>(`/analytics/brands?from=${from}&to=${to}`)
-        if (!cancelled) setData(res.data)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load brand analytics.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    void load()
+    setLoading(true)
+    setError(null)
+    get<ApiBrandPerf[]>(`/analytics/brands?from=${from}&to=${to}`)
+      .then(res => { if (!cancelled) setData(res.data ?? []) })
+      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load brand analytics.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [from, to])
 
-  // Weakest = last after rank sort (highest rank number = weakest)
-  const sorted   = [...data].sort((a, b) => a.rank - b.rank)
-  const weakest  = sorted.length > 0 ? sorted[sorted.length - 1] : undefined
+  const weakest  = data.find(b => b.is_weakest)
+  const topBrand = data[0]  // API returns ranked top→weak
+
+  const chartData = data.map((b, i) => ({
+    name:     b.name,
+    revenue:  b.revenue ?? 0,
+    color:    b.is_weakest ? '#EF4444' : CHART_PALETTE[i % CHART_PALETTE.length],
+    isWeak:   b.is_weakest,
+    brand_id: b.brand_id,
+  }))
 
   return (
-    <section className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Per-Brand Performance</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Revenue · Orders · Avg Order Value — ranked top to weak</p>
-        </div>
-        {weakest && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
-            ⚠ Scale or Cut: {weakest.brandName}
-          </span>
-        )}
-      </div>
-
-      {loading ? <LoadingSpinner /> : error ? <ErrorBox message={error} /> : sorted.length === 0 ? (
-        <EmptyBox label="No brand analytics yet" />
-      ) : (
-        <>
-          {/* Bar chart: revenue by brand */}
-          <div className="mb-6">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={sorted} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis
-                  dataKey="brandName"
-                  tick={{ fontSize: 11, fill: '#6b7280' }}
-                  interval={0}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={v => `₱${(v as number / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 11, fill: '#6b7280' }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip
-                  formatter={fmtRevTooltip}
-                  contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid #e5e7eb' }}
-                />
-                <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
-                  {sorted.map((entry, idx) => (
-                    <Cell
-                      key={entry.brandId}
-                      fill={entry.brandId === weakest?.brandId ? '#fca5a5' : brandColor(idx)}
-                      stroke={entry.brandId === weakest?.brandId ? '#ef4444' : 'none'}
-                      strokeWidth={entry.brandId === weakest?.brandId ? 2 : 0}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base font-semibold text-zinc-100">
+              Per-Brand Performance
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Revenue · Orders · Avg order value — ranked top to weak
+            </p>
           </div>
+          {weakest && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-400 ring-1 ring-inset ring-red-500/30">
+              <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+              Scale or Cut: {weakest.name}
+            </span>
+          )}
+        </div>
+      </CardHeader>
 
-          {/* Ranking table */}
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="px-4 py-2.5 text-left">Rank</th>
-                  <th className="px-4 py-2.5 text-left">Brand</th>
-                  <th className="px-4 py-2.5 text-right">Revenue</th>
-                  <th className="px-4 py-2.5 text-right">Orders</th>
-                  <th className="px-4 py-2.5 text-right">Avg Order</th>
-                  <th className="px-4 py-2.5 text-center">Signal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((b, idx) => {
-                  const isWeakest = b.brandId === weakest?.brandId
-                  return (
+      <CardContent>
+        {loading ? (
+          <ChartSkeleton />
+        ) : error ? (
+          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+        ) : data.length === 0 ? (
+          <EmptyState
+            icon={BarChart3}
+            title="No brand data yet"
+            description="No data yet — run the simulator to generate orders"
+          />
+        ) : (
+          <>
+            {/* Revenue bar chart */}
+            <div className="mb-6">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={{ stroke: CHART_GRID }}
+                    interval={0}
+                  />
+                  <YAxis
+                    tickFormatter={v => `₱${((v as number) / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={52}
+                  />
+                  <Tooltip
+                    formatter={(v) => [fmtPHP(Number(v)), 'Revenue']}
+                    contentStyle={TOOLTIP_STYLE}
+                    cursor={{ fill: CURSOR_FILL }}
+                  />
+                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry) => (
+                      <Cell key={entry.brand_id} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Ranked table */}
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                    <th className="px-4 py-2.5 text-left">#</th>
+                    <th className="px-4 py-2.5 text-left">Brand</th>
+                    <th className="px-4 py-2.5 text-right">Revenue</th>
+                    <th className="px-4 py-2.5 text-right">Orders</th>
+                    <th className="px-4 py-2.5 text-right">Avg Order</th>
+                    <th className="px-4 py-2.5 text-center">Signal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((b, idx) => (
                     <tr
-                      key={b.brandId}
+                      key={b.brand_id}
                       className={[
-                        'border-b border-gray-50 last:border-0',
-                        isWeakest ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40',
+                        'border-b border-border/50 last:border-0',
+                        b.is_weakest ? 'bg-red-500/5' : '',
                       ].join(' ')}
                     >
-                      <td className="px-4 py-2.5 font-bold text-gray-400 tabular-nums">
-                        #{b.rank}
+                      <td className="px-4 py-2.5 font-bold tabular-nums text-zinc-600">
+                        {idx + 1}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           <span
-                            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: brandColor(idx) }}
+                            className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                            style={{ backgroundColor: chartData[idx]?.color ?? CHART_PALETTE[0] }}
                           />
-                          <span className="font-medium text-gray-900">{b.brandName}</span>
+                          <span className="font-medium text-zinc-200">{b.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">
-                        {fmtCurrency(b.revenue)}
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                        {fmtPHP(b.revenue)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">
-                        {b.orderCount.toLocaleString()}
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                        {fmtNum(b.order_count)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">
-                        {fmtCurrency(b.avgOrderValue)}
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                        {fmtPHP(b.avg_order_value)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
-                        {isWeakest ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
-                            ⚠ Scale or Cut
+                        {b.is_weakest ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-400 ring-1 ring-inset ring-red-500/30">
+                            <AlertTriangle className="h-3 w-3" aria-hidden />
+                            Scale or Cut
                           </span>
-                        ) : idx === 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                        ) : idx === 0 && topBrand ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-400 ring-1 ring-inset ring-emerald-500/30">
+                            <Star className="h-3 w-3" aria-hidden />
                             Top
                           </span>
                         ) : null}
                       </td>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </section>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-// ─── Section: Orders by Hour (FR-AN-03) ──────────────────────────────────────
+// ─── Section: Orders by Hour (FR-AN-03) ───────────────────────────────────────
 
 function OrdersByHourSection({ date }: { date: string }) {
-  const [data, setData]       = useState<HourBucket[]>([])
-  const [loading, setLoading] = useState(false)
+  const [data, setData]       = useState<ApiHourBucket[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await get<HourBucket[]>(`/analytics/orders-by-hour?date=${date}`)
-        if (!cancelled) setData(res.data)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load hourly data.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    void load()
+    setLoading(true)
+    setError(null)
+    get<ApiHourBucket[]>(`/analytics/orders-by-hour?date=${date}`)
+      .then(res => { if (!cancelled) setData(res.data ?? []) })
+      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load hourly data.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [date])
 
-  const peak = data.length > 0 ? data.reduce((a, b) => (b.orderCount > a.orderCount ? b : a)) : null
-
-  // Build all 24 hours so chart is always full-width
-  const chartData: HourBucket[] = Array.from({ length: 24 }, (_, h) => {
+  // Build a full 24-hour scaffold (sparse data from API)
+  const chartData = Array.from({ length: 24 }, (_, h) => {
     const found = data.find(d => d.hour === h)
-    return found ?? { hour: h, orderCount: 0 }
+    return { hour: h, order_count: found?.order_count ?? 0 }
   })
 
-  const hourLabel = (h: number) => {
-    if (h === 0)  return '12am'
-    if (h < 12)   return `${h}am`
-    if (h === 12) return '12pm'
-    return `${h - 12}pm`
-  }
+  const peak = chartData.reduce(
+    (acc, d) => ((d.order_count ?? 0) > (acc.order_count ?? 0) ? d : acc),
+    chartData[0] ?? { hour: 0, order_count: 0 },
+  )
+  const hasPeak = (peak?.order_count ?? 0) > 0
 
   return (
-    <section className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold text-gray-900">Orders by Hour</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Peak-load view to inform kitchen staffing</p>
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base font-semibold text-zinc-100">
+              Orders by Hour
+            </CardTitle>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              Peak-load view — informs kitchen staffing
+            </p>
+          </div>
+          {hasPeak && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/30">
+              <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+              Peak: {hourLabel(peak.hour)} ({fmtNum(peak.order_count)} orders)
+            </span>
+          )}
         </div>
-        {peak && peak.orderCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
-            Peak: {hourLabel(peak.hour)} ({peak.orderCount} orders)
-          </span>
-        )}
-      </div>
+      </CardHeader>
 
-      {loading ? <LoadingSpinner /> : error ? <ErrorBox message={error} /> : (
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis
-              dataKey="hour"
-              tickFormatter={hourLabel}
-              tick={{ fontSize: 10, fill: '#6b7280' }}
-              interval={1}
-              tickLine={false}
-            />
-            <YAxis
-              allowDecimals={false}
-              tick={{ fontSize: 11, fill: '#6b7280' }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <Tooltip
-              formatter={fmtOrderCountTooltip}
-              labelFormatter={(label) => hourLabel(Number(label))}
-              contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid #e5e7eb' }}
-            />
-            <Bar dataKey="orderCount" radius={[4, 4, 0, 0]}>
-              {chartData.map(entry => (
-                <Cell
-                  key={entry.hour}
-                  fill={
-                    peak && entry.hour === peak.hour && peak.orderCount > 0
-                      ? '#f59e0b'
-                      : '#0ea5e9'
-                  }
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-    </section>
+      <CardContent>
+        {loading ? (
+          <ChartSkeleton />
+        ) : error ? (
+          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+              <XAxis
+                dataKey="hour"
+                tickFormatter={hourLabel}
+                tick={{ fontSize: 10, fill: CHART_TICK }}
+                tickLine={false}
+                axisLine={{ stroke: CHART_GRID }}
+                interval={1}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: CHART_TICK }}
+                tickLine={false}
+                axisLine={false}
+                width={32}
+              />
+              <Tooltip
+                formatter={(v) => [fmtNum(Number(v)), 'Orders']}
+                labelFormatter={(label) => hourLabel(Number(label))}
+                contentStyle={TOOLTIP_STYLE}
+                cursor={{ fill: CURSOR_FILL }}
+              />
+              <Bar dataKey="order_count" radius={[4, 4, 0, 0]}>
+                {chartData.map(entry => (
+                  <Cell
+                    key={entry.hour}
+                    fill={
+                      hasPeak && entry.hour === peak.hour
+                        ? '#F59E0B'         // amber — peak hour highlighted
+                        : CHART_PALETTE[0]  // emerald — normal hours
+                    }
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-// ─── Section: Aggregator Split (FR-AN-04) ────────────────────────────────────
+// ─── Section: Aggregator Split (FR-AN-04) ─────────────────────────────────────
 
 function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<AggregatorSplit[]>([])
-  const [loading, setLoading] = useState(false)
+  const [data, setData]       = useState<ApiAggregatorSplit[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await get<AggregatorSplit[]>(`/analytics/aggregators?from=${from}&to=${to}`)
-        if (!cancelled) setData(res.data)
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load aggregator data.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    void load()
+    setLoading(true)
+    setError(null)
+    get<ApiAggregatorSplit[]>(`/analytics/aggregators?from=${from}&to=${to}`)
+      .then(res => { if (!cancelled) setData(res.data ?? []) })
+      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load aggregator data.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [from, to])
 
-  const totalOrders  = data.reduce((s, d) => s + d.orderCount, 0)
-  const totalRevenue = data.reduce((s, d) => s + d.revenue, 0)
+  const totalOrders  = data.reduce((s, d) => s + (d.order_count ?? 0), 0)
+  const totalRevenue = data.reduce((s, d) => s + (d.revenue   ?? 0), 0)
 
   const pieData = data.map(d => ({
-    name:    AGG_LABEL[d.aggregator] ?? d.aggregator,
-    value:   d.orderCount,
-    revenue: d.revenue,
-    color:   AGG_COLOR[d.aggregator] ?? '#6b7280',
+    name:    AGGREGATOR_LABEL[d.aggregator as keyof typeof AGGREGATOR_LABEL] ?? d.aggregator,
+    value:   d.order_count ?? 0,
+    revenue: d.revenue ?? 0,
+    color:   AGGREGATOR_COLOR[d.aggregator as keyof typeof AGGREGATOR_COLOR] ?? '#71717A',
+    key:     d.aggregator,
   }))
 
   return (
-    <section className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-6">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-gray-900">Aggregator Split</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Orders and revenue by delivery platform</p>
-      </div>
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-zinc-100">
+          Aggregator Split
+        </CardTitle>
+        <p className="text-xs text-zinc-500">Orders and revenue by delivery platform</p>
+      </CardHeader>
 
-      {loading ? <LoadingSpinner /> : error ? <ErrorBox message={error} /> : data.length === 0 ? (
-        <EmptyBox label="No aggregator data yet" />
-      ) : (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          {/* Pie chart */}
-          <div className="flex-shrink-0">
-            <ResponsiveContainer width={180} height={180}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={46}
-                  outerRadius={76}
-                  paddingAngle={3}
-                >
-                  {pieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={((value, name) => {
-                    const v = Number(value)
-                    return [
-                      `${v} orders (${totalOrders > 0 ? ((v / totalOrders) * 100).toFixed(1) : 0}%)`,
-                      String(name),
-                    ]
-                  }) as Formatter}
-                  contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid #e5e7eb' }}
-                />
-                <Legend
-                  iconType="circle"
-                  iconSize={10}
-                  formatter={(value) => <span style={{ fontSize: 12, color: '#374151' }}>{value}</span>}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+      <CardContent>
+        {loading ? (
+          <ChartSkeleton />
+        ) : error ? (
+          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+        ) : data.length === 0 ? (
+          <EmptyState
+            icon={BarChart3}
+            title="No aggregator data yet"
+            description="No data yet — run the simulator to generate orders"
+          />
+        ) : (
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            {/* Donut chart */}
+            <div className="flex-shrink-0 self-center">
+              <ResponsiveContainer width={200} height={200}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={52}
+                    outerRadius={82}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                  >
+                    {pieData.map(entry => (
+                      <Cell key={entry.key} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name) => {
+                      const v = Number(value)
+                      const pct = totalOrders > 0 ? ((v / totalOrders) * 100).toFixed(1) : '0'
+                      return [`${fmtNum(v)} orders (${pct}%)`, String(name)]
+                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                  />
+                  <Legend
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => (
+                      <span style={{ fontSize: 12, color: '#A1A1AA' }}>{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-          {/* Summary table */}
-          <div className="flex-1 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="pb-2 text-left">Platform</th>
-                  <th className="pb-2 text-right">Orders</th>
-                  <th className="pb-2 text-right">Share</th>
-                  <th className="pb-2 text-right">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map(d => (
-                  <tr key={d.aggregator} className="border-b border-gray-50 last:border-0">
-                    <td className="py-2">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: AGG_COLOR[d.aggregator] ?? '#6b7280' }}
-                        />
-                        <span className="font-medium text-gray-900">
-                          {AGG_LABEL[d.aggregator] ?? d.aggregator}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-2 text-right tabular-nums text-gray-700">
-                      {d.orderCount.toLocaleString()}
-                    </td>
-                    <td className="py-2 text-right tabular-nums text-gray-500">
-                      {totalOrders > 0 ? fmtPct((d.orderCount / totalOrders) * 100) : '—'}
-                    </td>
-                    <td className="py-2 text-right tabular-nums text-gray-700">
-                      {fmtCurrency(d.revenue)}
-                    </td>
+            {/* Summary table */}
+            <div className="flex-1 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase tracking-wide text-zinc-500">
+                    <th className="pb-2.5 text-left">Platform</th>
+                    <th className="pb-2.5 text-right">Orders</th>
+                    <th className="pb-2.5 text-right">Share</th>
+                    <th className="pb-2.5 text-right">Revenue</th>
                   </tr>
-                ))}
-                <tr className="font-semibold text-gray-900">
-                  <td className="pt-2">Total</td>
-                  <td className="pt-2 text-right tabular-nums">{totalOrders.toLocaleString()}</td>
-                  <td className="pt-2 text-right text-gray-400">100%</td>
-                  <td className="pt-2 text-right tabular-nums">{fmtCurrency(totalRevenue)}</td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.map(d => {
+                    const orders = d.order_count ?? 0
+                    const rev    = d.revenue ?? 0
+                    const color  = AGGREGATOR_COLOR[d.aggregator as keyof typeof AGGREGATOR_COLOR] ?? '#71717A'
+                    const label  = AGGREGATOR_LABEL[d.aggregator as keyof typeof AGGREGATOR_LABEL] ?? d.aggregator
+                    return (
+                      <tr key={d.aggregator} className="border-b border-border/50 last:border-0">
+                        <td className="py-2.5">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                              style={{ backgroundColor: color }}
+                            />
+                            <span className="font-medium text-zinc-200">{label}</span>
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums text-zinc-300">
+                          {fmtNum(orders)}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums text-zinc-500">
+                          {totalOrders > 0 ? fmtPct((orders / totalOrders) * 100) : '—'}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums text-zinc-300">
+                          {fmtPHP(rev)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="font-semibold">
+                    <td className="pt-2.5 text-zinc-200">Total</td>
+                    <td className="pt-2.5 text-right tabular-nums text-zinc-200">{fmtNum(totalOrders)}</td>
+                    <td className="pt-2.5 text-right text-zinc-500">100%</td>
+                    <td className="pt-2.5 text-right tabular-nums text-zinc-200">{fmtPHP(totalRevenue)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
-    </section>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-// ─── Section: Brand Margins (FR-AN-05) ───────────────────────────────────────
+// ─── Section: Brand Margins (FR-AN-05) ────────────────────────────────────────
+
+function marginColor(marginPct: number): string {
+  if (marginPct >= 20) return 'text-emerald-400'
+  if (marginPct >= 0)  return 'text-amber-400'
+  return 'text-red-400'
+}
 
 function BrandMarginsSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<BrandMargin[]>([])
-  const [loading, setLoading] = useState(false)
+  const [data, setData]       = useState<ApiMargin[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await get<BrandMargin[]>(`/analytics/margins?from=${from}&to=${to}`)
-        if (!cancelled) {
-          // Derive marginPct if not supplied by the API
-          const enriched = res.data.map(d => ({
-            ...d,
-            marginPct: d.marginPct ?? (d.revenue > 0 ? (d.margin / d.revenue) * 100 : 0),
-          }))
-          setData(enriched)
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load margin data.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    void load()
+    setLoading(true)
+    setError(null)
+    get<ApiMargin[]>(`/analytics/margins?from=${from}&to=${to}`)
+      .then(res => { if (!cancelled) setData(res.data ?? []) })
+      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load margin data.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [from, to])
 
-  const sorted = [...data].sort((a, b) => b.margin - a.margin)
+  // Sort by margin descending
+  const sorted = [...data].sort((a, b) => (b.margin ?? 0) - (a.margin ?? 0))
+
+  const chartData = sorted.map((b, i) => ({
+    name:       b.name,
+    revenue:    b.revenue ?? 0,
+    cost:       b.recipe_cost_total ?? 0,
+    margin:     b.margin ?? 0,
+    marginPct:  (b.revenue ?? 0) > 0 ? ((b.margin ?? 0) / (b.revenue ?? 1)) * 100 : 0,
+    color:      CHART_PALETTE[i % CHART_PALETTE.length],
+    brand_id:   b.brand_id,
+  }))
 
   return (
-    <section className="rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-6">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-gray-900">Brand Margins</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Revenue minus shared-ingredient recipe cost per brand</p>
-      </div>
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-zinc-100">
+          Brand Margins
+        </CardTitle>
+        <p className="text-xs text-zinc-500">
+          Revenue minus shared-ingredient recipe cost per brand
+        </p>
+      </CardHeader>
 
-      {loading ? <LoadingSpinner /> : error ? <ErrorBox message={error} /> : sorted.length === 0 ? (
-        <EmptyBox label="No margin data yet" />
-      ) : (
-        <>
-          <div className="mb-6">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={sorted} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis
-                  dataKey="brandName"
-                  tick={{ fontSize: 11, fill: '#6b7280' }}
-                  interval={0}
-                  tickLine={false}
-                />
-                <YAxis
-                  tickFormatter={v => `₱${((v as number) / 1000).toFixed(0)}k`}
-                  tick={{ fontSize: 11, fill: '#6b7280' }}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <Tooltip
-                  formatter={fmtMarginTooltip}
-                  contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid #e5e7eb' }}
-                />
-                <Legend
-                  iconType="square"
-                  iconSize={10}
-                  formatter={(value) => {
-                    const labels: Record<string, string> = {
-                      revenue:    'Revenue',
-                      recipeCost: 'Recipe Cost',
-                      margin:     'Margin',
-                    }
-                    return <span style={{ fontSize: 12, color: '#374151' }}>{labels[value] ?? value}</span>
-                  }}
-                />
-                <Bar dataKey="revenue"    name="revenue"    stackId="a" fill="#bfdbfe" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="recipeCost" name="recipeCost" stackId="b" fill="#fca5a5" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="margin"     name="margin"     stackId="c" fill="#10b981" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      <CardContent>
+        {loading ? (
+          <ChartSkeleton />
+        ) : error ? (
+          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+        ) : sorted.length === 0 ? (
+          <EmptyState
+            icon={BarChart3}
+            title="No margin data yet"
+            description="No data yet — run the simulator to generate orders"
+          />
+        ) : (
+          <>
+            {/* Grouped bar chart */}
+            <div className="mb-6">
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={{ stroke: CHART_GRID }}
+                    interval={0}
+                  />
+                  <YAxis
+                    tickFormatter={v => `₱${((v as number) / 1000).toFixed(0)}k`}
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={52}
+                  />
+                  <Tooltip
+                    formatter={(v, name) => {
+                      const labels: Record<string, string> = {
+                        revenue: 'Revenue',
+                        cost:    'Recipe Cost',
+                        margin:  'Margin',
+                      }
+                      return [fmtPHP(Number(v)), labels[String(name)] ?? String(name)]
+                    }}
+                    contentStyle={TOOLTIP_STYLE}
+                    cursor={{ fill: CURSOR_FILL }}
+                  />
+                  <Legend
+                    iconType="square"
+                    iconSize={10}
+                    formatter={(value) => {
+                      const labels: Record<string, string> = {
+                        revenue: 'Revenue',
+                        cost:    'Recipe Cost',
+                        margin:  'Margin',
+                      }
+                      return (
+                        <span style={{ fontSize: 12, color: '#A1A1AA' }}>
+                          {labels[value] ?? value}
+                        </span>
+                      )
+                    }}
+                  />
+                  <Bar dataKey="revenue" name="revenue" fill="#14B8A6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="cost"    name="cost"    fill="#EF4444" radius={[4, 4, 0, 0]} opacity={0.7} />
+                  <Bar dataKey="margin"  name="margin"  fill="#10B981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
 
-          <div className="overflow-x-auto rounded-xl border border-gray-100">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="px-4 py-2.5 text-left">Brand</th>
-                  <th className="px-4 py-2.5 text-right">Revenue</th>
-                  <th className="px-4 py-2.5 text-right">Recipe Cost</th>
-                  <th className="px-4 py-2.5 text-right">Margin</th>
-                  <th className="px-4 py-2.5 text-right">Margin %</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((b, idx) => (
-                  <tr
-                    key={b.brandId}
-                    className={[
-                      'border-b border-gray-50 last:border-0',
-                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40',
-                    ].join(' ')}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: brandColor(idx) }}
-                        />
-                        <span className="font-medium text-gray-900">{b.brandName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtCurrency(b.revenue)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-red-500">{fmtCurrency(b.recipeCost)}</td>
-                    <td className={[
-                      'px-4 py-2.5 text-right tabular-nums font-semibold',
-                      b.margin >= 0 ? 'text-emerald-700' : 'text-red-700',
-                    ].join(' ')}>
-                      {fmtCurrency(b.margin)}
-                    </td>
-                    <td className={[
-                      'px-4 py-2.5 text-right tabular-nums',
-                      b.marginPct >= 20 ? 'text-emerald-600' : b.marginPct >= 0 ? 'text-amber-600' : 'text-red-600',
-                    ].join(' ')}>
-                      {fmtPct(b.marginPct)}
-                    </td>
+            {/* Margin table */}
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                    <th className="px-4 py-2.5 text-left">Brand</th>
+                    <th className="px-4 py-2.5 text-right">Revenue</th>
+                    <th className="px-4 py-2.5 text-right">Recipe Cost</th>
+                    <th className="px-4 py-2.5 text-right">Margin</th>
+                    <th className="px-4 py-2.5 text-right">Margin %</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </section>
+                </thead>
+                <tbody>
+                  {chartData.map((b) => (
+                    <tr key={b.brand_id} className="border-b border-border/50 last:border-0">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                            style={{ backgroundColor: b.color }}
+                          />
+                          <span className="font-medium text-zinc-200">{b.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                        {fmtPHP(b.revenue)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-red-400/80">
+                        {fmtPHP(b.cost)}
+                      </td>
+                      <td className={['px-4 py-2.5 text-right tabular-nums font-semibold', marginColor(b.marginPct)].join(' ')}>
+                        {fmtPHP(b.margin)}
+                      </td>
+                      <td className={['px-4 py-2.5 text-right tabular-nums', marginColor(b.marginPct)].join(' ')}>
+                        {fmtPct(b.marginPct)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-// ─── Main Analytics page ──────────────────────────────────────────────────────
+// ─── Main Analytics page ───────────────────────────────────────────────────────
 
 export default function Analytics() {
   const defaults = defaultRange()
 
-  const [from, setFrom]   = useState(defaults.from)
-  const [to, setTo]       = useState(defaults.to)
-  const [date, setDate]   = useState(isoDate(new Date()))
-
-  // Applied range — only update on explicit "Apply" to avoid spamming the API
+  const [preset, setPreset]         = useState<RangePreset>('30d')
   const [appliedFrom, setAppliedFrom] = useState(defaults.from)
   const [appliedTo,   setAppliedTo]   = useState(defaults.to)
+  const [date,        setDate]        = useState(isoDate(new Date()))
 
-  const applyRange = useCallback(() => {
+  // Brand data is fetched here for the KPI ribbon (avoids a separate endpoint)
+  const [brandsKpi,    setBrandsKpi]    = useState<ApiBrandPerf[]>([])
+  const [kpiLoading,   setKpiLoading]   = useState(true)
+
+  // Apply a preset range
+  const applyPreset = useCallback((p: RangePreset) => {
+    setPreset(p)
+    const { from, to } = presetRange(p)
     setAppliedFrom(from)
     setAppliedTo(to)
-  }, [from, to])
+  }, [])
 
-  // Apply when Enter key pressed in date inputs
-  function handleDateKey(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') applyRange()
-  }
+  // Fetch brand data for KPI ribbon (re-runs when date range changes)
+  useEffect(() => {
+    let cancelled = false
+    setKpiLoading(true)
+    get<ApiBrandPerf[]>(`/analytics/brands?from=${appliedFrom}&to=${appliedTo}`)
+      .then(res => { if (!cancelled) setBrandsKpi(res.data ?? []) })
+      .catch(() => { if (!cancelled) setBrandsKpi([]) })
+      .finally(() => { if (!cancelled) setKpiLoading(false) })
+    return () => { cancelled = true }
+  }, [appliedFrom, appliedTo])
+
+  // Derived KPI values (null-guarded)
+  const kpiData: KpiData | null = kpiLoading ? null : (() => {
+    const totalRevenue  = brandsKpi.reduce((s, b) => s + (b.revenue     ?? 0), 0)
+    const totalOrders   = brandsKpi.reduce((s, b) => s + (b.order_count ?? 0), 0)
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
+    const topBrand      = brandsKpi[0]?.name ?? '—'
+    return { totalRevenue, totalOrders, avgOrderValue, topBrand }
+  })()
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
+    <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
 
-        {/* ── Page header ── */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Analytics</h1>
-            <p className="mt-0.5 text-xs text-gray-400">
-              Per-brand ranking · Orders by hour · Aggregator split · Margins
-            </p>
-          </div>
+      {/* ── Page header ── */}
+      <PageHeader
+        title="Sales & Performance"
+        subtitle="Revenue · Brand ranking · Peak hours · Aggregator split · Margins"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Range preset */}
+            <Select value={preset} onValueChange={v => applyPreset(v as RangePreset)}>
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <SelectValue placeholder="Date range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
 
-          {/* Date-range controls */}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-gray-500">From</label>
+            {/* Hourly-view date */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5">
+              <CalendarDays className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
+              <label className="sr-only" htmlFor="hourly-date">Hourly view date</label>
               <input
-                type="date"
-                value={from}
-                onChange={e => setFrom(e.target.value)}
-                onKeyDown={handleDateKey}
-                max={to}
-                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-gray-500">To</label>
-              <input
-                type="date"
-                value={to}
-                onChange={e => setTo(e.target.value)}
-                onKeyDown={handleDateKey}
-                min={from}
-                max={isoDate(new Date())}
-                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <button
-              onClick={applyRange}
-              className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              Apply
-            </button>
-
-            <span className="mx-1 h-7 w-px self-end bg-gray-200 hidden sm:block" aria-hidden />
-
-            {/* By-hour date picker */}
-            <div className="flex flex-col gap-0.5">
-              <label className="text-[10px] font-medium uppercase tracking-wide text-gray-500">
-                Hourly view date
-              </label>
-              <input
+                id="hourly-date"
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 max={isoDate(new Date())}
-                className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="bg-transparent text-xs text-zinc-300 focus:outline-none [color-scheme:dark]"
               />
             </div>
           </div>
-        </div>
+        }
+      />
 
-        {/* ── Sections ── */}
-        <BrandPerformanceSection from={appliedFrom} to={appliedTo} />
-        <OrdersByHourSection     date={date} />
+      {/* ── KPI ribbon ── */}
+      <AnalyticsKpiRibbon data={kpiData} loading={kpiLoading} />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <AggregatorSplitSection from={appliedFrom} to={appliedTo} />
-          <BrandMarginsSection    from={appliedFrom} to={appliedTo} />
-        </div>
+      {/* ── Per-brand performance ── */}
+      <BrandPerformanceSection from={appliedFrom} to={appliedTo} />
+
+      {/* ── Orders by hour ── */}
+      <OrdersByHourSection date={date} />
+
+      {/* ── Aggregator split + Brand margins (side by side on wide screens) ── */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <AggregatorSplitSection from={appliedFrom} to={appliedTo} />
+        <BrandMarginsSection    from={appliedFrom} to={appliedTo} />
       </div>
     </div>
   )
