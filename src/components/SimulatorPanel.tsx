@@ -8,9 +8,12 @@
  * users in the prototype (RBAC enforced server-side per Business Rule #10).
  */
 import { useState } from 'react'
+import { Activity, Play, Square } from 'lucide-react'
 import { post } from '../lib/api'
 import type { Brand } from '../pages/Dashboard'
 import type { CKApiError } from '../lib/api'
+import { Button } from './ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 interface Props {
   brands: Brand[]
@@ -30,7 +33,7 @@ export default function SimulatorPanel({ brands }: Props) {
   }
 
   function selectAll() {
-    setSelectedIds(brands.filter(b => b.isActive).map(b => b.id))
+    setSelectedIds(activeBrands.map(b => b.id))
   }
 
   function clearAll() {
@@ -69,124 +72,137 @@ export default function SimulatorPanel({ brands }: Props) {
     }
   }
 
-  const activebrands = brands.filter(b => b.isActive)
+  const activeBrands = brands.filter(b => b.isActive)
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-          <span
-            className={[
-              'h-2 w-2 rounded-full',
-              running ? 'bg-green-500 animate-pulse' : 'bg-gray-300',
-            ].join(' ')}
-          />
-          Order Simulator
-        </h2>
-        {running && (
-          <span className="text-xs text-green-600 font-medium">Running</span>
-        )}
-      </div>
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-sm font-semibold text-zinc-200">
+          <span className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-500" aria-hidden />
+            Order Simulator
+          </span>
+          {running && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              Running
+            </span>
+          )}
+        </CardTitle>
+      </CardHeader>
 
-      {/* Brand toggles */}
-      <div className="mb-2">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs text-gray-500">Brands</span>
-          {!running && activebrands.length > 0 && (
-            <div className="flex gap-2">
-              <button
-                onClick={selectAll}
-                className="text-xs text-brand-600 hover:underline"
-              >
-                All
-              </button>
-              <button
-                onClick={clearAll}
-                className="text-xs text-gray-400 hover:underline"
-              >
-                None
-              </button>
+      <CardContent className="space-y-4">
+        {/* Brand toggles */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Brands
+            </span>
+            {!running && activeBrands.length > 0 && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-xs text-emerald-500 hover:text-emerald-400"
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-xs text-zinc-500 hover:text-zinc-300"
+                >
+                  None
+                </button>
+              </div>
+            )}
+          </div>
+
+          {activeBrands.length === 0 ? (
+            <p className="text-xs text-zinc-500 italic">No active brands</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {activeBrands.map(brand => {
+                const selected = selectedIds.includes(brand.id)
+                return (
+                  <button
+                    key={brand.id}
+                    type="button"
+                    onClick={() => toggleBrand(brand.id)}
+                    disabled={running}
+                    className={[
+                      'rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition',
+                      'disabled:cursor-not-allowed disabled:opacity-50',
+                      selected
+                        ? 'text-white ring-transparent'
+                        : 'bg-transparent text-zinc-400 ring-zinc-700 hover:ring-zinc-500',
+                    ].join(' ')}
+                    style={selected ? { backgroundColor: brand.color, borderColor: brand.color } : {}}
+                  >
+                    {brand.name}
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
 
-        {activebrands.length === 0 ? (
-          <p className="text-xs text-gray-400 italic">No active brands</p>
+        {/* Rate */}
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium uppercase tracking-wide text-zinc-500 shrink-0">
+            Rate
+          </label>
+          <input
+            type="number"
+            min={0.1}
+            max={60}
+            step={0.1}
+            value={rate}
+            onChange={e => setRate(Number(e.target.value))}
+            disabled={running}
+            className={[
+              'w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-zinc-200',
+              'tabular-nums focus:outline-none focus:ring-1 focus:ring-ring',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+            ].join(' ')}
+          />
+          <span className="text-xs text-zinc-500">orders / min</span>
+        </div>
+
+        {/* Start / Stop */}
+        {!running ? (
+          <Button
+            onClick={() => void handleStart()}
+            disabled={loading || activeBrands.length === 0}
+            className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+            size="sm"
+          >
+            <Play className="h-3.5 w-3.5" />
+            {loading ? 'Starting...' : 'Start Simulator'}
+          </Button>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {activebrands.map(brand => {
-              const selected = selectedIds.includes(brand.id)
-              return (
-                <button
-                  key={brand.id}
-                  onClick={() => toggleBrand(brand.id)}
-                  disabled={running}
-                  className={[
-                    'rounded-full px-2.5 py-0.5 text-xs font-medium border transition',
-                    selected
-                      ? 'text-white border-transparent'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 disabled:cursor-not-allowed disabled:opacity-50',
-                  ].join(' ')}
-                  style={
-                    selected
-                      ? { backgroundColor: brand.color, borderColor: brand.color }
-                      : {}
-                  }
-                >
-                  {brand.name}
-                </button>
-              )
-            })}
-          </div>
+          <Button
+            onClick={() => void handleStop()}
+            disabled={loading}
+            variant="destructive"
+            className="w-full"
+            size="sm"
+          >
+            <Square className="h-3.5 w-3.5" />
+            {loading ? 'Stopping...' : 'Stop Simulator'}
+          </Button>
         )}
-      </div>
 
-      {/* Rate */}
-      <div className="mb-3 flex items-center gap-2">
-        <label className="text-xs text-gray-500 shrink-0">Rate</label>
-        <input
-          type="number"
-          min={0.1}
-          max={60}
-          step={0.1}
-          value={rate}
-          onChange={e => setRate(Number(e.target.value))}
-          disabled={running}
-          className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        <span className="text-xs text-gray-400">orders / min</span>
-      </div>
+        {/* Error */}
+        {error && (
+          <p className="text-xs text-red-400">{error}</p>
+        )}
 
-      {/* Start / Stop */}
-      {!running ? (
-        <button
-          onClick={() => void handleStart()}
-          disabled={loading || activebrands.length === 0}
-          className="w-full rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-        >
-          {loading ? 'Starting…' : 'Start Simulator'}
-        </button>
-      ) : (
-        <button
-          onClick={() => void handleStop()}
-          disabled={loading}
-          className="w-full rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-        >
-          {loading ? 'Stopping…' : 'Stop Simulator'}
-        </button>
-      )}
-
-      {/* Error */}
-      {error && (
-        <p className="mt-2 text-xs text-red-600">{error}</p>
-      )}
-
-      {/* Helper note */}
-      <p className="mt-3 text-[10px] text-gray-400 leading-snug">
-        Orders will appear in the feed in real time.
-        Only SUPER_ADMIN can start/stop the simulator.
-      </p>
-    </div>
+        {/* Helper note */}
+        <p className="text-[10px] leading-snug text-zinc-600">
+          Orders will appear in the feed in real time. Only SUPER_ADMIN can start/stop the simulator.
+        </p>
+      </CardContent>
+    </Card>
   )
 }

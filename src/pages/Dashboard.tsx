@@ -1,25 +1,50 @@
 /**
- * Dashboard — Unified Order Feed (FR-OD-01..07)
+ * Dashboard — Unified Order Feed (FR-OD-01..07)  [Reskin: M1 dark mockup]
  *
  * Implements:
  *   FR-OD-01  One chronological feed across all brands + aggregators
  *   FR-OD-02  Brand color chip + aggregator badge (pink=FoodPanda, green=GrabFood)
  *   FR-OD-03  Real-time: order.created prepends; order.updated updates in place
  *   FR-OD-04  Distinct audible alert on order.created; mute toggle
- *   FR-OD-06  Filters by brand / aggregator / station / status + per-stage counts
+ *   FR-OD-06  Filters by brand / aggregator / status + per-stage counts
  *   NFR-05    Responsive layout (phone / tablet / desktop)
  *
  * Business Rule #6: web app NEVER prints — only shows print-job status.
  * Business Rule #9: real-time within ~2 s; distinct audible alert.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, BellOff, ReceiptText } from 'lucide-react'
+import {
+  Bell,
+  BellOff,
+  CheckCircle2,
+  Clock,
+  Flame,
+  PackageCheck,
+  ReceiptText,
+  XCircle,
+} from 'lucide-react'
+import type { ColumnDef } from '@tanstack/react-table'
+import { toast } from 'sonner'
 import { get } from '../lib/api'
 import { getSocket, initSocket, onSocketEvent } from '../lib/socket'
-import OrderCard from '../components/OrderCard'
+import { Button } from '../components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
+import PageHeader from '../components/common/PageHeader'
+import KpiCard from '../components/common/KpiCard'
+import KpiRibbon from '../components/common/KpiRibbon'
+import DataTable from '../components/common/DataTable'
+import StatusBadge from '../components/common/StatusBadge'
+import AggregatorBadge from '../components/common/AggregatorBadge'
+import BrandChip from '../components/common/BrandChip'
 import SimulatorPanel from '../components/SimulatorPanel'
 
-// ─── Public types (consumed by OrderCard / SimulatorPanel) ────────────────────
+// ─── Public types (consumed by SimulatorPanel) ────────────────────────────────
 
 export interface Brand {
   id: string
@@ -59,7 +84,7 @@ export interface OrderDetail {
   status: 'NEW' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
   total: string
   placedAt: string
-  items: KotItem[]        // aggregated from print-job payloads (have item names)
+  items: KotItem[]
   printJobs: PrintJobSummary[]
 }
 
@@ -100,7 +125,6 @@ interface RawOrderDetail extends RawOrder {
 /**
  * Aggregate item names + quantities across all print-job payloads for an order.
  * Items in the KOT payload have names; raw order_items only have menuItemId.
- * We merge by name to collapse duplicates if the same item appears across stations.
  */
 function aggregateItems(printJobs: RawPrintJob[]): KotItem[] {
   const map = new Map<string, KotItem>()
@@ -168,19 +192,27 @@ function playBeep(): void {
   }
 }
 
-// ─── Stage summary config ─────────────────────────────────────────────────────
+// ─── Time helpers ─────────────────────────────────────────────────────────────
 
-const STAGES = ['NEW', 'PREPARING', 'READY', 'COMPLETED'] as const
-type Stage = (typeof STAGES)[number]
-
-const STAGE_STYLES: Record<Stage, string> = {
-  NEW:       'bg-blue-100 text-blue-800 ring-blue-400',
-  PREPARING: 'bg-amber-100 text-amber-800 ring-amber-400',
-  READY:     'bg-emerald-100 text-emerald-800 ring-emerald-400',
-  COMPLETED: 'bg-gray-100 text-gray-600 ring-gray-400',
+function formatTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+function formatElapsed(isoStart: string): string {
+  const secs = Math.floor((Date.now() - new Date(isoStart).getTime()) / 1000)
+  if (secs < 60) return `${secs}s`
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m`
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+}
+
+// ─── Filters interface ────────────────────────────────────────────────────────
 
 interface Filters {
   brand_id: string
@@ -188,6 +220,8 @@ interface Filters {
   status: string
   station_id: string
 }
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const [orders, setOrders]     = useState<OrderDetail[]>([])
@@ -229,7 +263,6 @@ export default function Dashboard() {
         setStations(loadedStations)
 
         // Ensure socket is connected and joined to the correct location room.
-        // The prototype has one location; join via its UUID so we receive events.
         if (!getSocket()) initSocket()
         const socket = getSocket()
         if (socket && loadedBrands.length > 0) {
@@ -240,7 +273,7 @@ export default function Dashboard() {
         rawOrders.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
         const toFetch = rawOrders.slice(0, 100)
 
-        // Fetch full detail for each order in parallel (gets items + print-job status)
+        // Fetch full detail for each order in parallel
         const details = await Promise.all(toFetch.map(o => fetchOrderDetail(o.id)))
         if (cancelled) return
 
@@ -264,19 +297,17 @@ export default function Dashboard() {
   // ── Socket subscriptions (FR-OD-03, FR-OD-04) ────────────────────────────
   useEffect(() => {
     const unsubCreated = onSocketEvent('order.created', payload => {
-      // Backend emits { order_id, ... } (snake_case) — see lib/socket.ts notes.
       const orderId = payload.order_id
       if (!orderId) return
 
       // Audible alert — Business Rule #9
       if (!mutedRef.current) playBeep()
 
-      // Fetch full detail (socket payload is summary-only, lacks items)
       void fetchOrderDetail(orderId).then(detail => {
         if (!detail) return
         setOrders(prev => {
-          if (prev.some(o => o.id === detail.id)) return prev   // idempotent
-          return [detail, ...prev]                              // prepend (newest first)
+          if (prev.some(o => o.id === detail.id)) return prev
+          return [detail, ...prev]
         })
       })
     })
@@ -307,12 +338,20 @@ export default function Dashboard() {
       )
     })
 
+    // Low-stock alert toast (FR-OD-XX)
+    const unsubLowStock = onSocketEvent('lowstock.alert', payload => {
+      toast.warning('Low stock alert', {
+        description: `${payload.ingredientName} is running low (${payload.quantity} remaining, threshold: ${payload.threshold}).`,
+      })
+    })
+
     return () => {
       unsubCreated()
       unsubUpdated()
       unsubPrint()
+      unsubLowStock()
     }
-  }, []) // empty deps — mutedRef handles mute state without stale closure
+  }, [])
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
@@ -330,11 +369,12 @@ export default function Dashboard() {
   }, [orders, filters])
 
   const stageCounts = useMemo(
-    () =>
-      STAGES.reduce<Record<Stage, number>>(
-        (acc, s) => { acc[s] = orders.filter(o => o.status === s).length; return acc },
-        { NEW: 0, PREPARING: 0, READY: 0, COMPLETED: 0 },
-      ),
+    () => ({
+      NEW:       orders.filter(o => o.status === 'NEW').length,
+      PREPARING: orders.filter(o => o.status === 'PREPARING').length,
+      READY:     orders.filter(o => o.status === 'READY').length,
+      COMPLETED: orders.filter(o => o.status === 'COMPLETED').length,
+    }),
     [orders],
   )
 
@@ -344,164 +384,284 @@ export default function Dashboard() {
     setFilters({ brand_id: '', aggregator: '', status: '', station_id: '' })
   }
 
-  function toggleStageFilter(stage: Stage) {
-    setFilters(f => ({ ...f, status: f.status === stage ? '' : stage }))
-  }
+  // ── Table columns (memoized; captures brandMap via closure) ───────────────
+
+  const columns = useMemo<ColumnDef<OrderDetail, unknown>[]>(
+    () => [
+      {
+        accessorKey: 'externalRef',
+        header: 'Order #',
+        cell: ({ row }) => (
+          <span className="font-mono text-xs tabular-nums text-zinc-200">
+            {row.original.externalRef}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'placedAt',
+        header: 'Time',
+        sortingFn: 'datetime',
+        cell: ({ row }) => (
+          <span className="tabular-nums text-xs text-zinc-400">
+            <span className="block">{formatTime(row.original.placedAt)}</span>
+            <span className="text-zinc-600">{formatDate(row.original.placedAt)}</span>
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'aggregator',
+        header: 'Platform',
+        cell: ({ row }) => (
+          <AggregatorBadge aggregator={row.original.aggregator} />
+        ),
+      },
+      {
+        id: 'brand',
+        header: 'Brand',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <BrandChip brand={brandMap.get(row.original.brandId)} />
+        ),
+      },
+      {
+        accessorKey: 'customerName',
+        header: 'Customer',
+        cell: ({ row }) => (
+          <span className="text-sm text-zinc-300">
+            {row.original.customerName ?? '—'}
+          </span>
+        ),
+      },
+      {
+        id: 'items',
+        header: 'Items',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const totalQty = row.original.items.reduce((s, i) => s + i.qty, 0)
+          return (
+            <span className="tabular-nums text-sm text-zinc-400">
+              {totalQty > 0 ? totalQty : '—'}
+            </span>
+          )
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <StatusBadge status={row.original.status} />
+        ),
+      },
+      {
+        id: 'prep',
+        header: 'Prep',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const { status, placedAt } = row.original
+          if (status === 'COMPLETED' || status === 'CANCELLED') {
+            return <span className="text-zinc-600 text-xs">—</span>
+          }
+          return (
+            <span className="tabular-nums text-xs text-zinc-400">
+              {formatElapsed(placedAt)}
+            </span>
+          )
+        },
+      },
+    ],
+    [brandMap],
+  )
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  return (
-    <div className="flex h-full flex-col overflow-hidden bg-gray-50">
-
-      {/* ── Page header ── */}
-      <header className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-5 py-3 sm:px-6">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 sm:text-xl">Unified Order Dashboard</h1>
-          <p className="text-[11px] text-gray-400">All brands · All aggregators · Real-time</p>
+  // Error state (full-page)
+  if (error) {
+    return (
+      <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
+        <PageHeader
+          title="Unified Order Dashboard"
+          subtitle="All orders across every brand & platform, in real time"
+        />
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
+          <p className="text-sm font-medium text-red-400">{error}</p>
+          <p className="mt-1 text-xs text-red-500/70">
+            Make sure the backend is running on :4000
+          </p>
         </div>
+      </div>
+    )
+  }
 
-        {/* Mute toggle */}
-        <button
-          onClick={() => setMuted(m => !m)}
-          aria-label={muted ? 'Unmute order alerts' : 'Mute order alerts'}
-          title={muted ? 'Unmute order alerts' : 'Mute order alerts'}
-          className={[
-            'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium border transition',
-            muted
-              ? 'border-gray-200 bg-gray-50 text-gray-400 hover:text-gray-600'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-          ].join(' ')}
-        >
-          {muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
-          {muted ? 'Muted' : 'Alert on'}
-        </button>
-      </header>
+  return (
+    <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
 
-      {/* ── Main layout: feed + sidebar ── */}
-      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
+      {/* ── Page header ────────────────────────────────────────────────────── */}
+      <PageHeader
+        title="Unified Order Dashboard"
+        subtitle="All orders across every brand & platform, in real time"
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setMuted(m => !m)}
+            aria-label={muted ? 'Unmute order alerts' : 'Mute order alerts'}
+            className={
+              muted
+                ? 'border-zinc-700 text-zinc-400 hover:text-zinc-200'
+                : 'border-emerald-500/40 text-emerald-400 hover:border-emerald-500/70 hover:text-emerald-300'
+            }
+          >
+            {muted
+              ? <><BellOff className="h-3.5 w-3.5" />Muted</>
+              : <><Bell className="h-3.5 w-3.5" />Alert on</>
+            }
+          </Button>
+        }
+      />
 
-        {/* ── Left: order feed ── */}
-        <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-4 min-w-0">
+      {/* ── KPI ribbon ─────────────────────────────────────────────────────── */}
+      <KpiRibbon>
+        <KpiCard
+          icon={ReceiptText}
+          label="Total Orders"
+          value={orders.length}
+        />
+        <KpiCard
+          icon={Clock}
+          label="New"
+          value={stageCounts.NEW}
+        />
+        <KpiCard
+          icon={Flame}
+          label="Preparing"
+          value={stageCounts.PREPARING}
+        />
+        <KpiCard
+          icon={CheckCircle2}
+          label="Ready"
+          value={stageCounts.READY}
+        />
+        <KpiCard
+          icon={PackageCheck}
+          label="Completed"
+          value={stageCounts.COMPLETED}
+        />
+      </KpiRibbon>
 
-          {/* Stage-count cards (clickable to filter) */}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-            {STAGES.map(stage => (
-              <button
-                key={stage}
-                onClick={() => toggleStageFilter(stage)}
-                className={[
-                  'rounded-xl p-3 text-center transition ring-2',
-                  STAGE_STYLES[stage],
-                  filters.status === stage ? 'ring-current' : 'ring-transparent hover:opacity-80',
-                ].join(' ')}
-              >
-                <div className="text-3xl font-bold tabular-nums">{stageCounts[stage]}</div>
-                <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide">{stage}</div>
-              </button>
-            ))}
-          </div>
+      {/* ── Feed + Simulator ────────────────────────────────────────────────── */}
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row">
+
+        {/* ── Order feed ─────────────────────────────────────────────────── */}
+        <section className="flex min-w-0 flex-1 flex-col gap-3">
 
           {/* Filter bar */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Brand */}
-            <select
-              value={filters.brand_id}
-              onChange={e => setFilters(f => ({ ...f, brand_id: e.target.value }))}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+            <Select
+              value={filters.brand_id || '_all'}
+              onValueChange={v => setFilters(f => ({ ...f, brand_id: v === '_all' ? '' : v }))}
             >
-              <option value="">All Brands</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue placeholder="All Brands" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Brands</SelectItem>
+                {brands.map(b => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {/* Aggregator */}
-            <select
-              value={filters.aggregator}
-              onChange={e => setFilters(f => ({ ...f, aggregator: e.target.value }))}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+            <Select
+              value={filters.aggregator || '_all'}
+              onValueChange={v => setFilters(f => ({ ...f, aggregator: v === '_all' ? '' : v }))}
             >
-              <option value="">All Aggregators</option>
-              <option value="FOODPANDA">FoodPanda</option>
-              <option value="GRABFOOD">GrabFood</option>
-              <option value="OTHER">Other</option>
-            </select>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue placeholder="All Platforms" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Platforms</SelectItem>
+                <SelectItem value="FOODPANDA">foodpanda</SelectItem>
+                <SelectItem value="GRABFOOD">GrabFood</SelectItem>
+                <SelectItem value="OTHER">Other</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Status */}
-            <select
-              value={filters.status}
-              onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
+            <Select
+              value={filters.status || '_all'}
+              onValueChange={v => setFilters(f => ({ ...f, status: v === '_all' ? '' : v }))}
             >
-              <option value="">All Statuses</option>
-              <option value="NEW">New</option>
-              <option value="PREPARING">Preparing</option>
-              <option value="READY">Ready</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Statuses</SelectItem>
+                <SelectItem value="NEW">New</SelectItem>
+                <SelectItem value="PREPARING">Preparing</SelectItem>
+                <SelectItem value="READY">Ready</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
 
             {/* Station */}
-            <select
-              value={filters.station_id}
-              onChange={e => setFilters(f => ({ ...f, station_id: e.target.value }))}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              <option value="">All Stations</option>
-              {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            {stations.length > 0 && (
+              <Select
+                value={filters.station_id || '_all'}
+                onValueChange={v => setFilters(f => ({ ...f, station_id: v === '_all' ? '' : v }))}
+              >
+                <SelectTrigger className="h-8 w-36 text-xs">
+                  <SelectValue placeholder="All Stations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">All Stations</SelectItem>
+                  {stations.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             {/* Clear */}
             {hasActiveFilters && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={clearFilters}
-                className="text-xs text-gray-400 underline hover:text-gray-700"
+                className="h-8 gap-1 text-xs text-zinc-400 hover:text-zinc-200"
               >
-                Clear filters
-              </button>
+                <XCircle className="h-3.5 w-3.5" />
+                Clear
+              </Button>
             )}
 
             {/* Count */}
-            <span className="ml-auto text-xs text-gray-400 tabular-nums">
+            <span className="ml-auto text-xs tabular-nums text-zinc-500">
               {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
               {filteredOrders.length !== orders.length ? ` of ${orders.length}` : ''}
             </span>
           </div>
 
-          {/* ── Feed states ── */}
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-              <div className="mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
-              <p className="text-sm">Loading orders…</p>
-            </div>
-          ) : error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-              <p className="text-sm font-medium text-red-700">{error}</p>
-              <p className="mt-1 text-xs text-red-400">
-                Make sure the backend is running on :4000
-              </p>
-            </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
-              <ReceiptText className="h-10 w-10 mb-3 text-gray-300" aria-hidden />
-              <p className="text-sm font-medium text-gray-600">No orders</p>
-              <p className="mt-1 text-xs text-gray-400">
-                {orders.length > 0
-                  ? 'No orders match the active filters.'
-                  : 'Start the simulator (right panel) or ingest an order manually.'}
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {filteredOrders.map(order => (
-                <li key={order.id}>
-                  <OrderCard order={order} brand={brandMap.get(order.brandId)} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </main>
+          {/* DataTable */}
+          <DataTable<OrderDetail>
+            columns={columns}
+            data={filteredOrders}
+            loading={loading}
+            searchPlaceholder="Search by order #, customer..."
+            emptyTitle={hasActiveFilters ? 'No matching orders' : 'No orders yet'}
+            emptyDescription={
+              hasActiveFilters
+                ? 'Try adjusting the filters above.'
+                : 'Start the simulator in the panel on the right, or wait for a live order.'
+            }
+            pageSize={15}
+          />
+        </section>
 
-        {/* ── Right: simulator sidebar ── */}
-        <aside className="w-full shrink-0 border-t border-gray-200 bg-gray-50 p-4 lg:w-72 lg:border-t-0 lg:border-l">
+        {/* ── Simulator panel ─────────────────────────────────────────────── */}
+        <aside className="w-full shrink-0 lg:w-72">
           <SimulatorPanel brands={brands} />
         </aside>
       </div>
