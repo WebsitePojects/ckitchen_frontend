@@ -1,47 +1,61 @@
 import { io, type Socket } from 'socket.io-client'
 
-// ─── Event payload types (CK1-API-003 §10) ───────────────────────────────────
+// ─── Event payload types ──────────────────────────────────────────────────────
+//
+// NOTE: verified directly against the live backend source
+// (ckitchen_backend/src/modules/orders/routes.ts, inventory/routes.ts,
+// printing/routes.ts). The backend's Socket.IO emit payloads are NOT
+// consistently camelCase like the REST GET responses — casing is mixed
+// per-event (and sometimes per-field within the same event). Do not
+// "normalize" these to camelCase without re-checking the backend emit call.
 
+/** `order.created` / `order.updated` — emitted with snake_case fields, unlike REST. */
 export interface OrderPayload {
-  id: string
+  order_id: string
   status: 'NEW' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
-  brand_id: string
-  aggregator: string
+  brand_id?: string
+  aggregator?: string
   external_ref?: string
-  customer_name?: string
-  placed_at: string
+  customer_name?: string | null
+  print_jobs?: unknown[]
+  prepAt?: string | null
+  readyAt?: string | null
+  completedAt?: string | null
   [key: string]: unknown
 }
 
+/** `stock.updated` — camelCase fields, but `warehouseType` (not `warehouse`), no `unit`. */
 export interface StockPayload {
-  ingredient_id: string
-  ingredient_name: string
-  warehouse: 'MAIN' | 'KITCHEN'
+  ingredientId: string
+  ingredientName: string
+  warehouseType: 'MAIN' | 'KITCHEN'
   quantity: number
-  unit: string
   [key: string]: unknown
 }
 
+/** `lowstock.alert` — camelCase fields, but `threshold` (not `lowStockThreshold`), no `unit`. */
 export interface LowStockAlert {
-  ingredient_id: string
-  ingredient_name: string
+  ingredientId: string
+  ingredientName: string
   quantity: number
-  low_stock_threshold: number
-  unit: string
+  threshold: number
 }
 
+/** `print.status` — snake_case fields; job id key is `print_job_id` (not `job_id`). */
 export interface PrintStatusPayload {
-  job_id: string
+  print_job_id: string
+  order_id: string
+  station_id: string
   status: 'PENDING' | 'PRINTED' | 'FAILED'
-  error?: string
-  printer_id: string
-  station_id?: string
+  error?: string | null
+  printed_at?: string | null
 }
 
+/** `printer.status` — snake_case fields. */
 export interface PrinterStatusPayload {
   printer_id: string
   status: 'ONLINE' | 'OFFLINE' | 'ERROR'
-  last_seen: string
+  last_seen: string | null
 }
 
 // Map event names to their payload types

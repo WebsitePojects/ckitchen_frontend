@@ -263,8 +263,8 @@ export default function Dashboard() {
   // ── Socket subscriptions (FR-OD-03, FR-OD-04) ────────────────────────────
   useEffect(() => {
     const unsubCreated = onSocketEvent('order.created', payload => {
-      // Backend emits { order_id, ... }; OrderPayload.id is a fallback alias
-      const orderId = (payload['order_id'] as string | undefined) ?? payload.id
+      // Backend emits { order_id, ... } (snake_case) — see lib/socket.ts notes.
+      const orderId = payload.order_id
       if (!orderId) return
 
       // Audible alert — Business Rule #9
@@ -281,7 +281,7 @@ export default function Dashboard() {
     })
 
     const unsubUpdated = onSocketEvent('order.updated', payload => {
-      const orderId = (payload['order_id'] as string | undefined) ?? payload.id
+      const orderId = payload.order_id
       if (!orderId) return
       const newStatus = payload.status
       setOrders(prev =>
@@ -290,7 +290,7 @@ export default function Dashboard() {
     })
 
     const unsubPrint = onSocketEvent('print.status', payload => {
-      const { job_id: jobId, status: jobStatus, error: jobError } = payload
+      const { print_job_id: jobId, status: jobStatus, error: jobError } = payload
       setOrders(prev =>
         prev.map(o => {
           if (!o.printJobs.some(j => j.id === jobId)) return o

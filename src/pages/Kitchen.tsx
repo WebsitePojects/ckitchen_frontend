@@ -499,7 +499,8 @@ export default function Kitchen() {
   useEffect(() => {
     // order.created → fetch detail and add to active list
     const unsubCreated = onSocketEvent('order.created', payload => {
-      const orderId = (payload['order_id'] as string | undefined) ?? payload.id
+      // Backend emits { order_id, ... } (snake_case) — see lib/socket.ts notes.
+      const orderId = payload.order_id
       if (!orderId) return
       void fetchOrderDetail(orderId).then(detail => {
         if (!detail) return
@@ -513,7 +514,7 @@ export default function Kitchen() {
 
     // order.updated → update status in place; remove if COMPLETED/CANCELLED
     const unsubUpdated = onSocketEvent('order.updated', payload => {
-      const orderId = (payload['order_id'] as string | undefined) ?? payload.id
+      const orderId = payload.order_id
       if (!orderId) return
       const newStatus = payload.status
 
@@ -550,12 +551,12 @@ export default function Kitchen() {
 
     // stock.updated (Business Rule #2 — surfaces result of PREPARING deduction)
     const unsubStock = onSocketEvent('stock.updated', (payload: StockPayload) => {
-      if (payload.warehouse === 'KITCHEN') {
+      if (payload.warehouseType === 'KITCHEN') {
         // Only surface if it looks like a significant drop (below 20 units) — brief info toast
         if (payload.quantity < 20) {
           addToast(
             'info',
-            `Stock updated: ${payload.ingredient_name} → ${payload.quantity} ${payload.unit} (Kitchen)`,
+            `Stock updated: ${payload.ingredientName} → ${payload.quantity} (Kitchen)`,
             4000,
           )
         }
@@ -566,7 +567,7 @@ export default function Kitchen() {
     const unsubLowstock = onSocketEvent('lowstock.alert', (alert: LowStockAlert) => {
       addToast(
         'lowstock',
-        `⚠ LOW STOCK: ${alert.ingredient_name} — ${alert.quantity} ${alert.unit} remaining (threshold: ${alert.low_stock_threshold} ${alert.unit})`,
+        `⚠ LOW STOCK: ${alert.ingredientName} — ${alert.quantity} remaining (threshold: ${alert.threshold})`,
         10_000,
       )
     })

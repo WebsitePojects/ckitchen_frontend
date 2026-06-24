@@ -15,7 +15,7 @@
  *   #8  Low-stock alerts are non-negotiable — prominent red toast, 10 s TTL
  *   #10 RBAC enforced server-side; UI hides/disables unreachable actions
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { get, post } from '../lib/api'
 import { onSocketEvent } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
@@ -25,11 +25,11 @@ import type { UserRole } from '../auth/AuthContext'
 // ─── Role helpers ──────────────────────────────────────────────────────────────
 
 /** Roles that can receive stock into MAIN warehouse (FR-IV-08) */
-const CAN_RECEIVE: UserRole[] = ['SUPER_ADMIN', 'WAREHOUSE_PERSONNEL']
+const CAN_RECEIVE: UserRole[] = ['SUPER_ADMIN', 'WAREHOUSE']
 /** Roles that can request an ITO (FR-IV-04) */
 const CAN_REQUEST_ITO: UserRole[] = ['SUPER_ADMIN', 'KITCHEN_STAFF']
 /** Roles that can confirm an ITO (FR-IV-04) */
-const CAN_CONFIRM_ITO: UserRole[] = ['SUPER_ADMIN', 'WAREHOUSE_PERSONNEL']
+const CAN_CONFIRM_ITO: UserRole[] = ['SUPER_ADMIN', 'WAREHOUSE']
 
 function hasRole(role: UserRole | undefined, allowed: UserRole[]): boolean {
   return !!role && allowed.includes(role)
@@ -42,37 +42,47 @@ interface Ingredient {
   name: string
   unit: string
   unitCost: string
-  lowStockThreshold: number
+  lowStockThreshold: string
 }
 
+/** GET /inventory?warehouse=MAIN|KITCHEN row shape (CK1-API-003) */
 interface StockLine {
-  ingredient_id: string
-  ingredient_name: string
-  quantity: number
-  unit: string
-  threshold: number
+  id: string
+  warehouseId: string
+  ingredientId: string
+  quantity: string
+  ingredient: Ingredient
+  /** NOTE: API returns this one field snake_case — kept as-is. */
   below_threshold: boolean
 }
 
 type ItoStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED'
 
 interface ItoItem {
-  ingredient_id: string
-  ingredient_name: string
-  quantity: number
-  unit: string
+  id: string
+  itoId: string
+  ingredientId: string
+  quantity: string
 }
 
+/**
+ * GET /itos row shape (verified against ckitchen_backend src/db/schema.ts +
+ * src/modules/inventory/routes.ts — it's a bare `ito` table row, no joined
+ * items/ingredient names and no `from`/`to` string literals; only warehouse
+ * UUIDs and `createdAt` — there is no separate `requestedAt` column).
+ * `POST /itos` (create) is the only call that returns `items` inline.
+ */
 interface Ito {
   id: string
-  from: 'MAIN'
-  to: 'KITCHEN'
+  fromWarehouseId: string
+  toWarehouseId: string
   status: ItoStatus
-  requested_by: string
-  confirmed_by: string | null
-  requested_at: string
-  confirmed_at: string | null
-  items: ItoItem[]
+  requestedBy: string | null
+  confirmedBy: string | null
+  createdAt: string
+  confirmedAt: string | null
+  /** Only present on the POST /itos response; absent from GET /itos list rows. */
+  items?: ItoItem[]
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -85,8 +95,9 @@ interface Toast {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatQty(qty: number, unit: string): string {
-  return `${qty % 1 === 0 ? qty : qty.toFixed(2)} ${unit}`
+function formatQty(qty: number | string, unit: string): string {
+  const n = typeof qty === 'string' ? Number(qty) : qty
+  return `${n % 1 === 0 ? n : n.toFixed(2)} ${unit}`
 }
 
 function formatTime(iso: string): string {
@@ -154,10 +165,10 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
             </thead>
             <tbody className="divide-y divide-gray-50">
               {rows.map(row => {
-                const isAlert = row.below_threshold || alertedIds.has(row.ingredient_id)
+                const isAlert = row.below_threshold || alertedIds.has(row.ingredientId)
                 return (
                   <tr
-                    key={row.ingredient_id}
+                    key={row.ingredientId}
                     className={[
                       'transition-colors duration-300',
                       isAlert
@@ -166,7 +177,7 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                     ].join(' ')}
                   >
                     <td className="px-4 py-2.5 font-medium text-gray-900">
-                      {row.ingredient_name}
+                      {row.ingredient.name}
                       {isAlert && (
                         <span className="ml-2 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700 uppercase">
                           Low
@@ -177,10 +188,10 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                       'px-4 py-2.5 text-right font-mono tabular-nums font-semibold',
                       isAlert ? 'text-red-700' : 'text-gray-800',
                     ].join(' ')}>
-                      {formatQty(row.quantity, row.unit)}
+                      {formatQty(row.quantity, row.ingredient.unit)}
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono tabular-nums text-gray-400 text-xs">
-                      {row.threshold} {row.unit}
+                      {row.ingredient.lowStockThreshold} {row.ingredient.unit}
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       {isAlert ? (
@@ -207,7 +218,7 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
 // ─── Receive into MAIN form ────────────────────────────────────────────────────
 
 interface ReceiveItem {
-  ingredient_id: string
+  ingredientId: string
   quantity: string
 }
 
@@ -218,11 +229,11 @@ interface ReceiveFormProps {
 }
 
 function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
-  const [items, setItems] = useState<ReceiveItem[]>([{ ingredient_id: '', quantity: '' }])
+  const [items, setItems] = useState<ReceiveItem[]>([{ ingredientId: '', quantity: '' }])
   const [submitting, setSubmitting] = useState(false)
 
   function addRow() {
-    setItems(prev => [...prev, { ingredient_id: '', quantity: '' }])
+    setItems(prev => [...prev, { ingredientId: '', quantity: '' }])
   }
 
   function removeRow(idx: number) {
@@ -235,7 +246,7 @@ function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const valid = items.filter(it => it.ingredient_id && Number(it.quantity) > 0)
+    const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
     if (valid.length === 0) {
       onToast('error', 'Add at least one ingredient with a quantity > 0.')
       return
@@ -243,13 +254,15 @@ function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
     setSubmitting(true)
     try {
       await post('/inventory/receive', {
+        // Backend Zod schema expects snake_case `ingredient_id` in the request body
+        // (verified against ckitchen_backend/src/modules/inventory/routes.ts).
         items: valid.map(it => ({
-          ingredient_id: it.ingredient_id,
+          ingredient_id: it.ingredientId,
           quantity: Number(it.quantity),
         })),
       })
       onToast('success', `Received ${valid.length} ingredient(s) into MAIN warehouse.`)
-      setItems([{ ingredient_id: '', quantity: '' }])
+      setItems([{ ingredientId: '', quantity: '' }])
       onSuccess()
     } catch (e) {
       onToast('error', e instanceof Error ? e.message : 'Failed to receive stock.')
@@ -267,8 +280,8 @@ function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
               <label className="mb-1 block text-xs font-medium text-gray-600">Ingredient</label>
             )}
             <select
-              value={item.ingredient_id}
-              onChange={e => setField(idx, 'ingredient_id', e.target.value)}
+              value={item.ingredientId}
+              onChange={e => setField(idx, 'ingredientId', e.target.value)}
               required
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
@@ -329,7 +342,7 @@ function ReceiveForm({ ingredients, onSuccess, onToast }: ReceiveFormProps) {
 // ─── ITO Request form ─────────────────────────────────────────────────────────
 
 interface ItoRequestItem {
-  ingredient_id: string
+  ingredientId: string
   quantity: string
 }
 
@@ -340,11 +353,11 @@ interface ItoRequestFormProps {
 }
 
 function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps) {
-  const [items, setItems] = useState<ItoRequestItem[]>([{ ingredient_id: '', quantity: '' }])
+  const [items, setItems] = useState<ItoRequestItem[]>([{ ingredientId: '', quantity: '' }])
   const [submitting, setSubmitting] = useState(false)
 
   function addRow() {
-    setItems(prev => [...prev, { ingredient_id: '', quantity: '' }])
+    setItems(prev => [...prev, { ingredientId: '', quantity: '' }])
   }
 
   function removeRow(idx: number) {
@@ -357,7 +370,7 @@ function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const valid = items.filter(it => it.ingredient_id && Number(it.quantity) > 0)
+    const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
     if (valid.length === 0) {
       onToast('error', 'Add at least one ingredient with a quantity > 0.')
       return
@@ -367,13 +380,15 @@ function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps
       await post('/itos', {
         from: 'MAIN',
         to: 'KITCHEN',
+        // Backend Zod schema expects snake_case `ingredient_id` in the request body
+        // (verified against ckitchen_backend/src/modules/inventory/routes.ts).
         items: valid.map(it => ({
-          ingredient_id: it.ingredient_id,
+          ingredient_id: it.ingredientId,
           quantity: Number(it.quantity),
         })),
       })
       onToast('success', `ITO requested for ${valid.length} ingredient(s). Awaiting warehouse confirmation.`)
-      setItems([{ ingredient_id: '', quantity: '' }])
+      setItems([{ ingredientId: '', quantity: '' }])
       onSuccess()
     } catch (e) {
       onToast('error', e instanceof Error ? e.message : 'Failed to request ITO.')
@@ -391,8 +406,8 @@ function ItoRequestForm({ ingredients, onSuccess, onToast }: ItoRequestFormProps
               <label className="mb-1 block text-xs font-medium text-gray-600">Ingredient</label>
             )}
             <select
-              value={item.ingredient_id}
-              onChange={e => setField(idx, 'ingredient_id', e.target.value)}
+              value={item.ingredientId}
+              onChange={e => setField(idx, 'ingredientId', e.target.value)}
               required
               className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
@@ -465,9 +480,11 @@ interface ItoListProps {
   canConfirm: boolean
   confirming: Set<string>
   onConfirm: (id: string) => void
+  /** Used to resolve ingredient names/units for ITO line items — GET /itos doesn't join them. */
+  ingredientsById: Map<string, Ingredient>
 }
 
-function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm }: ItoListProps) {
+function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm, ingredientsById }: ItoListProps) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -518,21 +535,30 @@ function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm }: It
                 {ito.status}
               </span>
               <span className="ml-auto text-[11px] text-gray-400">
-                {formatTime(ito.requested_at)}
+                {formatTime(ito.createdAt)}
               </span>
             </div>
 
-            {/* Items */}
-            <ul className="mb-2 space-y-0.5">
-              {ito.items.map((it, idx) => (
-                <li key={idx} className="flex items-center gap-2 text-sm text-gray-700">
-                  <span className="font-medium">{it.ingredient_name}</span>
-                  <span className="ml-auto font-mono tabular-nums text-xs text-gray-500">
-                    {formatQty(it.quantity, it.unit)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {/* Items — GET /itos doesn't join line items; resolve names via ingredientsById */}
+            {ito.items && ito.items.length > 0 ? (
+              <ul className="mb-2 space-y-0.5">
+                {ito.items.map((it) => {
+                  const ing = ingredientsById.get(it.ingredientId)
+                  return (
+                    <li key={it.id} className="flex items-center gap-2 text-sm text-gray-700">
+                      <span className="font-medium">{ing?.name ?? it.ingredientId}</span>
+                      <span className="ml-auto font-mono tabular-nums text-xs text-gray-500">
+                        {formatQty(it.quantity, ing?.unit ?? '')}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <p className="mb-2 text-[11px] italic text-gray-400">
+                Item detail unavailable from the list view.
+              </p>
+            )}
 
             {/* Confirm button — only for REQUESTED ITOs and allowed roles */}
             {ito.status === 'REQUESTED' && canConfirm && (
@@ -549,9 +575,9 @@ function ItoList({ itos, loading, error, canConfirm, confirming, onConfirm }: It
               </button>
             )}
 
-            {ito.status === 'CONFIRMED' && ito.confirmed_at && (
+            {ito.status === 'CONFIRMED' && ito.confirmedAt && (
               <p className="text-[11px] text-emerald-700 mt-1">
-                Confirmed {formatTime(ito.confirmed_at)}
+                Confirmed {formatTime(ito.confirmedAt)}
               </p>
             )}
           </div>
@@ -616,6 +642,11 @@ export default function Inventory() {
 
   // — Ingredients list (for receive + ITO forms)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
+  // Lookup map for resolving ITO line-item ingredient names (GET /itos has no join)
+  const ingredientsById = useMemo(
+    () => new Map(ingredients.map(ing => [ing.id, ing])),
+    [ingredients],
+  )
 
   // — ITOs
   const [itos,       setItos]       = useState<Ito[]>([])
@@ -680,8 +711,8 @@ export default function Inventory() {
     setItosError(null)
     try {
       const { data } = await get<Ito[]>('/itos')
-      // Show most recent first
-      data.sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
+      // Show most recent first (GET /itos has no requestedAt column — use createdAt)
+      data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       setItos(data)
     } catch (e) {
       setItosError(e instanceof Error ? e.message : 'Failed to load ITOs.')
@@ -715,9 +746,9 @@ export default function Inventory() {
   useEffect(() => {
     // stock.updated — refresh the affected warehouse tier
     const unsubStock = onSocketEvent('stock.updated', (payload: StockPayload) => {
-      if (payload.warehouse === 'MAIN') {
+      if (payload.warehouseType === 'MAIN') {
         void fetchMainStock()
-      } else if (payload.warehouse === 'KITCHEN') {
+      } else if (payload.warehouseType === 'KITCHEN') {
         void fetchKitchenStock()
       }
     })
@@ -726,11 +757,11 @@ export default function Inventory() {
     const unsubLowstock = onSocketEvent('lowstock.alert', (alert: LowStockAlert) => {
       addToast(
         'lowstock',
-        `LOW STOCK: ${alert.ingredient_name} — ${alert.quantity} ${alert.unit} remaining (threshold: ${alert.low_stock_threshold} ${alert.unit})`,
+        `LOW STOCK: ${alert.ingredientName} — ${alert.quantity} remaining (threshold: ${alert.threshold})`,
         10_000,
       )
       // Also highlight the row on the table
-      setAlertedIds(prev => new Set(prev).add(alert.ingredient_id))
+      setAlertedIds(prev => new Set(prev).add(alert.ingredientId))
     })
 
     return () => {
@@ -950,6 +981,7 @@ export default function Inventory() {
               canConfirm={canConfirmIto}
               confirming={confirming}
               onConfirm={id => void handleConfirmIto(id)}
+              ingredientsById={ingredientsById}
             />
           </div>
         </aside>

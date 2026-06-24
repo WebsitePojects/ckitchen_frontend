@@ -15,9 +15,10 @@ export type UserRole =
   | 'SUPER_ADMIN'
   | 'BRAND_MANAGER'
   | 'KITCHEN_STAFF'
-  | 'WAREHOUSE_PERSONNEL'
+  | 'WAREHOUSE'
   | 'SUPPLIER_COORDINATOR'
   | 'ACCOUNTANT'
+  | 'RIDER'
 
 export interface AuthUser {
   id: string
