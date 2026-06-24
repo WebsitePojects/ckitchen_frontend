@@ -1,7 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import {
   Building2,
-  Printer,
   ReceiptText,
   Settings,
   Tags,
@@ -18,6 +17,7 @@ import Analytics from './pages/Analytics'
 import ComingSoon from './pages/ComingSoon'
 import Merchants from './pages/Merchants'
 import Menu from './pages/Menu'
+import Printers from './pages/Printers'
 
 export default function App() {
   return (
@@ -42,10 +42,7 @@ export default function App() {
               />
               <Route path="brands" element={<ComingSoon title="Brands" subtitle="Brand directory" icon={Tags} />} />
               <Route path="kitchen" element={<Kitchen />} />
-              <Route
-                path="printers"
-                element={<ComingSoon title="Printers" subtitle="Print queue & printer status" icon={Printer} />}
-              />
+              <Route path="printers" element={<Printers />} />
               <Route path="menu" element={<Menu />} />
               <Route path="inventory" element={<Inventory />} />
               <Route
