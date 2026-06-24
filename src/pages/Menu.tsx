@@ -390,34 +390,38 @@ export default function Menu() {
       },
       {
         id: 'channels',
-        header: 'Channels',
+        header: 'Channel Visibility',
         enableSorting: false,
         cell: ({ row }) => {
           const ch = row.original._channels ?? DEFAULT_CHANNELS
           return (
-            <div className="flex items-center gap-2">
-              <label className="flex flex-col items-center gap-0.5">
+            <div className="flex items-center gap-3">
+              <label className="flex flex-col items-center gap-0.5" title="Show this item on foodpanda">
                 <Switch
                   checked={ch.foodpanda}
                   onCheckedChange={() => toggleChannel(row.original.id, 'foodpanda')}
                   className="data-[state=checked]:bg-[#E2136E]"
                 />
-                <span className="text-[9px] text-zinc-500">FP</span>
+                <span className="text-[10px] text-zinc-400">foodpanda</span>
               </label>
-              <label className="flex flex-col items-center gap-0.5">
+              <label className="flex flex-col items-center gap-0.5" title="Show this item on GrabFood">
                 <Switch
                   checked={ch.grabfood}
                   onCheckedChange={() => toggleChannel(row.original.id, 'grabfood')}
                   className="data-[state=checked]:bg-[#00B14F]"
                 />
-                <span className="text-[9px] text-zinc-500">GF</span>
+                <span className="text-[10px] text-zinc-400">GrabFood</span>
               </label>
-              <label className="flex flex-col items-center gap-0.5">
+              <label
+                className="flex flex-col items-center gap-0.5"
+                title="Direct orders — your own ordering channel, not via an aggregator"
+              >
                 <Switch
                   checked={ch.direct}
                   onCheckedChange={() => toggleChannel(row.original.id, 'direct')}
+                  className="data-[state=checked]:bg-emerald-600"
                 />
-                <span className="text-[9px] text-zinc-500">Dir</span>
+                <span className="text-[10px] text-zinc-400">Direct</span>
               </label>
             </div>
           )
