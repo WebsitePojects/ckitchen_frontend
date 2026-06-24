@@ -1,5 +1,6 @@
 /**
  * Kitchen Display System (KDS) — FR-KD-01..05
+ * M4 dark back-of-house reskin (build/prototype).
  *
  * Implements:
  *   FR-KD-01  Four-stage lifecycle: NEW → PREPARING → READY → COMPLETED
@@ -10,15 +11,32 @@
  *
  * Business Rule #2 : advancing to PREPARING triggers backend deduction → stock.updated
  * Business Rule #9 : real-time via order.created / order.updated; ~2 s propagation
- * Business Rule #8 : lowstock.alert toasted prominently
+ * Business Rule #8 : lowstock.alert toasted prominently (sonner)
  *
  * Tablet-first layout: buttons large/touch-friendly, columns responsive.
+ * Fix: orders fetched with comma-separated status (single param, backend compatible).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ChefHat,
+  Clock,
+  Flame,
+  LayoutGrid,
+  PackageCheck,
+} from 'lucide-react'
+import { toast } from 'sonner'
 import { get, post } from '../lib/api'
 import { getSocket, initSocket, onSocketEvent } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import type { Brand, Station } from './Dashboard'
+import PageHeader from '../components/common/PageHeader'
+import BrandChip from '../components/common/BrandChip'
+import AggregatorBadge from '../components/common/AggregatorBadge'
+import StatusBadge from '../components/common/StatusBadge'
+import EmptyState from '../components/common/EmptyState'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -29,7 +47,7 @@ const OVERDUE_MINS = 15
 
 type OrderStatus = 'NEW' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
 
-/** Active statuses shown on the KDS (COMPLETED/CANCELLED are excluded) */
+/** Active statuses shown on the KDS (COMPLETED/CANCELLED are excluded from the board) */
 const ACTIVE_STATUSES: OrderStatus[] = ['NEW', 'PREPARING', 'READY']
 
 interface KdsOrderItem {
@@ -48,9 +66,9 @@ interface KdsOrder {
   status: OrderStatus
   total: string
   placedAt: string
-  prepAt: string | null   // when status moved to PREPARING (if available from API)
+  prepAt: string | null
   items: KdsOrderItem[]
-  stationIds: string[]    // derived: unique stations this order touches
+  stationIds: string[]
 }
 
 // ─── Raw API shapes ───────────────────────────────────────────────────────────
@@ -97,33 +115,13 @@ interface RawOrderSummary {
   placedAt: string
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
-
-interface Toast {
-  id: string
-  kind: 'lowstock' | 'stock' | 'error' | 'info'
-  message: string
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
  * Build KdsOrderItems from print-job payloads and raw order items.
  * Print-job payloads carry item names; raw order items carry stationId.
- * We merge by name (best-effort) so each item record has both name + stationId.
  */
 function buildItems(rawItems: RawOrderItem[], printJobs: RawPrintJob[]): KdsOrderItem[] {
-  // Build a name→stationId map from print-job payloads keyed by stationId
-  const stationByName = new Map<string, string>()
-  for (const job of printJobs) {
-    for (const item of job.payload?.items ?? []) {
-      if (!stationByName.has(item.name)) {
-        stationByName.set(item.name, job.stationId)
-      }
-    }
-  }
-
-  // Collect unique items from print-job payloads (they have the display name)
   const seen = new Map<string, KdsOrderItem>()
   for (const job of printJobs) {
     for (const pi of job.payload?.items ?? []) {
@@ -142,7 +140,6 @@ function buildItems(rawItems: RawOrderItem[], printJobs: RawPrintJob[]): KdsOrde
     }
   }
 
-  // Fallback: if no print-job items, use raw items (names unavailable → use menuItemId)
   if (seen.size === 0) {
     return rawItems.map(ri => ({
       qty: ri.qty,
@@ -182,17 +179,28 @@ async function fetchOrderDetail(id: string): Promise<KdsOrder | null> {
   }
 }
 
-/** Elapsed minutes from the given ISO timestamp to now. */
-function elapsedMins(iso: string): number {
-  return (Date.now() - new Date(iso).getTime()) / 60_000
+/** Elapsed milliseconds from the given ISO timestamp to now. */
+function elapsedMs(iso: string): number {
+  return Date.now() - new Date(iso).getTime()
 }
 
-/** Human-readable elapsed label (e.g. "4m", "1h 3m"). */
-function elapsedLabel(iso: string): string {
-  const mins = Math.floor(elapsedMins(iso))
-  if (mins < 1) return '<1m'
-  if (mins < 60) return `${mins}m`
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+/** Elapsed minutes from the given ISO timestamp to now. */
+function elapsedMins(iso: string): number {
+  return elapsedMs(iso) / 60_000
+}
+
+/** Live mm:ss timer label — used on the KDS card. For >= 1 h: Xh YYm format. */
+function elapsedMMSS(iso: string): string {
+  const totalSecs = Math.floor(elapsedMs(iso) / 1000)
+  if (totalSecs < 0) return '00:00'
+  const mins = Math.floor(totalSecs / 60)
+  const secs = totalSecs % 60
+  if (mins < 60) {
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
+  const hours = Math.floor(mins / 60)
+  const remainMins = mins % 60
+  return `${hours}h ${String(remainMins).padStart(2, '0')}m`
 }
 
 function formatTime(iso: string): string {
@@ -201,7 +209,6 @@ function formatTime(iso: string): string {
 
 /** Returns the timestamp to use for elapsed / overdue check. */
 function timerStart(order: KdsOrder): string {
-  // Once in PREPARING, measure from prep_at if available (more meaningful)
   if (order.status === 'PREPARING' && order.prepAt) return order.prepAt
   return order.placedAt
 }
@@ -214,38 +221,62 @@ const NEXT_STAGE: Record<string, string> = {
   READY:     'COMPLETED',
 }
 
-const STAGE_COLORS: Record<string, { card: string; badge: string; btn: string }> = {
+// ─── Dark-mode stage color tokens ─────────────────────────────────────────────
+
+interface StageStyle {
+  cardBorder: string
+  btnClass: string
+}
+
+const STAGE_STYLE: Record<string, StageStyle> = {
   NEW: {
-    card:  'border-blue-400 bg-blue-50',
-    badge: 'bg-blue-100 text-blue-800',
-    btn:   'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white',
+    cardBorder: 'border-blue-500/40',
+    btnClass:   'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white',
   },
   PREPARING: {
-    card:  'border-amber-400 bg-amber-50',
-    badge: 'bg-amber-100 text-amber-800',
-    btn:   'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white',
+    cardBorder: 'border-amber-500/40',
+    btnClass:   'bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-zinc-900',
   },
   READY: {
-    card:  'border-emerald-400 bg-emerald-50',
-    badge: 'bg-emerald-100 text-emerald-800',
-    btn:   'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white',
+    cardBorder: 'border-emerald-500/40',
+    btnClass:   'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white',
   },
   COMPLETED: {
-    card:  'border-gray-300 bg-gray-50',
-    badge: 'bg-gray-100 text-gray-500',
-    btn:   'bg-gray-300 text-gray-400 cursor-not-allowed',
+    cardBorder: 'border-zinc-700',
+    btnClass:   'bg-zinc-800 text-zinc-500 cursor-not-allowed',
   },
 }
 
-const AGG_STYLES: Record<string, { label: string; cls: string }> = {
-  FOODPANDA: { label: 'FP',  cls: 'bg-pink-100 text-pink-700 border border-pink-200' },
-  GRABFOOD:  { label: 'GF',  cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
-  OTHER:     { label: 'OTH', cls: 'bg-gray-100 text-gray-600 border border-gray-200' },
+// ─── Stage tab definitions ────────────────────────────────────────────────────
+
+type StageFilter = 'ALL' | OrderStatus
+
+interface StageTab {
+  key: StageFilter
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  countKey?: keyof StageCounts
 }
 
-// ─── OrderTile ────────────────────────────────────────────────────────────────
+const STAGE_TABS: StageTab[] = [
+  { key: 'ALL',       label: 'All Active', icon: LayoutGrid   },
+  { key: 'NEW',       label: 'New',        icon: Clock,       countKey: 'NEW'       },
+  { key: 'PREPARING', label: 'Preparing',  icon: Flame,       countKey: 'PREPARING' },
+  { key: 'READY',     label: 'Ready',      icon: PackageCheck, countKey: 'READY'    },
+  { key: 'COMPLETED', label: 'Completed',  icon: CheckCircle2, countKey: 'COMPLETED'},
+]
 
-interface OrderTileProps {
+interface StageCounts {
+  ALL: number
+  NEW: number
+  PREPARING: number
+  READY: number
+  COMPLETED: number
+}
+
+// ─── OrderCard ────────────────────────────────────────────────────────────────
+
+interface OrderCardProps {
   order: KdsOrder
   brand: Brand | undefined
   stationId: string
@@ -254,85 +285,75 @@ interface OrderTileProps {
   advancing: boolean
 }
 
-function OrderTile({ order, brand, stationId, now: _now, onAdvance, advancing }: OrderTileProps) {
-  const styles    = STAGE_COLORS[order.status] ?? STAGE_COLORS.NEW
-  const agg       = AGG_STYLES[order.aggregator] ?? AGG_STYLES.OTHER
-  const brandColor = brand?.color ?? '#9ca3af'
-  const next      = NEXT_STAGE[order.status]
+function OrderCard({ order, brand, stationId, now: _now, onAdvance, advancing }: OrderCardProps) {
+  const style   = STAGE_STYLE[order.status] ?? STAGE_STYLE.NEW
+  const next    = NEXT_STAGE[order.status]
+  const start   = timerStart(order)
+  const mins    = elapsedMins(start)
+  const isOverdue = mins >= OVERDUE_MINS && order.status !== 'COMPLETED'
+  const elapsed = elapsedMMSS(start)
 
-  // Elapsed time for this order at this moment (parent ticks `now` every 30 s)
-  const elapsed   = elapsedLabel(timerStart(order))
-  const mins      = elapsedMins(timerStart(order))
-  const isOverdue = mins >= OVERDUE_MINS
-
-  // Items relevant to THIS station only
-  const stationItems = order.items.filter(i => i.stationId === stationId)
-  // If no per-station items resolved, show all items (graceful fallback)
-  const displayItems = stationItems.length > 0 ? stationItems : order.items
+  // Items relevant to THIS station only; fall back to all items
+  const stationItems  = order.items.filter(i => i.stationId === stationId)
+  const displayItems  = stationItems.length > 0 ? stationItems : order.items
 
   return (
     <div
       className={[
-        'rounded-xl border-2 shadow-sm transition-all duration-300',
-        styles.card,
-        isOverdue && order.status !== 'COMPLETED'
-          ? 'animate-pulse border-red-500 bg-red-50 ring-2 ring-red-400 ring-offset-1'
+        'group relative flex flex-col rounded-xl border bg-[#121A17] shadow-lg',
+        'transition-all duration-300',
+        style.cardBorder,
+        isOverdue
+          ? 'animate-pulse ring-2 ring-red-500/60 ring-offset-2 ring-offset-[#0A0F0D] border-red-500/60'
           : '',
       ].join(' ')}
-      style={{ borderLeftColor: brandColor, borderLeftWidth: 4 }}
+      style={{ borderLeftColor: brand?.color ?? '#52525B', borderLeftWidth: 3 }}
     >
       {/* ── Card header ── */}
-      <div className="flex flex-wrap items-center gap-1.5 px-3 pt-2.5 pb-1.5">
-        {/* Brand chip */}
-        <span
-          className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
-          style={{ backgroundColor: brandColor }}
-        >
-          {brand?.name ?? '—'}
+      <div className="flex flex-wrap items-center gap-1.5 px-3 pt-3 pb-2">
+        <BrandChip brand={brand} />
+        <AggregatorBadge aggregator={order.aggregator} />
+        <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
+          {order.externalRef}
         </span>
-
-        {/* Aggregator badge */}
-        <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${agg.cls}`}>
-          {agg.label}
-        </span>
-
-        {/* Ref */}
-        <span className="text-[11px] font-mono text-gray-500">{order.externalRef}</span>
-
-        {/* Status badge */}
-        <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${styles.badge}`}>
-          {order.status}
-        </span>
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {isOverdue && (
+            <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-label="Overdue" />
+          )}
+          <StatusBadge status={order.status} />
+        </div>
       </div>
 
-      {/* ── Customer + timer ── */}
+      {/* ── Customer + timer row ── */}
       <div className="flex items-center justify-between px-3 pb-2">
-        <span className="text-sm font-semibold text-gray-800 truncate max-w-[55%]">
+        <span className="text-sm font-semibold text-zinc-100 truncate max-w-[55%]">
           {order.customerName ?? 'Guest'}
         </span>
         <span
           title={`Placed ${formatTime(order.placedAt)}`}
           className={[
-            'shrink-0 text-xs font-bold tabular-nums',
-            isOverdue && order.status !== 'COMPLETED'
-              ? 'text-red-600'
-              : 'text-gray-500',
+            'shrink-0 text-sm font-bold tabular-nums font-mono',
+            isOverdue ? 'text-red-400' : 'text-zinc-400',
           ].join(' ')}
         >
-          {isOverdue && order.status !== 'COMPLETED' ? '⚠ ' : ''}{elapsed}
+          {elapsed}
         </span>
       </div>
 
       {/* ── Items for this station ── */}
       {displayItems.length > 0 && (
-        <ul className="border-t border-white/60 px-3 py-2 space-y-0.5">
+        <ul className="border-t border-[#1F2A24] px-3 py-2 space-y-1">
           {displayItems.map((item, idx) => (
-            <li key={idx} className="flex gap-2 text-sm text-gray-800">
-              <span className="w-5 shrink-0 text-right font-bold text-gray-900">{item.qty}×</span>
+            <li key={idx} className="flex gap-2 text-sm text-zinc-200">
+              <span className="w-6 shrink-0 text-right font-bold text-emerald-400 tabular-nums">
+                {item.qty}×
+              </span>
               <span className="flex-1 leading-snug">
                 {item.name}
                 {item.notes && (
-                  <span className="ml-1 text-[10px] italic text-gray-400">({item.notes})</span>
+                  <span className="ml-1.5 text-[10px] italic text-zinc-500">
+                    ({item.notes})
+                  </span>
                 )}
               </span>
             </li>
@@ -348,17 +369,34 @@ function OrderTile({ order, brand, stationId, now: _now, onAdvance, advancing }:
             disabled={advancing}
             aria-label={`Advance order ${order.externalRef} to ${next}`}
             className={[
-              'w-full rounded-lg px-4 py-3 text-sm font-bold tracking-wide transition',
-              'disabled:opacity-60 disabled:cursor-not-allowed',
-              styles.btn,
+              'w-full flex items-center justify-center gap-2',
+              'rounded-lg px-4 py-3.5 text-sm font-bold tracking-wide',
+              'transition-colors duration-150 select-none',
+              'min-h-[52px]',        // large touch target
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              style.btnClass,
             ].join(' ')}
           >
-            {advancing
-              ? 'Advancing…'
-              : `→ ${next.charAt(0) + next.slice(1).toLowerCase()}`}
+            {advancing ? (
+              <>
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Advancing…
+              </>
+            ) : next === 'COMPLETED' ? (
+              <>
+                <CheckCircle2 className="h-4 w-4" />
+                Mark Ready
+              </>
+            ) : (
+              <>
+                <ArrowRight className="h-4 w-4" />
+                {next.charAt(0) + next.slice(1).toLowerCase()}
+              </>
+            )}
           </button>
         ) : (
-          <div className="w-full rounded-lg px-4 py-3 text-center text-sm font-bold text-gray-400 bg-gray-100">
+          <div className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-zinc-800/50 text-sm font-semibold text-zinc-600">
+            <CheckCircle2 className="h-4 w-4" />
             Completed
           </div>
         )}
@@ -367,75 +405,24 @@ function OrderTile({ order, brand, stationId, now: _now, onAdvance, advancing }:
   )
 }
 
-// ─── ToastBanner ──────────────────────────────────────────────────────────────
-
-interface ToastBannerProps {
-  toasts: Toast[]
-  onDismiss: (id: string) => void
-}
-
-function ToastBanner({ toasts, onDismiss }: ToastBannerProps) {
-  if (toasts.length === 0) return null
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs w-full pointer-events-none">
-      {toasts.map(t => (
-        <div
-          key={t.id}
-          className={[
-            'pointer-events-auto flex items-start gap-2 rounded-xl px-4 py-3 shadow-lg text-sm font-medium',
-            t.kind === 'lowstock'
-              ? 'bg-red-600 text-white'
-              : t.kind === 'error'
-                ? 'bg-red-100 text-red-800 border border-red-300'
-                : 'bg-gray-800 text-white',
-          ].join(' ')}
-        >
-          <span className="flex-1 leading-snug">{t.message}</span>
-          <button
-            onClick={() => onDismiss(t.id)}
-            aria-label="Dismiss"
-            className="shrink-0 opacity-70 hover:opacity-100 text-lg leading-none"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ─── Kitchen ──────────────────────────────────────────────────────────────────
 
 export default function Kitchen() {
-  const [orders, setOrders]     = useState<KdsOrder[]>([])
-  const [brands, setBrands]     = useState<Brand[]>([])
-  const [stations, setStations] = useState<Station[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
+  const [orders,    setOrders]    = useState<KdsOrder[]>([])
+  const [brands,    setBrands]    = useState<Brand[]>([])
+  const [stations,  setStations]  = useState<Station[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState<string | null>(null)
   const [advancing, setAdvancing] = useState<Set<string>>(new Set())
-  const [toasts, setToasts]     = useState<Toast[]>([])
-  const [now, setNow]           = useState(() => Date.now())
+  const [now,       setNow]       = useState(() => Date.now())
+  const [activeStage, setActiveStage] = useState<StageFilter>('ALL')
 
   const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
 
-  // ── Toast helpers ──────────────────────────────────────────────────────────
-
-  const addToast = useCallback((kind: Toast['kind'], message: string, ttl = 6000) => {
-    const id = `${Date.now()}-${Math.random()}`
-    setToasts(prev => [...prev.slice(-4), { id, kind, message }])
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id))
-    }, ttl)
-  }, [])
-
-  function dismissToast(id: string) {
-    setToasts(prev => prev.filter(t => t.id !== id))
-  }
-
-  // ── Tick every 30 s so elapsed timers update without per-order intervals ───
+  // ── Tick every second for mm:ss timers (single shared interval) ───────────
 
   useEffect(() => {
-    const handle = setInterval(() => setNow(Date.now()), 30_000)
+    const handle = setInterval(() => setNow(Date.now()), 1_000)
     return () => clearInterval(handle)
   }, [])
 
@@ -451,7 +438,8 @@ export default function Kitchen() {
         const [brandsRes, stationsRes, ordersRes] = await Promise.all([
           get<Brand[]>('/brands'),
           get<Station[]>('/stations'),
-          get<RawOrderSummary[]>('/orders?status=NEW&status=PREPARING&status=READY'),
+          // Fix: comma-separated single param — backend now accepts this form
+          get<RawOrderSummary[]>('/orders?status=NEW,PREPARING,READY'),
         ])
         if (cancelled) return
 
@@ -473,7 +461,7 @@ export default function Kitchen() {
         if (cancelled) return
 
         const active = details.filter((d): d is KdsOrder => d !== null)
-        // Sort: NEW first, then PREPARING, then READY; within stage newest first
+        // Sort: NEW first, then PREPARING, then READY; within stage oldest first (longest wait)
         active.sort((a, b) => {
           const stageOrder: Record<string, number> = { NEW: 0, PREPARING: 1, READY: 2, COMPLETED: 3 }
           const sd = (stageOrder[a.status] ?? 0) - (stageOrder[b.status] ?? 0)
@@ -499,7 +487,6 @@ export default function Kitchen() {
   useEffect(() => {
     // order.created → fetch detail and add to active list
     const unsubCreated = onSocketEvent('order.created', payload => {
-      // Backend emits { order_id, ... } (snake_case) — see lib/socket.ts notes.
       const orderId = payload.order_id
       if (!orderId) return
       void fetchOrderDetail(orderId).then(detail => {
@@ -508,6 +495,9 @@ export default function Kitchen() {
         setOrders(prev => {
           if (prev.some(o => o.id === detail.id)) return prev
           return [detail, ...prev]
+        })
+        toast.info(`New order: ${detail.externalRef}`, {
+          description: detail.customerName ? `Customer: ${detail.customerName}` : undefined,
         })
       })
     })
@@ -519,7 +509,6 @@ export default function Kitchen() {
       const newStatus = payload.status
 
       if (!(ACTIVE_STATUSES as string[]).includes(newStatus)) {
-        // Remove from KDS (completed / cancelled)
         setOrders(prev => prev.filter(o => o.id !== orderId))
         return
       }
@@ -551,25 +540,21 @@ export default function Kitchen() {
 
     // stock.updated (Business Rule #2 — surfaces result of PREPARING deduction)
     const unsubStock = onSocketEvent('stock.updated', (payload: StockPayload) => {
-      if (payload.warehouseType === 'KITCHEN') {
-        // Only surface if it looks like a significant drop (below 20 units) — brief info toast
-        if (payload.quantity < 20) {
-          addToast(
-            'info',
-            `Stock updated: ${payload.ingredientName} → ${payload.quantity} (Kitchen)`,
-            4000,
-          )
-        }
+      if (payload.warehouseType === 'KITCHEN' && payload.quantity < 20) {
+        toast.info(`Stock updated: ${payload.ingredientName}`, {
+          description: `${payload.quantity} remaining in Kitchen`,
+          duration: 4000,
+        })
       }
     })
 
-    // lowstock.alert (Business Rule #8 — non-negotiable alert)
+    // lowstock.alert (Business Rule #8 — non-negotiable prominent alert)
     const unsubLowstock = onSocketEvent('lowstock.alert', (alert: LowStockAlert) => {
-      addToast(
-        'lowstock',
-        `⚠ LOW STOCK: ${alert.ingredientName} — ${alert.quantity} remaining (threshold: ${alert.threshold})`,
-        10_000,
-      )
+      toast.error(`Low stock: ${alert.ingredientName}`, {
+        description: `${alert.quantity} remaining — threshold is ${alert.threshold}`,
+        duration: 10_000,
+        icon: <AlertTriangle className="h-4 w-4" />,
+      })
     })
 
     return () => {
@@ -578,11 +563,11 @@ export default function Kitchen() {
       unsubStock()
       unsubLowstock()
     }
-  }, [addToast])
+  }, [])
 
   // ── Advance handler ────────────────────────────────────────────────────────
 
-  async function handleAdvance(orderId: string) {
+  const handleAdvance = useCallback(async (orderId: string) => {
     setAdvancing(prev => new Set(prev).add(orderId))
     try {
       const { data } = await post<{ id: string; status: OrderStatus; prepAt?: string }>(
@@ -591,8 +576,8 @@ export default function Kitchen() {
       const newStatus = data.status
 
       if (!(ACTIVE_STATUSES as string[]).includes(newStatus)) {
-        // Completed — remove from KDS
         setOrders(prev => prev.filter(o => o.id !== orderId))
+        toast.success('Order completed', { description: `Order advanced to ${newStatus}` })
       } else {
         setOrders(prev =>
           prev.map(o =>
@@ -607,7 +592,9 @@ export default function Kitchen() {
         )
       }
     } catch (e) {
-      addToast('error', e instanceof Error ? e.message : 'Failed to advance order.')
+      toast.error('Failed to advance order', {
+        description: e instanceof Error ? e.message : 'Unknown error',
+      })
     } finally {
       setAdvancing(prev => {
         const next = new Set(prev)
@@ -615,21 +602,25 @@ export default function Kitchen() {
         return next
       })
     }
-  }
+  }, [])
 
   // ── Station-grouped view ───────────────────────────────────────────────────
 
   /**
    * For each station, collect orders that have at least one item routed to it.
-   * An order can appear in multiple station columns if its items span stations.
+   * Filtered by activeStage if not 'ALL'.
    */
+  const visibleOrders = useMemo(() => {
+    if (activeStage === 'ALL') return orders
+    return orders.filter(o => o.status === activeStage)
+  }, [orders, activeStage])
+
   const stationOrders = useMemo(() => {
     const map = new Map<string, KdsOrder[]>()
     for (const station of stations) {
       map.set(station.id, [])
     }
-    for (const order of orders) {
-      // If no stationIds resolved (no print-job items), show in every column
+    for (const order of visibleOrders) {
       const targetStations = order.stationIds.length > 0 ? order.stationIds : stations.map(s => s.id)
       for (const sid of targetStations) {
         if (map.has(sid)) {
@@ -638,84 +629,117 @@ export default function Kitchen() {
       }
     }
     return map
-  }, [orders, stations])
-
-  const totalActive = orders.length
-  const overdueCount = orders.filter(
-    o => elapsedMins(timerStart(o)) >= OVERDUE_MINS && o.status !== 'COMPLETED',
-  ).length
+  }, [visibleOrders, stations])
 
   // ── Stage summary counts ──────────────────────────────────────────────────
 
-  const stageCounts = useMemo(
+  const stageCounts = useMemo<StageCounts>(
     () => ({
+      ALL:       orders.length,
       NEW:       orders.filter(o => o.status === 'NEW').length,
       PREPARING: orders.filter(o => o.status === 'PREPARING').length,
       READY:     orders.filter(o => o.status === 'READY').length,
+      COMPLETED: 0, // COMPLETED orders are removed from the KDS board
     }),
     [orders],
+  )
+
+  const overdueCount = useMemo(
+    () => orders.filter(o => elapsedMins(timerStart(o)) >= OVERDUE_MINS && o.status !== 'COMPLETED').length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [orders, now],
   )
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-gray-100">
-      {/* ── Page header ── */}
-      <header className="shrink-0 flex items-center justify-between border-b border-gray-200 bg-white px-5 py-3 sm:px-6">
-        <div className="min-w-0">
-          <h1 className="text-lg font-bold text-gray-900 sm:text-xl truncate">Kitchen Display</h1>
-          <p className="text-[11px] text-gray-400">Station-grouped · Real-time · Tablet-ready</p>
-        </div>
+    <div className="flex h-full flex-col overflow-hidden">
 
-        {/* Summary pills */}
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 tabular-nums">
-            {stageCounts.NEW} New
-          </span>
-          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 tabular-nums">
-            {stageCounts.PREPARING} Preparing
-          </span>
-          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800 tabular-nums">
-            {stageCounts.READY} Ready
-          </span>
-          {overdueCount > 0 && (
-            <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white tabular-nums animate-pulse">
-              {overdueCount} Overdue (&gt;{OVERDUE_MINS}m)
-            </span>
-          )}
-          <span className="text-xs text-gray-400 tabular-nums">{totalActive} active</span>
+      {/* ── Page content wrapper (matches Dashboard padding) ── */}
+      <div className="shrink-0 space-y-4 px-5 pt-5 pb-4 sm:px-6">
+        <PageHeader
+          title="Kitchen Display"
+          subtitle="Station-grouped · real-time · tablet-ready"
+          actions={
+            overdueCount > 0 ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-400 ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {overdueCount} overdue (&gt;{OVERDUE_MINS}m)
+              </span>
+            ) : undefined
+          }
+        />
+
+        {/* ── Stage tabs ── */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1">
+          {STAGE_TABS.map(tab => {
+            const count = tab.countKey ? stageCounts[tab.countKey] : stageCounts.ALL
+            const isActive = activeStage === tab.key
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveStage(tab.key)}
+                aria-pressed={isActive}
+                className={[
+                  'flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold',
+                  'transition-colors duration-150 select-none min-h-[40px]',
+                  isActive
+                    ? 'bg-emerald-600/20 text-emerald-400 ring-1 ring-inset ring-emerald-500/40'
+                    : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200',
+                ].join(' ')}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+                <span
+                  className={[
+                    'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5',
+                    'text-[11px] font-bold tabular-nums',
+                    isActive
+                      ? 'bg-emerald-500/25 text-emerald-300'
+                      : 'bg-zinc-700/70 text-zinc-400',
+                  ].join(' ')}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
-      </header>
+      </div>
+
+      {/* ── Divider ── */}
+      <div className="shrink-0 border-t border-[#1F2A24]" />
 
       {/* ── Body ── */}
       {loading ? (
-        <div className="flex flex-1 flex-col items-center justify-center text-gray-400">
-          <div className="mb-3 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-500">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-emerald-500" />
           <p className="text-sm">Loading kitchen orders…</p>
         </div>
       ) : error ? (
         <div className="flex flex-1 flex-col items-center justify-center p-8">
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center max-w-md">
-            <p className="text-sm font-medium text-red-700">{error}</p>
-            <p className="mt-1 text-xs text-red-400">Make sure the backend is running on :4000</p>
+          <div className="w-full max-w-md rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center">
+            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-400" />
+            <p className="text-sm font-semibold text-red-300">{error}</p>
+            <p className="mt-1 text-xs text-red-500">Make sure the backend is running on :4000</p>
           </div>
         </div>
       ) : stations.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center p-8">
-          <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center max-w-md">
-            <p className="text-4xl mb-3" aria-hidden>🍳</p>
-            <p className="text-sm font-medium text-gray-600">No stations configured</p>
-            <p className="mt-1 text-xs text-gray-400">
-              Create kitchen stations via the API to enable the display.
-            </p>
-          </div>
+        <div className="flex flex-1 items-center justify-center p-8">
+          <EmptyState
+            icon={ChefHat}
+            title="No stations configured"
+            description="Create kitchen stations via the API to enable the display."
+            className="max-w-md"
+          />
         </div>
       ) : (
         /* ── Station columns ── */
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div
-            className="flex h-full gap-3 p-3 sm:gap-4 sm:p-4"
-            style={{ minWidth: `${stations.length * 280}px` }}
+            className="flex h-full gap-3 p-4 sm:gap-4"
+            style={{ minWidth: `${Math.max(stations.length * 296, 100)}px` }}
           >
             {stations.map(station => {
               const col = stationOrders.get(station.id) ?? []
@@ -726,36 +750,42 @@ export default function Kitchen() {
               return (
                 <section
                   key={station.id}
-                  className="flex w-72 shrink-0 flex-col rounded-2xl bg-white shadow-sm border border-gray-200 overflow-hidden"
+                  className="flex w-72 shrink-0 flex-col rounded-2xl border border-[#1F2A24] bg-[#0C1310] overflow-hidden shadow-xl"
                   aria-label={`${station.name} station`}
                 >
                   {/* Station header */}
-                  <div className="shrink-0 flex items-center justify-between bg-gray-800 px-4 py-3">
-                    <h2 className="text-base font-bold text-white tracking-wide truncate">
-                      {station.name}
-                    </h2>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="shrink-0 flex items-center justify-between border-b border-[#1F2A24] bg-[#121A17] px-4 py-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <ChefHat className="h-4 w-4 shrink-0 text-emerald-500" />
+                      <h2 className="text-sm font-bold text-zinc-100 tracking-wide truncate">
+                        {station.name}
+                      </h2>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0 pl-2">
                       {colOverdue > 0 && (
-                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-[11px] font-bold text-white animate-pulse tabular-nums">
-                          {colOverdue}⚠
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-400 ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
+                          <AlertTriangle className="h-2.5 w-2.5" />
+                          {colOverdue}
                         </span>
                       )}
-                      <span className="rounded-full bg-gray-600 px-2 py-0.5 text-[11px] font-bold text-gray-200 tabular-nums">
+                      <span className="rounded-full bg-zinc-700/60 px-2 py-0.5 text-[11px] font-bold text-zinc-300 tabular-nums">
                         {col.length}
                       </span>
                     </div>
                   </div>
 
-                  {/* Order tiles */}
-                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {/* Order cards */}
+                  <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
                     {col.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-gray-300">
-                        <p className="text-3xl" aria-hidden>✓</p>
-                        <p className="mt-2 text-xs font-medium text-gray-400">No active orders</p>
-                      </div>
+                      <EmptyState
+                        icon={CheckCircle2}
+                        title="No active orders"
+                        description={activeStage !== 'ALL' ? `No ${activeStage.toLowerCase()} orders at this station` : undefined}
+                        className="mt-4 border-[#1F2A24] bg-transparent"
+                      />
                     ) : (
                       col.map(order => (
-                        <OrderTile
+                        <OrderCard
                           key={order.id}
                           order={order}
                           brand={brandMap.get(order.brandId)}
@@ -773,9 +803,6 @@ export default function Kitchen() {
           </div>
         </div>
       )}
-
-      {/* ── Toast notifications (low-stock + stock.updated + errors) ── */}
-      <ToastBanner toasts={toasts} onDismiss={dismissToast} />
     </div>
   )
 }
