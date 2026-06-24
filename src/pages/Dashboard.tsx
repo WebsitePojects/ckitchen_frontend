@@ -13,6 +13,7 @@
  * Business Rule #9: real-time within ~2 s; distinct audible alert.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bell, BellOff, ReceiptText } from 'lucide-react'
 import { get } from '../lib/api'
 import { getSocket, initSocket, onSocketEvent } from '../lib/socket'
 import OrderCard from '../components/OrderCard'
@@ -371,7 +372,8 @@ export default function Dashboard() {
               : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
           ].join(' ')}
         >
-          {muted ? '🔇 Muted' : '🔔 Alert on'}
+          {muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
+          {muted ? 'Muted' : 'Alert on'}
         </button>
       </header>
 
@@ -479,7 +481,7 @@ export default function Dashboard() {
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
-              <p className="text-4xl mb-3" aria-hidden>📋</p>
+              <ReceiptText className="h-10 w-10 mb-3 text-gray-300" aria-hidden />
               <p className="text-sm font-medium text-gray-600">No orders</p>
               <p className="mt-1 text-xs text-gray-400">
                 {orders.length > 0
