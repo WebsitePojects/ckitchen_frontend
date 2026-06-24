@@ -4,7 +4,6 @@ import {
   Printer,
   ReceiptText,
   Settings,
-  Store,
   Tags,
   UtensilsCrossed,
   Users,
@@ -18,6 +17,7 @@ import Kitchen from './pages/Kitchen'
 import Inventory from './pages/Inventory'
 import Analytics from './pages/Analytics'
 import ComingSoon from './pages/ComingSoon'
+import Merchants from './pages/Merchants'
 
 export default function App() {
   return (
@@ -35,12 +35,7 @@ export default function App() {
                 path="orders"
                 element={<ComingSoon title="Orders" subtitle="Full order feed" icon={ReceiptText} />}
               />
-              <Route
-                path="merchants"
-                element={
-                  <ComingSoon title="Merchant Management" subtitle="Brands, outlets & performance" icon={Store} />
-                }
-              />
+              <Route path="merchants" element={<Merchants />} />
               <Route
                 path="outlets"
                 element={<ComingSoon title="Outlets" subtitle="Outlet directory" icon={Building2} />}
