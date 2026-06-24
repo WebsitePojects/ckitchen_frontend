@@ -1,10 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import {
-  Building2,
-  ReceiptText,
-  Settings,
-  Tags,
-} from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import AppShell from './components/layout/AppShell'
@@ -18,6 +13,9 @@ import Merchants from './pages/Merchants'
 import Menu from './pages/Menu'
 import Printers from './pages/Printers'
 import UsersPage from './pages/Users'
+import Orders from './pages/Orders'
+import Brands from './pages/Brands'
+import Outlets from './pages/Outlets'
 
 export default function App() {
   return (
@@ -31,16 +29,10 @@ export default function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
               <Route index element={<Dashboard />} />
-              <Route
-                path="orders"
-                element={<ComingSoon title="Orders" subtitle="Full order feed" icon={ReceiptText} />}
-              />
+              <Route path="orders" element={<Orders />} />
               <Route path="merchants" element={<Merchants />} />
-              <Route
-                path="outlets"
-                element={<ComingSoon title="Outlets" subtitle="Outlet directory" icon={Building2} />}
-              />
-              <Route path="brands" element={<ComingSoon title="Brands" subtitle="Brand directory" icon={Tags} />} />
+              <Route path="outlets" element={<Outlets />} />
+              <Route path="brands" element={<Brands />} />
               <Route path="kitchen" element={<Kitchen />} />
               <Route path="printers" element={<Printers />} />
               <Route path="menu" element={<Menu />} />
