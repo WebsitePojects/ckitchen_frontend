@@ -1,3 +1,90 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * CloudKitchen ONE — dark theme tokens (UI Reskin Plan)
+ * Base: shadcn/ui "zinc" palette. Primary overridden to emerald.
+ * Dark surfaces use the client-mockup-derived hexes:
+ *   app bg #0A0F0D · card #121A17 · border #27332C · sidebar #0C1310
+ */
+@layer base {
+  :root {
+    /* Light theme kept for completeness; app runs dark-only (see <html class="dark">) */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --primary: 160 84% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 160 84% 39%;
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 6% 10%;
+    --sidebar-border: 240 6% 90%;
+    --sidebar-accent: 160 84% 95%;
+    --sidebar-accent-foreground: 160 84% 30%;
+  }
+
+  .dark {
+    /* App background — near-black green (#0A0F0D) */
+    --background: 156 20% 5%;
+    --foreground: 0 0% 98%;
+
+    /* Card surface (#121A17) with visible border (#27332C) */
+    --card: 158 18% 9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 158 18% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary/accent — emerald */
+    --primary: 160 84% 39%;        /* emerald-500 #10B981 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 4% 16%;        /* zinc-800 */
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%; /* zinc-400 */
+
+    --accent: 161 94% 30%;          /* emerald-600 #059669 */
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;       /* red-500 #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 145 13% 18%;          /* #27332C */
+    --input: 145 13% 18%;
+    --ring: 160 84% 39%;
+
+    /* Sidebar — distinct, slightly darker than the card surface (#0C1310) */
+    --sidebar-background: 154 23% 6%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-border: 145 13% 18%;
+    --sidebar-accent: 160 84% 39% / 0.15;
+    --sidebar-accent-foreground: 160 84% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'tnum' 1;
+  }
+}
