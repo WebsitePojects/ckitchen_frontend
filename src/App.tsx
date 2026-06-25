@@ -1,5 +1,4 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { Settings } from 'lucide-react'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import AppShell from './components/layout/AppShell'
@@ -8,7 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Kitchen from './pages/Kitchen'
 import Inventory from './pages/Inventory'
 import Analytics from './pages/Analytics'
-import ComingSoon from './pages/ComingSoon'
+import Settings from './pages/Settings'
 import Merchants from './pages/Merchants'
 import Menu from './pages/Menu'
 import Printers from './pages/Printers'
@@ -39,10 +38,7 @@ export default function App() {
               <Route path="inventory" element={<Inventory />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="reports" element={<Analytics />} />
-              <Route
-                path="settings"
-                element={<ComingSoon title="Settings" subtitle="System configuration" icon={Settings} />}
-              />
+              <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
 
