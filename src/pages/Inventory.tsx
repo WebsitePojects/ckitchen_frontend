@@ -305,11 +305,12 @@ interface ReceiveItem {
 
 interface ReceiveFormProps {
   ingredients: Ingredient[]
+  outletId?: string
   onSuccess: () => void
   onClose: () => void
 }
 
-function ReceiveForm({ ingredients, onSuccess, onClose }: ReceiveFormProps) {
+function ReceiveForm({ ingredients, outletId, onSuccess, onClose }: ReceiveFormProps) {
   const [items, setItems] = useState<ReceiveItem[]>([{ ingredientId: '', quantity: '' }])
   const [submitting, setSubmitting] = useState(false)
 
@@ -335,6 +336,7 @@ function ReceiveForm({ ingredients, onSuccess, onClose }: ReceiveFormProps) {
     setSubmitting(true)
     try {
       await post('/inventory/receive', {
+        outlet_id: outletId,
         // Backend Zod schema expects snake_case `ingredient_id` in the request body
         // (verified against ckitchen_backend/src/modules/inventory/routes.ts).
         items: valid.map(it => ({
@@ -449,11 +451,12 @@ interface ItoRequestItem {
 
 interface ItoRequestFormProps {
   ingredients: Ingredient[]
+  outletId?: string
   onSuccess: () => void
   onClose: () => void
 }
 
-function ItoRequestForm({ ingredients, onSuccess, onClose }: ItoRequestFormProps) {
+function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoRequestFormProps) {
   const [items, setItems] = useState<ItoRequestItem[]>([{ ingredientId: '', quantity: '' }])
   const [submitting, setSubmitting] = useState(false)
 
@@ -479,6 +482,7 @@ function ItoRequestForm({ ingredients, onSuccess, onClose }: ItoRequestFormProps
     setSubmitting(true)
     try {
       await post('/itos', {
+        outlet_id: outletId,
         from: 'MAIN',
         to: 'KITCHEN',
         // Backend Zod schema expects snake_case `ingredient_id` in the request body

@@ -1,13 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Building2, CheckCircle2 } from 'lucide-react'
-import { get } from '../lib/api'
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { Building2, CheckCircle2, Home, Plus, Warehouse } from 'lucide-react'
+import { get, post } from '../lib/api'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
-import AggregatorBadge from '../components/common/AggregatorBadge'
-import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
+import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../components/ui/dialog'
+import { Input } from '../components/ui/input'
 import {
   Table,
   TableBody,
@@ -17,58 +26,79 @@ import {
   TableRow,
 } from '../components/ui/table'
 
-interface Brand {
+interface OutletWarehouse {
   id: string
-  name: string
-  color: string
+  type: 'MAIN' | 'KITCHEN'
 }
-interface Account {
-  id: string
-  aggregator: string
-  externalMerchantId?: string
-  external_merchant_id?: string
-  isActive?: boolean
-  is_active?: boolean
-}
+
 interface Outlet {
   id: string
-  brand: Brand
-  aggregator: string
-  merchantId: string
-  active: boolean
+  code: string
+  name: string
+  address?: string | null
+  status: 'ACTIVE' | 'INACTIVE'
+  timezone: string
+  contactName?: string | null
+  contactPhone?: string | null
+  warehouses: OutletWarehouse[]
+}
+
+interface OutletForm {
+  code: string
+  name: string
+  address: string
+  timezone: string
+  contactName: string
+  contactPhone: string
+}
+
+const EMPTY_FORM: OutletForm = {
+  code: '',
+  name: '',
+  address: '',
+  timezone: 'Asia/Manila',
+  contactName: '',
+  contactPhone: '',
+}
+
+function hasWarehouse(outlet: Outlet, type: OutletWarehouse['type']) {
+  return outlet.warehouses.some((warehouse) => warehouse.type === type)
+}
+
+function warehousePill(label: string, ready: boolean) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${
+        ready
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+          : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+      }`}
+    >
+      {label}
+    </span>
+  )
 }
 
 export default function Outlets() {
   const [outlets, setOutlets] = useState<Outlet[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [form, setForm] = useState<OutletForm>(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+
+  const loadOutlets = useCallback(async () => {
+    setError(null)
+    const { data } = await get<Outlet[]>('/outlets')
+    setOutlets(data)
+  }, [])
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
-        const { data: brands } = await get<Brand[]>('/brands')
-        const lists = await Promise.all(
-          brands.map((b) =>
-            get<Account[]>(`/brands/${b.id}/accounts`)
-              .then((r) => ({ brand: b, accounts: r.data }))
-              .catch(() => ({ brand: b, accounts: [] as Account[] })),
-          ),
-        )
-        if (!alive) return
-        const flat: Outlet[] = []
-        for (const { brand, accounts } of lists) {
-          for (const a of accounts) {
-            flat.push({
-              id: a.id,
-              brand,
-              aggregator: a.aggregator,
-              merchantId: a.externalMerchantId ?? a.external_merchant_id ?? '—',
-              active: a.isActive ?? a.is_active ?? true,
-            })
-          }
-        }
-        setOutlets(flat)
+        const { data } = await get<Outlet[]>('/outlets')
+        if (alive) setOutlets(data)
       } catch (e) {
         if (alive) setError((e as { message?: string })?.message ?? 'Failed to load outlets')
       } finally {
@@ -81,55 +111,199 @@ export default function Outlets() {
   }, [])
 
   const stats = useMemo(() => {
-    const fp = outlets.filter((o) => o.aggregator === 'FOODPANDA').length
-    const gf = outlets.filter((o) => o.aggregator === 'GRABFOOD').length
-    const active = outlets.filter((o) => o.active).length
-    return { fp, gf, active }
+    const active = outlets.filter((outlet) => outlet.status === 'ACTIVE').length
+    const readyWarehousePairs = outlets.filter(
+      (outlet) => hasWarehouse(outlet, 'MAIN') && hasWarehouse(outlet, 'KITCHEN'),
+    ).length
+    return { active, inactive: outlets.length - active, readyWarehousePairs }
   }, [outlets])
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSaving(true)
+    setError(null)
+
+    try {
+      await post<Outlet>('/outlets', {
+        code: form.code,
+        name: form.name,
+        address: form.address || undefined,
+        timezone: form.timezone || 'Asia/Manila',
+        contact_name: form.contactName || undefined,
+        contact_phone: form.contactPhone || undefined,
+      })
+      await loadOutlets()
+      setForm(EMPTY_FORM)
+      setDialogOpen(false)
+    } catch (e) {
+      setError((e as { message?: string })?.message ?? 'Failed to create outlet')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <div className="space-y-5">
-      <PageHeader title="Outlets" subtitle="Each brand's listing on a delivery platform" />
+    <div className="space-y-5 p-4 sm:p-6">
+      <PageHeader
+        title="Outlets"
+        subtitle="Physical operating sites with their own warehouse and in-house inventory"
+        actions={
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-emerald-600 text-white hover:bg-emerald-500">
+                <Plus className="h-4 w-4" />
+                Add Outlet
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="border-border bg-card text-zinc-50">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle>Add physical outlet</DialogTitle>
+                  <DialogDescription>
+                    Creates the outlet and initializes its MAIN warehouse plus KITCHEN in-house
+                    inventory.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-sm">
+                    <span className="text-zinc-300">Outlet code</span>
+                    <Input
+                      value={form.code}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, code: event.target.value }))
+                      }
+                      placeholder="QC2"
+                      required
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm">
+                    <span className="text-zinc-300">Outlet name</span>
+                    <Input
+                      value={form.name}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="Quezon City Outlet"
+                      required
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm sm:col-span-2">
+                    <span className="text-zinc-300">Address</span>
+                    <Input
+                      value={form.address}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, address: event.target.value }))
+                      }
+                      placeholder="Street, city"
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm">
+                    <span className="text-zinc-300">Timezone</span>
+                    <Input
+                      value={form.timezone}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, timezone: event.target.value }))
+                      }
+                      placeholder="Asia/Manila"
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm">
+                    <span className="text-zinc-300">Contact phone</span>
+                    <Input
+                      value={form.contactPhone}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, contactPhone: event.target.value }))
+                      }
+                      placeholder="+63 ..."
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm sm:col-span-2">
+                    <span className="text-zinc-300">Contact person</span>
+                    <Input
+                      value={form.contactName}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, contactName: event.target.value }))
+                      }
+                      placeholder="Outlet manager"
+                    />
+                  </label>
+                </div>
+
+                {error && <p className="text-sm text-red-400">{error}</p>}
+
+                <DialogFooter>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? 'Creating…' : 'Create outlet'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <KpiRibbon>
         <KpiCard icon={Building2} label="Total Outlets" value={outlets.length} />
         <KpiCard icon={CheckCircle2} label="Active" value={stats.active} />
-        <KpiCard icon={Building2} label="foodpanda" value={stats.fp} />
-        <KpiCard icon={Building2} label="GrabFood" value={stats.gf} />
+        <KpiCard icon={Warehouse} label="Warehouse Pairs" value={stats.readyWarehousePairs} />
+        <KpiCard icon={Home} label="Inactive" value={stats.inactive} />
       </KpiRibbon>
 
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading outlets…</p>
-        ) : error ? (
+          <p className="p-6 text-sm text-zinc-500">Loading physical outlets…</p>
+        ) : error && outlets.length === 0 ? (
           <p className="p-6 text-sm text-red-400">{error}</p>
         ) : outlets.length === 0 ? (
           <EmptyState
             icon={Building2}
-            title="No outlets"
-            description="Add aggregator accounts to brands from Merchant Management."
+            title="No physical outlets"
+            description="Create the first outlet to attach warehouses, stations, printers, and staff."
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead>Brand</TableHead>
-                <TableHead>Platform</TableHead>
-                <TableHead>Merchant ID</TableHead>
+                <TableHead>Code</TableHead>
+                <TableHead>Outlet</TableHead>
+                <TableHead>Warehouse</TableHead>
+                <TableHead>In-house Inventory</TableHead>
+                <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {outlets.map((o) => (
-                <TableRow key={o.id} className="border-border">
-                  <TableCell><BrandChip brand={o.brand} /></TableCell>
-                  <TableCell><AggregatorBadge aggregator={o.aggregator} /></TableCell>
-                  <TableCell className="font-mono text-xs text-zinc-400">{o.merchantId}</TableCell>
+              {outlets.map((outlet) => (
+                <TableRow key={outlet.id} className="border-border">
+                  <TableCell className="font-mono text-xs text-emerald-300">{outlet.code}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium text-zinc-100">{outlet.name}</p>
+                      <p className="text-xs text-zinc-500">{outlet.address || 'No address set'}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>{warehousePill('MAIN', hasWarehouse(outlet, 'MAIN'))}</TableCell>
+                  <TableCell>{warehousePill('KITCHEN', hasWarehouse(outlet, 'KITCHEN'))}</TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <p className="text-zinc-300">{outlet.contactName || '—'}</p>
+                      <p className="text-xs text-zinc-500">{outlet.contactPhone || outlet.timezone}</p>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <span className="flex items-center gap-1.5 text-xs">
-                      <span className={`h-1.5 w-1.5 rounded-full ${o.active ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
-                      <span className={o.active ? 'text-emerald-400' : 'text-zinc-500'}>
-                        {o.active ? 'Active' : 'Inactive'}
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          outlet.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-zinc-600'
+                        }`}
+                      />
+                      <span
+                        className={
+                          outlet.status === 'ACTIVE' ? 'text-emerald-400' : 'text-zinc-500'
+                        }
+                      >
+                        {outlet.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                       </span>
                     </span>
                   </TableCell>
