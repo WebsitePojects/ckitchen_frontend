@@ -15,6 +15,7 @@ import {
   ScrollText,
   ListOrdered,
   Camera,
+  Handshake,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -36,6 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/printers', label: 'Printers', icon: Printer },
   { to: '/menu', label: 'Menu Management', icon: UtensilsCrossed },
   { to: '/stock-ledger', label: 'Stock Ledger', icon: ListOrdered },
+  { to: '/master-data', label: 'Master Data', icon: Handshake },
   { to: '/users', label: 'Users & Roles', icon: Users },
   { to: '/employees', label: 'Employees', icon: UserCog },
   { to: '/attendance', label: 'Attendance / DTR', icon: Camera },
