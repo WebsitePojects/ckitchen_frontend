@@ -18,6 +18,7 @@ import Outlets from './pages/Outlets'
 import ChannelListings from './pages/ChannelListings'
 import Employees from './pages/Employees'
 import AuditTrail from './pages/AuditTrail'
+import StockLedger from './pages/StockLedger'
 
 export default function App() {
   return (
@@ -40,6 +41,7 @@ export default function App() {
               <Route path="printers" element={<Printers />} />
               <Route path="menu" element={<Menu />} />
               <Route path="inventory" element={<Inventory />} />
+              <Route path="stock-ledger" element={<StockLedger />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="employees" element={<Employees />} />
               <Route path="audit" element={<AuditTrail />} />
