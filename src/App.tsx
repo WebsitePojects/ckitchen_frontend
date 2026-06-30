@@ -19,6 +19,7 @@ import ChannelListings from './pages/ChannelListings'
 import Employees from './pages/Employees'
 import AuditTrail from './pages/AuditTrail'
 import StockLedger from './pages/StockLedger'
+import Attendance from './pages/Attendance'
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="stock-ledger" element={<StockLedger />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="employees" element={<Employees />} />
+              <Route path="attendance" element={<Attendance />} />
               <Route path="audit" element={<AuditTrail />} />
               <Route path="reports" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />

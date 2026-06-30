@@ -14,6 +14,7 @@ import {
   UserCog,
   ScrollText,
   ListOrdered,
+  Camera,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -37,6 +38,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/stock-ledger', label: 'Stock Ledger', icon: ListOrdered },
   { to: '/users', label: 'Users & Roles', icon: Users },
   { to: '/employees', label: 'Employees', icon: UserCog },
+  { to: '/attendance', label: 'Attendance / DTR', icon: Camera },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
