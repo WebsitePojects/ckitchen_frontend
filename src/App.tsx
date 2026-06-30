@@ -16,6 +16,8 @@ import Orders from './pages/Orders'
 import Brands from './pages/Brands'
 import Outlets from './pages/Outlets'
 import ChannelListings from './pages/ChannelListings'
+import Employees from './pages/Employees'
+import AuditTrail from './pages/AuditTrail'
 
 export default function App() {
   return (
@@ -39,6 +41,8 @@ export default function App() {
               <Route path="menu" element={<Menu />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="users" element={<UsersPage />} />
+              <Route path="employees" element={<Employees />} />
+              <Route path="audit" element={<AuditTrail />} />
               <Route path="reports" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
             </Route>

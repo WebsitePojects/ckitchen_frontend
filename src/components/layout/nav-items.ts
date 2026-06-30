@@ -11,6 +11,8 @@ import {
   Users,
   BarChart3,
   Settings,
+  UserCog,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -32,6 +34,8 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/printers', label: 'Printers', icon: Printer },
   { to: '/menu', label: 'Menu Management', icon: UtensilsCrossed },
   { to: '/users', label: 'Users & Roles', icon: Users },
+  { to: '/employees', label: 'Employees', icon: UserCog },
+  { to: '/audit', label: 'Audit Log', icon: ScrollText },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
