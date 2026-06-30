@@ -15,6 +15,7 @@ import UsersPage from './pages/Users'
 import Orders from './pages/Orders'
 import Brands from './pages/Brands'
 import Outlets from './pages/Outlets'
+import ChannelListings from './pages/ChannelListings'
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="orders" element={<Orders />} />
               <Route path="merchants" element={<Merchants />} />
               <Route path="outlets" element={<Outlets />} />
+              <Route path="channel-listings" element={<ChannelListings />} />
               <Route path="brands" element={<Brands />} />
               <Route path="kitchen" element={<Kitchen />} />
               <Route path="printers" element={<Printers />} />
