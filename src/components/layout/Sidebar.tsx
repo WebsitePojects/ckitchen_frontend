@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import { cn } from '../../lib/utils'
 import { NAV_ITEMS } from './nav-items'
+import { canAccess } from '../../auth/access'
 import { useSignOut } from './useSignOut'
 
 function initials(name: string | undefined): string {
@@ -41,7 +42,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {NAV_ITEMS.filter((item) => user != null && canAccess(user.role, item.to)).map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
