@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
+import { RequireAccess } from './auth/RequireAccess'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -33,6 +34,7 @@ export default function App() {
           {/* Protected shell */}
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
+              <Route element={<RequireAccess />}>
               <Route index element={<Dashboard />} />
               <Route path="orders" element={<Orders />} />
               <Route path="merchants" element={<Merchants />} />
@@ -51,6 +53,7 @@ export default function App() {
               <Route path="audit" element={<AuditTrail />} />
               <Route path="reports" element={<Analytics />} />
               <Route path="settings" element={<Settings />} />
+              </Route>
             </Route>
           </Route>
 
