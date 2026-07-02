@@ -26,9 +26,18 @@ import {
   Flame,
   LayoutGrid,
   PackageCheck,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { get, post } from '../lib/api'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '../components/ui/dialog'
 import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import type { Brand, Station } from './Dashboard'
@@ -282,12 +291,29 @@ interface OrderCardProps {
   stationId: string
   now: number           // tick from parent — triggers elapsed re-render
   onAdvance: (id: string) => void
+  onCancel: (id: string, reason: string) => Promise<void>
   advancing: boolean
 }
 
-function OrderCard({ order, brand, stationId, now: _now, onAdvance, advancing }: OrderCardProps) {
+function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, advancing }: OrderCardProps) {
   const style   = STAGE_STYLE[order.status] ?? STAGE_STYLE.NEW
   const next    = NEXT_STAGE[order.status]
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+
+  const submitCancel = async () => {
+    const reason = cancelReason.trim()
+    if (reason.length === 0) return
+    setCancelling(true)
+    try {
+      await onCancel(order.id, reason)
+      setCancelOpen(false)
+      setCancelReason('')
+    } finally {
+      setCancelling(false)
+    }
+  }
   const start   = timerStart(order)
   const mins    = elapsedMins(start)
   const isOverdue = mins >= OVERDUE_MINS && order.status !== 'COMPLETED'
@@ -400,7 +426,55 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, advancing }:
             Completed
           </div>
         )}
+
+        {/* ── Cancel (requires a reason) — only while the order is still active ── */}
+        {next && (
+          <button
+            onClick={() => setCancelOpen(true)}
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-300/80 hover:text-red-200 hover:bg-red-500/10 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+            Cancel order
+          </button>
+        )}
       </div>
+
+      {/* ── Cancel-reason dialog (MOTM 2026-07-01: cancellations must be justified) ── */}
+      <Dialog open={cancelOpen} onOpenChange={(o) => { if (!cancelling) setCancelOpen(o) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel order {order.externalRef}</DialogTitle>
+            <DialogDescription>
+              A reason is required and is saved to the audit log.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            maxLength={500}
+            rows={3}
+            autoFocus
+            placeholder="e.g. customer cancelled, item unavailable, duplicate order…"
+            className="w-full rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+          />
+          <DialogFooter>
+            <button
+              onClick={() => { setCancelOpen(false); setCancelReason('') }}
+              disabled={cancelling}
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+            >
+              Keep order
+            </button>
+            <button
+              onClick={() => void submitCancel()}
+              disabled={cancelling || cancelReason.trim().length === 0}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {cancelling ? 'Cancelling…' : 'Cancel order'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -613,6 +687,20 @@ export default function Kitchen() {
     }
   }, [])
 
+  // ── Cancel handler (reason required; backend records it + audits) ────────────
+  const handleCancel = useCallback(async (orderId: string, reason: string) => {
+    try {
+      await post(`/orders/${orderId}/cancel`, { reason })
+      setOrders(prev => prev.filter(o => o.id !== orderId))
+      toast.success('Order cancelled', { description: reason })
+    } catch (e) {
+      toast.error('Failed to cancel order', {
+        description: e instanceof Error ? e.message : 'Unknown error',
+      })
+      throw e // let the dialog keep itself open on failure
+    }
+  }, [])
+
   // ── Station-grouped view ───────────────────────────────────────────────────
 
   /**
@@ -801,6 +889,7 @@ export default function Kitchen() {
                           stationId={station.id}
                           now={now}
                           onAdvance={id => void handleAdvance(id)}
+                          onCancel={handleCancel}
                           advancing={advancing.has(order.id)}
                         />
                       ))
