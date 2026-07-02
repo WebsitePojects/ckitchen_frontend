@@ -12,7 +12,7 @@
  * Channel visibility (foodpanda / GrabFood / Direct) is presentational — local state only.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -78,8 +78,17 @@ interface MenuItem {
   prepTimeMin: number
   stationId: string
   availability: Availability
+  // MOTM 2026-07-01
+  itemNo?: string | null
+  remarks?: string | null
+  imageUrl?: string | null
   // Local-only channel visibility (not persisted to backend)
   _channels?: { foodpanda: boolean; grabfood: boolean; direct: boolean }
+}
+
+/** Inserts Cloudinary transforms into a delivery URL for a small, fast thumbnail. */
+function thumb(url: string): string {
+  return url.replace('/upload/', '/upload/w_80,h_80,c_fill,f_auto,q_auto/')
 }
 
 interface Station {
@@ -156,6 +165,11 @@ export default function Menu() {
   const [addStation, setAddStation] = useState('')
   const [addAvailability, setAddAvailability] = useState<Availability>('AVAILABLE')
   const [addSubmitting, setAddSubmitting] = useState(false)
+  // MOTM 2026-07-01: item number, remarks, photo
+  const [addItemNo, setAddItemNo] = useState('')
+  const [addRemarks, setAddRemarks] = useState('')
+  const [addImageUrl, setAddImageUrl] = useState('')
+  const [addUploading, setAddUploading] = useState(false)
 
   // Station lookup map
   const stationMap = useMemo(
@@ -306,6 +320,9 @@ export default function Menu() {
         prep_time_min: Number(addPrep) || 0,
         station_id: addStation || null,
         availability: addAvailability,
+        item_no: addItemNo.trim() || undefined,
+        remarks: addRemarks.trim() || undefined,
+        image_url: addImageUrl || undefined,
       })
       const newItem: MenuItem = { ...res.data, _channels: { ...DEFAULT_CHANNELS } }
       setMenuItems((prev) => [newItem, ...prev])
@@ -313,10 +330,35 @@ export default function Menu() {
       setAddOpen(false)
       resetAddForm()
     } catch (e) {
+      // Surface a duplicate product number clearly.
       const msg = e instanceof Error ? e.message : 'Failed to add item.'
       toast.error('Add failed', { description: msg })
     } finally {
       setAddSubmitting(false)
+    }
+  }
+
+  /** Reads a chosen image file, uploads it to Cloudinary via the backend, stores the URL. */
+  async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+    setAddUploading(true)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Could not read the file.'))
+        reader.readAsDataURL(file)
+      })
+      const res = await post<{ url: string }>('/menu/upload-photo', { data_url: dataUrl })
+      setAddImageUrl(res.data.url)
+      toast.success('Photo uploaded')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed.'
+      toast.error('Photo upload failed', { description: msg })
+    } finally {
+      setAddUploading(false)
     }
   }
 
@@ -326,16 +368,52 @@ export default function Menu() {
     setAddPrep('')
     setAddStation('')
     setAddAvailability('AVAILABLE')
+    setAddItemNo('')
+    setAddRemarks('')
+    setAddImageUrl('')
   }
 
   // ── Table columns ─────────────────────────────────────────────────────────
   const columns = useMemo<ColumnDef<MenuItem, unknown>[]>(
     () => [
       {
+        id: 'photo',
+        header: '',
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.imageUrl ? (
+            <img
+              src={thumb(row.original.imageUrl)}
+              alt={row.original.name}
+              loading="lazy"
+              className="h-9 w-9 rounded-md object-cover ring-1 ring-border"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-800 text-zinc-600">
+              <UtensilsCrossed className="h-4 w-4" />
+            </div>
+          ),
+      },
+      {
         accessorKey: 'name',
         header: 'Name',
         cell: ({ row }) => (
-          <span className="font-medium text-zinc-100">{row.original.name}</span>
+          <div className="min-w-0">
+            <span className="font-medium text-zinc-100">{row.original.name}</span>
+            {row.original.remarks && (
+              <span className="block truncate text-[11px] text-zinc-500" title={row.original.remarks}>
+                {row.original.remarks}
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        id: 'itemNo',
+        header: 'Product No.',
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs text-zinc-400">{row.original.itemNo ?? '—'}</span>
         ),
       },
       {
@@ -578,6 +656,67 @@ export default function Menu() {
             </Select>
           </div>
 
+          {/* Product number (MOTM) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Product No. (optional)</label>
+            <Input
+              value={addItemNo}
+              maxLength={32}
+              onChange={(e) => setAddItemNo(e.target.value)}
+              placeholder="e.g. SKU-001 (unique per brand)"
+            />
+          </div>
+
+          {/* Remarks (MOTM) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Remarks (optional)</label>
+            <textarea
+              value={addRemarks}
+              maxLength={500}
+              rows={2}
+              onChange={(e) => setAddRemarks(e.target.value)}
+              placeholder="Notes about this item…"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            />
+          </div>
+
+          {/* Photo (MOTM) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Photo (optional)</label>
+            <div className="flex items-center gap-3">
+              {addImageUrl ? (
+                <img
+                  src={thumb(addImageUrl)}
+                  alt="menu item preview"
+                  className="h-14 w-14 rounded-lg object-cover ring-1 ring-border"
+                />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-800 text-zinc-600">
+                  <UtensilsCrossed className="h-5 w-5" />
+                </div>
+              )}
+              <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-zinc-800/60">
+                {addUploading ? 'Uploading…' : addImageUrl ? 'Replace photo' : 'Upload photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={addUploading}
+                  onChange={(e) => void handlePhotoChange(e)}
+                />
+              </label>
+              {addImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAddImageUrl('')}
+                  className="text-xs text-zinc-500 hover:text-red-400"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -591,7 +730,7 @@ export default function Menu() {
             <Button
               type="submit"
               size="sm"
-              disabled={addSubmitting}
+              disabled={addSubmitting || addUploading}
               className="bg-emerald-600 text-white hover:bg-emerald-500"
             >
               {addSubmitting ? 'Adding…' : 'Add Item'}
