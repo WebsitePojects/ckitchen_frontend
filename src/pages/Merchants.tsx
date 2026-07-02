@@ -2,14 +2,14 @@
  * Merchants — M2 Merchant & Food Brand Management
  *
  * Implements:
- *   - KPI ribbon: Total Merchants / Brands / Outlets / Active Outlets / Orders Today
+ *   - KPI ribbon: Total Merchants / Brands / Channel Listings / Active Listings / Orders Today
  *   - Search toolbar + Add Merchant dialog (SUPER_ADMIN / BRAND_MANAGER only)
- *   - DataTable with per-brand row: avatar, outlets, status, categories, stations,
+ *   - DataTable with per-brand row: avatar, channel listings, status, categories, stations,
  *     printers, today's performance (orders / revenue / avg-time placeholder)
  *
  * Data notes:
  *   - Total Merchants = Total Brands = brand count (API only exposes /brands)
- *   - Outlets = aggregator accounts per brand (GET /brands/{id}/accounts)
+ *   - Channel Listings = aggregator accounts per brand (GET /brands/{id}/accounts)
  *   - Categories = distinct `category` fields from GET /brands/{id}/menu; "—" if none
  *   - Kitchen Stations = shared global resource (GET /stations) — same for every brand
  *   - Printers = shared global resource (GET /printers) — same for every brand
@@ -254,11 +254,11 @@ export default function Merchants() {
 
   // ── Derived KPIs ──────────────────────────────────────────────────────────
 
-  const totalOutlets = useMemo(
+  const totalListings = useMemo(
     () => rows.reduce((s, r) => s + r.accounts.length, 0),
     [rows],
   )
-  const activeOutlets = useMemo(
+  const activeListings = useMemo(
     () => rows.reduce((s, r) => s + r.accounts.filter((a) => a.isActive).length, 0),
     [rows],
   )
@@ -339,7 +339,7 @@ export default function Merchants() {
               <div>
                 <p className="text-sm font-medium leading-tight text-zinc-100">{r.name}</p>
                 <p className="mt-0.5 text-[11px] leading-tight tabular-nums text-zinc-500">
-                  1 Brand · {r.accounts.length} Outlet
+                  1 Brand · {r.accounts.length} Listing
                   {r.accounts.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -348,10 +348,10 @@ export default function Merchants() {
         },
       },
 
-      // ── Outlets ─────────────────────────────────────────────────────────
+      // ── Channel Listings ────────────────────────────────────────────────
       {
-        id: 'outlets',
-        header: 'Outlets',
+        id: 'listings',
+        header: 'Channel Listings',
         accessorFn: (r) => r.accounts.length,
         cell: ({ row }) => (
           <span className="tabular-nums text-sm text-zinc-300">
@@ -545,7 +545,7 @@ export default function Merchants() {
       <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
         <PageHeader
           title="Merchant & Food Brand Management"
-          subtitle="Manage all merchants, brands, outlets, kitchen stations and printer mappings"
+          subtitle="Manage all merchants, brands, channel listings, kitchen stations and printer mappings"
         />
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
           <p className="text-sm font-medium text-red-400">{error}</p>
@@ -565,7 +565,7 @@ export default function Merchants() {
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <PageHeader
         title="Merchant & Food Brand Management"
-        subtitle="Manage all merchants, brands, outlets, kitchen stations and printer mappings"
+        subtitle="Manage all merchants, brands, channel listings, kitchen stations and printer mappings"
         actions={
           <>
             {/* Merchant selector — also filters the table */}
@@ -620,13 +620,13 @@ export default function Merchants() {
         />
         <KpiCard
           icon={Building2}
-          label="Total Outlets"
-          value={loading ? '—' : totalOutlets}
+          label="Total Listings"
+          value={loading ? '—' : totalListings}
         />
         <KpiCard
           icon={CheckCircle2}
-          label="Active Outlets"
-          value={loading ? '—' : activeOutlets}
+          label="Active Listings"
+          value={loading ? '—' : activeListings}
         />
         <KpiCard
           icon={ReceiptText}
@@ -646,7 +646,7 @@ export default function Merchants() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search merchants, brands or outlets"
+            placeholder="Search merchants, brands or listings"
             className="h-9 pl-8 text-sm"
           />
         </div>

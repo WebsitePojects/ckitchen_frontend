@@ -103,6 +103,7 @@ export default function AuditTrail() {
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>('ALL')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [rangeError, setRangeError] = useState<string | null>(null)
 
   // ── Fetch ────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,14 @@ export default function AuditTrail() {
       setLoading(false)
       return
     }
+    // Inverted date range — block the fetch and surface an inline error instead
+    // of silently sending both params to the API (which would just return empty).
+    if (fromDate && toDate && fromDate > toDate) {
+      setRangeError('From date must be before To date.')
+      setLoading(false)
+      return
+    }
+    setRangeError(null)
     setLoading(true)
     setError(null)
     const qs = buildQuery({
@@ -178,6 +187,7 @@ export default function AuditTrail() {
             placeholder="Search actor, action, description…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            maxLength={200}
             className="w-72 pl-8"
           />
         </div>
@@ -215,6 +225,7 @@ export default function AuditTrail() {
             onChange={(e) => setToDate(e.target.value)}
             className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
+          {rangeError && <span className="text-xs text-red-400">{rangeError}</span>}
         </div>
 
         <span className="text-sm text-zinc-500">{rows.length} shown</span>

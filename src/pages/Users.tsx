@@ -32,16 +32,30 @@ import { useAuth } from '../auth/AuthContext'
 
 // The 8 users created by the backend seed (`npm run seed`). The prototype backend
 // has no users-CRUD endpoint, so this team list is seed-derived (accurate to the DB).
-const SEED_USERS = [
-  { name: 'Admin', email: 'admin@cloudkitchen.local', role: 'SUPER_ADMIN' },
-  { name: 'Super Admin', email: 'super_admin@cloudkitchen.local', role: 'SUPER_ADMIN' },
-  { name: 'Brand Manager', email: 'brand_manager@cloudkitchen.local', role: 'BRAND_MANAGER' },
-  { name: 'Kitchen Staff', email: 'kitchen_staff@cloudkitchen.local', role: 'KITCHEN_STAFF' },
-  { name: 'Warehouse', email: 'warehouse@cloudkitchen.local', role: 'WAREHOUSE' },
-  { name: 'Supplier Coordinator', email: 'supplier_coordinator@cloudkitchen.local', role: 'SUPPLIER_COORDINATOR' },
-  { name: 'Accountant', email: 'accountant@cloudkitchen.local', role: 'ACCOUNTANT' },
-  { name: 'Rider', email: 'rider@cloudkitchen.local', role: 'RIDER' },
-]
+// No backend users-list API exists yet (see audit-frontend.md) — table is seed-derived.
+// Real emails only ship in DEV builds; production masks them via Vite's compile-time DEV
+// constant so Vite's dead-code elimination drops the real-email branch entirely.
+const SEED_USERS = import.meta.env.DEV
+  ? [
+      { name: 'Admin', email: 'admin@cloudkitchen.local', role: 'SUPER_ADMIN' },
+      { name: 'Super Admin', email: 'super_admin@cloudkitchen.local', role: 'SUPER_ADMIN' },
+      { name: 'Brand Manager', email: 'brand_manager@cloudkitchen.local', role: 'BRAND_MANAGER' },
+      { name: 'Kitchen Staff', email: 'kitchen_staff@cloudkitchen.local', role: 'KITCHEN_STAFF' },
+      { name: 'Warehouse', email: 'warehouse@cloudkitchen.local', role: 'WAREHOUSE' },
+      { name: 'Supplier Coordinator', email: 'supplier_coordinator@cloudkitchen.local', role: 'SUPPLIER_COORDINATOR' },
+      { name: 'Accountant', email: 'accountant@cloudkitchen.local', role: 'ACCOUNTANT' },
+      { name: 'Rider', email: 'rider@cloudkitchen.local', role: 'RIDER' },
+    ]
+  : [
+      { name: 'Admin', email: '***@cloudkitchen.local', role: 'SUPER_ADMIN' },
+      { name: 'Super Admin', email: '***@cloudkitchen.local', role: 'SUPER_ADMIN' },
+      { name: 'Brand Manager', email: '***@cloudkitchen.local', role: 'BRAND_MANAGER' },
+      { name: 'Kitchen Staff', email: '***@cloudkitchen.local', role: 'KITCHEN_STAFF' },
+      { name: 'Warehouse', email: '***@cloudkitchen.local', role: 'WAREHOUSE' },
+      { name: 'Supplier Coordinator', email: '***@cloudkitchen.local', role: 'SUPPLIER_COORDINATOR' },
+      { name: 'Accountant', email: '***@cloudkitchen.local', role: 'ACCOUNTANT' },
+      { name: 'Rider', email: '***@cloudkitchen.local', role: 'RIDER' },
+    ]
 
 const ROLES = [
   'SUPER_ADMIN',
@@ -144,7 +158,7 @@ export default function Users() {
                   {SEED_USERS.map((u) => {
                     const isYou = user?.email === u.email
                     return (
-                      <TableRow key={u.email} className="border-border">
+                      <TableRow key={u.name} className="border-border">
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="h-8 w-8">

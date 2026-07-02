@@ -88,6 +88,13 @@ export default function MasterData() {
       setMsg({ err: 'Code and name are required.' })
       return
     }
+    if (form.payment_term_days) {
+      const days = Number(form.payment_term_days)
+      if (Number.isNaN(days) || days < 0) {
+        setMsg({ err: 'Payment terms must be a non-negative number of days.' })
+        return
+      }
+    }
     setSaving(true)
     try {
       await post(`/${kind}`, {
@@ -145,6 +152,7 @@ export default function MasterData() {
             placeholder={`Search ${kind} by code or name…`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            maxLength={128}
             className="w-72 pl-8"
           />
         </div>
@@ -160,10 +168,10 @@ export default function MasterData() {
       {adding && canWrite && (
         <Card className="border-border bg-card p-4">
           <div className="grid gap-3 sm:grid-cols-4">
-            <Input placeholder="Code *" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
-            <Input placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Input placeholder="Contact phone" value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
-            <Input placeholder="Payment terms (days)" type="number" value={form.payment_term_days} onChange={(e) => setForm({ ...form, payment_term_days: e.target.value })} />
+            <Input placeholder="Code *" maxLength={32} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+            <Input placeholder="Name *" maxLength={120} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <Input placeholder="Contact phone" maxLength={32} value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
+            <Input placeholder="Payment terms (days)" type="number" min="0" value={form.payment_term_days} onChange={(e) => setForm({ ...form, payment_term_days: e.target.value })} />
           </div>
           <div className="mt-3 flex items-center gap-3">
             <Button onClick={submit} disabled={saving}>{saving ? 'Saving…' : `Save ${singular}`}</Button>

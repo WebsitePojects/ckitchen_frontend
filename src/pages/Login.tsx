@@ -117,10 +117,12 @@ export default function Login() {
             </button>
           </div>
 
-          <p className="mt-5 rounded-lg bg-zinc-900/60 px-3 py-2 text-center text-xs text-zinc-500">
-            Demo: <span className="text-zinc-300">admin@cloudkitchen.local</span> /{' '}
-            <span className="text-zinc-300">admin123</span>
-          </p>
+          {import.meta.env.DEV && (
+            <p className="mt-5 rounded-lg bg-zinc-900/60 px-3 py-2 text-center text-xs text-zinc-500">
+              Demo: <span className="text-zinc-300">admin@cloudkitchen.local</span> /{' '}
+              <span className="text-zinc-300">admin123</span>
+            </p>
+          )}
         </form>
 
         <p className="mt-4 text-center text-xs text-zinc-600">

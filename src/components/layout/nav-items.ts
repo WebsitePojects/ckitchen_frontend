@@ -16,6 +16,7 @@ import {
   ListOrdered,
   Camera,
   Handshake,
+  Boxes,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -36,6 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/kitchen', label: 'Kitchen Stations', icon: ChefHat },
   { to: '/printers', label: 'Printers', icon: Printer },
   { to: '/menu', label: 'Menu Management', icon: UtensilsCrossed },
+  { to: '/inventory', label: 'Inventory', icon: Boxes },
   { to: '/stock-ledger', label: 'Stock Ledger', icon: ListOrdered },
   { to: '/master-data', label: 'Master Data', icon: Handshake },
   { to: '/users', label: 'Users & Roles', icon: Users },
