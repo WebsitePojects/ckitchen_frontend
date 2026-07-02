@@ -117,9 +117,11 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
   _socket = io(SOCKET_ORIGIN || '/', {
     // Dev: same-origin (Vite proxies /socket.io). Prod: absolute backend origin.
     path: '/socket.io',
-    // NOTE: JWT in handshake needs backend socket-auth verification support —
-    // deferred, see audit-frontend.md §4.
-    auth: { locationId },
+    // Send the user JWT in the handshake — the backend rejects sockets without a
+    // valid token (see backend realtime/hub.ts). Read directly from storage to
+    // avoid a circular import with api.ts (which imports destroySocket here).
+    // socket.io re-sends this same auth payload on every reconnect.
+    auth: { token: localStorage.getItem('ck_jwt') ?? undefined, locationId },
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
