@@ -77,6 +77,23 @@ export interface ServerEvents {
 
 let _socket: Socket | null = null
 
+// Room-join + reconnect bookkeeping (module state, mirrors the singleton above).
+let _lastJoinedLocationId: string | null = null
+let _hasConnectedBefore = false
+
+// Handlers notified when the socket reconnects (i.e. `connect` fires again
+// after the first connection) — used by pages to refetch and catch up on
+// any events missed while offline (Business Rule #9).
+const _reconnectHandlers = new Set<() => void>()
+
+// Handlers notified on connection status transitions, so the UI can show a
+// "reconnecting / offline" indicator (see AppShell.tsx).
+const _statusHandlers = new Set<(status: 'connected' | 'disconnected') => void>()
+
+function _emitStatus(status: 'connected' | 'disconnected'): void {
+  _statusHandlers.forEach(handler => handler(status))
+}
+
 const DEFAULT_LOCATION_ID = 'default'
 
 /**
@@ -94,26 +111,50 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
     _socket = null
   }
 
+  // Fresh session — the "first connect vs reconnect" distinction starts over.
+  _hasConnectedBefore = false
+
   _socket = io(SOCKET_ORIGIN || '/', {
     // Dev: same-origin (Vite proxies /socket.io). Prod: absolute backend origin.
     path: '/socket.io',
+    // NOTE: JWT in handshake needs backend socket-auth verification support —
+    // deferred, see audit-frontend.md §4.
     auth: { locationId },
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,
-    reconnectionAttempts: 10,
+    reconnectionDelayMax: 10_000,
+    reconnectionAttempts: Infinity,
   })
 
   _socket.on('connect', () => {
     console.log('[socket] connected', _socket?.id)
+
+    // Room join must survive every reconnect, not just the first connect —
+    // re-emit whatever location the app last asked to join.
+    if (_lastJoinedLocationId) {
+      _socket?.emit('join', _lastJoinedLocationId)
+    }
+
+    // If we've connected before, this `connect` is a reconnect after a drop —
+    // let subscribers (pages) know so they can refetch and catch up on any
+    // events missed while offline.
+    if (_hasConnectedBefore) {
+      _reconnectHandlers.forEach(handler => handler())
+    }
+    _hasConnectedBefore = true
+
+    _emitStatus('connected')
   })
 
   _socket.on('disconnect', (reason) => {
     console.log('[socket] disconnected', reason)
+    _emitStatus('disconnected')
   })
 
   _socket.on('connect_error', (err) => {
     console.warn('[socket] connect_error', err.message)
+    _emitStatus('disconnected')
   })
 
   return _socket
@@ -123,11 +164,52 @@ export function getSocket(): Socket | null {
   return _socket
 }
 
+/**
+ * Sets the location room the client should be joined to, and (if currently
+ * connected) joins it immediately. This is the one place that emits 'join' —
+ * pages should call this instead of `socket.emit('join', ...)` directly, so
+ * the room join is automatically re-applied after every reconnect.
+ */
+export function joinLocation(locationId: string): void {
+  _lastJoinedLocationId = locationId
+  if (_socket?.connected) {
+    _socket.emit('join', locationId)
+  }
+}
+
+/**
+ * Subscribes to socket reconnect events (fired when `connect` occurs again
+ * after the initial connection, i.e. the client dropped and came back).
+ * Returns an unsubscribe function.
+ */
+export function onSocketReconnect(handler: () => void): () => void {
+  _reconnectHandlers.add(handler)
+  return () => {
+    _reconnectHandlers.delete(handler)
+  }
+}
+
+/**
+ * Subscribes to connection status changes ('connected' | 'disconnected') so
+ * the UI can surface a "reconnecting / offline" indicator. Returns an
+ * unsubscribe function.
+ */
+export function onSocketStatusChange(
+  handler: (status: 'connected' | 'disconnected') => void,
+): () => void {
+  _statusHandlers.add(handler)
+  return () => {
+    _statusHandlers.delete(handler)
+  }
+}
+
 export function destroySocket(): void {
   if (_socket) {
     _socket.disconnect()
     _socket = null
   }
+  _lastJoinedLocationId = null
+  _hasConnectedBefore = false
 }
 
 /**

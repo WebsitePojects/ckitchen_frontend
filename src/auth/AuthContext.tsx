@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { apiClient } from '../lib/api'
+import { destroySocket } from '../lib/socket'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch(() => undefined)
     }
+    // Tear down the realtime socket unconditionally — every logout path clears it,
+    // not just useSignOut.
+    destroySocket()
     localStorage.removeItem(TOKEN_KEY)
     setState({ token: null, user: null, loading: false })
   }, [state.token])

@@ -27,7 +27,7 @@ import {
 import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 import { get, post } from '../lib/api'
-import { onSocketEvent } from '../lib/socket'
+import { onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { PrintStatusPayload, PrinterStatusPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
@@ -265,46 +265,57 @@ export default function Printers() {
   )
 
   // ── Initial data load ──────────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false
+  // Wrapped in useCallback (stable identity, no external deps — it fetches
+  // printers/stations/print-jobs fresh from the API every call) so it can
+  // also be re-invoked on socket reconnect to catch up on any missed
+  // print.status / printer.status events (Business Rule #9).
+  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
+    setLoading(true)
+    setError(null)
 
-    async function load() {
-      setLoading(true)
-      setError(null)
+    try {
+      const [printersRes, stationsRes, pendingRes, printedRes, failedRes] = await Promise.all([
+        get<PrinterDevice[]>('/printers'),
+        get<Station[]>('/stations'),
+        get<PrintJob[]>('/print-jobs?status=PENDING'),
+        get<PrintJob[]>('/print-jobs?status=PRINTED'),
+        get<PrintJob[]>('/print-jobs?status=FAILED'),
+      ])
+      if (cancelledRef?.current) return
 
-      try {
-        const [printersRes, stationsRes, pendingRes, printedRes, failedRes] = await Promise.all([
-          get<PrinterDevice[]>('/printers'),
-          get<Station[]>('/stations'),
-          get<PrintJob[]>('/print-jobs?status=PENDING'),
-          get<PrintJob[]>('/print-jobs?status=PRINTED'),
-          get<PrintJob[]>('/print-jobs?status=FAILED'),
-        ])
-        if (cancelled) return
+      setPrinters(printersRes.data)
+      setStations(stationsRes.data)
 
-        setPrinters(printersRes.data)
-        setStations(stationsRes.data)
-
-        // Merge all statuses, sort newest-first
-        const allJobs = [
-          ...failedRes.data,
-          ...pendingRes.data,
-          ...printedRes.data,
-        ]
-        allJobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        setJobs(allJobs)
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load printer data.')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+      // Merge all statuses, sort newest-first
+      const allJobs = [
+        ...failedRes.data,
+        ...pendingRes.data,
+        ...printedRes.data,
+      ]
+      allJobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      setJobs(allJobs)
+    } catch (e) {
+      if (!cancelledRef?.current) {
+        setError(e instanceof Error ? e.message : 'Failed to load printer data.')
       }
+    } finally {
+      if (!cancelledRef?.current) setLoading(false)
     }
-
-    void load()
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    const cancelledRef = { current: false }
+    void load(cancelledRef)
+    return () => { cancelledRef.current = true }
+  }, [load])
+
+  // ── Reconnect recovery ─────────────────────────────────────────────────────
+  // Printers doesn't own room-join responsibility (Dashboard/Kitchen already
+  // join the shared location room) — just refetch on reconnect to catch up
+  // on any print.status / printer.status events missed while offline.
+  useEffect(() => {
+    return onSocketReconnect(() => { void load() })
+  }, [load])
 
   // ── Realtime socket subscriptions ─────────────────────────────────────────
   useEffect(() => {

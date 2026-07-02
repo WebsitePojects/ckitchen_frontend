@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { get, post } from '../lib/api'
-import { onSocketEvent } from '../lib/socket'
+import { onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
@@ -328,6 +328,22 @@ function ReceiveForm({ ingredients, outletId, onSuccess, onClose }: ReceiveFormP
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    // A row is "bad" if only one of ingredientId/quantity is filled in, or quantity
+    // is filled but not a finite number > 0. A fully blank row (extra "Add row" click)
+    // is fine to silently ignore.
+    const hasBadRow = items.some(it => {
+      const hasIngredient = !!it.ingredientId
+      const qtyNum = Number(it.quantity)
+      const hasValidQty = it.quantity !== '' && Number.isFinite(qtyNum) && qtyNum > 0
+      if (!hasIngredient && !it.quantity) return false
+      return hasIngredient !== hasValidQty
+    })
+    if (hasBadRow) {
+      toast.error(
+        'Fix or remove incomplete rows before submitting — each row needs both an ingredient and a quantity greater than 0.',
+      )
+      return
+    }
     const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
     if (valid.length === 0) {
       toast.error('Add at least one ingredient with a quantity > 0.')
@@ -474,6 +490,22 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    // A row is "bad" if only one of ingredientId/quantity is filled in, or quantity
+    // is filled but not a finite number > 0. A fully blank row (extra "Add row" click)
+    // is fine to silently ignore.
+    const hasBadRow = items.some(it => {
+      const hasIngredient = !!it.ingredientId
+      const qtyNum = Number(it.quantity)
+      const hasValidQty = it.quantity !== '' && Number.isFinite(qtyNum) && qtyNum > 0
+      if (!hasIngredient && !it.quantity) return false
+      return hasIngredient !== hasValidQty
+    })
+    if (hasBadRow) {
+      toast.error(
+        'Fix or remove incomplete rows before requesting the transfer — each row needs both an ingredient and a quantity greater than 0.',
+      )
+      return
+    }
     const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
     if (valid.length === 0) {
       toast.error('Add at least one ingredient with a quantity > 0.')
@@ -838,6 +870,18 @@ export default function Inventory() {
       unsubLowstock()
     }
   }, [fetchMainStock, fetchKitchenStock])
+
+  // ── Socket reconnect refetch ─────────────────────────────────────────────────
+  // On reconnect, refetch both stock tiers + ITOs (ingredients rarely change and
+  // are non-critical — see fetchIngredients comment above).
+  useEffect(() => {
+    const unsubReconnect = onSocketReconnect(() => {
+      void Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])
+    })
+    return () => {
+      unsubReconnect()
+    }
+  }, [fetchMainStock, fetchKitchenStock, fetchItos])
 
   // ── ITO confirm handler ──────────────────────────────────────────────────────
 

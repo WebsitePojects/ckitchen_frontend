@@ -29,7 +29,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { get, post } from '../lib/api'
-import { getSocket, initSocket, onSocketEvent } from '../lib/socket'
+import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import type { Brand, Station } from './Dashboard'
 import PageHeader from '../components/common/PageHeader'
@@ -427,60 +427,69 @@ export default function Kitchen() {
   }, [])
 
   // ── Initial data load ──────────────────────────────────────────────────────
+  // Wrapped in useCallback (stable identity, no external deps — it fetches
+  // brands/stations/orders fresh from the API every call) so it can also be
+  // re-invoked on socket reconnect to catch up on any missed events
+  // (Business Rule #9).
+
+  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [brandsRes, stationsRes, ordersRes] = await Promise.all([
+        get<Brand[]>('/brands'),
+        get<Station[]>('/stations'),
+        // Fix: comma-separated single param — backend now accepts this form
+        get<RawOrderSummary[]>('/orders?status=NEW,PREPARING,READY'),
+      ])
+      if (cancelledRef?.current) return
+
+      setBrands(brandsRes.data)
+      setStations(stationsRes.data)
+
+      // Ensure socket connected and joined to the location room
+      if (!getSocket()) initSocket()
+      if (brandsRes.data.length > 0) {
+        joinLocation(brandsRes.data[0].locationId)
+      }
+
+      // Fetch full details for active orders
+      const summaries = ordersRes.data.filter(
+        o => (ACTIVE_STATUSES as string[]).includes(o.status),
+      )
+      const details = await Promise.all(summaries.map(o => fetchOrderDetail(o.id)))
+      if (cancelledRef?.current) return
+
+      const active = details.filter((d): d is KdsOrder => d !== null)
+      // Sort: NEW first, then PREPARING, then READY; within stage oldest first (longest wait)
+      active.sort((a, b) => {
+        const stageOrder: Record<string, number> = { NEW: 0, PREPARING: 1, READY: 2, COMPLETED: 3 }
+        const sd = (stageOrder[a.status] ?? 0) - (stageOrder[b.status] ?? 0)
+        if (sd !== 0) return sd
+        return new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime()
+      })
+      setOrders(active)
+    } catch (e) {
+      if (!cancelledRef?.current) {
+        setError(e instanceof Error ? e.message : 'Failed to load kitchen orders.')
+      }
+    } finally {
+      if (!cancelledRef?.current) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
+    const cancelledRef = { current: false }
+    void load(cancelledRef)
+    return () => { cancelledRef.current = true }
+  }, [load])
 
-    async function load() {
-      setLoading(true)
-      setError(null)
-      try {
-        const [brandsRes, stationsRes, ordersRes] = await Promise.all([
-          get<Brand[]>('/brands'),
-          get<Station[]>('/stations'),
-          // Fix: comma-separated single param — backend now accepts this form
-          get<RawOrderSummary[]>('/orders?status=NEW,PREPARING,READY'),
-        ])
-        if (cancelled) return
-
-        setBrands(brandsRes.data)
-        setStations(stationsRes.data)
-
-        // Ensure socket connected and joined to the location room
-        if (!getSocket()) initSocket()
-        const socket = getSocket()
-        if (socket && brandsRes.data.length > 0) {
-          socket.emit('join', brandsRes.data[0].locationId)
-        }
-
-        // Fetch full details for active orders
-        const summaries = ordersRes.data.filter(
-          o => (ACTIVE_STATUSES as string[]).includes(o.status),
-        )
-        const details = await Promise.all(summaries.map(o => fetchOrderDetail(o.id)))
-        if (cancelled) return
-
-        const active = details.filter((d): d is KdsOrder => d !== null)
-        // Sort: NEW first, then PREPARING, then READY; within stage oldest first (longest wait)
-        active.sort((a, b) => {
-          const stageOrder: Record<string, number> = { NEW: 0, PREPARING: 1, READY: 2, COMPLETED: 3 }
-          const sd = (stageOrder[a.status] ?? 0) - (stageOrder[b.status] ?? 0)
-          if (sd !== 0) return sd
-          return new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime()
-        })
-        setOrders(active)
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load kitchen orders.')
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => { cancelled = true }
-  }, [])
+  // ── Reconnect recovery ─────────────────────────────────────────────────────
+  // A dropped-then-restored socket may have missed order.created/updated
+  // events entirely — refetch to catch up (Business Rule #9).
+  useEffect(() => {
+    return onSocketReconnect(() => { void load() })
+  }, [load])
 
   // ── Socket subscriptions ───────────────────────────────────────────────────
 

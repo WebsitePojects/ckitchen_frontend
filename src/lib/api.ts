@@ -4,6 +4,7 @@ import axios, {
   type AxiosResponse,
   isAxiosError,
 } from 'axios'
+import { destroySocket } from './socket'
 
 // ─── Error shape from CK1-API-003 §1 ─────────────────────────────────────────
 
@@ -66,6 +67,16 @@ apiClient.interceptors.response.use(
   (res) => res,
   (err: unknown) => {
     if (isAxiosError(err) && err.response) {
+      // Session expired/invalid — clear local auth state and bounce to /login.
+      // Fires exactly once per 401 response; no retry.
+      if (err.response.status === 401) {
+        localStorage.removeItem(TOKEN_KEY)
+        destroySocket()
+        if (window.location.pathname !== '/login') {
+          window.location.assign('/login')
+        }
+      }
+
       const body = err.response.data as { error?: ApiError }
       const apiErr = body?.error
       if (apiErr) {

@@ -45,6 +45,10 @@ export default function SimulatorPanel({ brands }: Props) {
       setError('Select at least one brand to simulate.')
       return
     }
+    if (Number.isNaN(rate) || rate < 0.1 || rate > 60) {
+      setError('Rate must be a number between 0.1 and 60 orders/min.')
+      return
+    }
     setLoading(true)
     setError(null)
     try {

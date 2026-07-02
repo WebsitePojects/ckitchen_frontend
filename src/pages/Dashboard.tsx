@@ -12,7 +12,7 @@
  * Business Rule #6: web app NEVER prints — only shows print-job status.
  * Business Rule #9: real-time within ~2 s; distinct audible alert.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
   BellOff,
@@ -26,7 +26,7 @@ import {
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { get } from '../lib/api'
-import { getSocket, initSocket, onSocketEvent } from '../lib/socket'
+import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
 import { Button } from '../components/ui/button'
 import {
   Select,
@@ -239,60 +239,69 @@ export default function Dashboard() {
   const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
 
   // ── Initial data load ──────────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false
+  // Wrapped in useCallback (stable identity, no external deps — it fetches
+  // brands/stations/orders fresh from the API every call) so it can also be
+  // re-invoked on socket reconnect to catch up on any missed events
+  // (Business Rule #9).
+  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
+    setLoading(true)
+    setError(null)
 
-    async function load() {
-      setLoading(true)
-      setError(null)
+    try {
+      // Fetch brands, stations, and order list in parallel
+      const [brandsRes, stationsRes, ordersRes] = await Promise.all([
+        get<Brand[]>('/brands'),
+        get<Station[]>('/stations'),
+        get<RawOrder[]>('/orders'),
+      ])
+      if (cancelledRef?.current) return
 
-      try {
-        // Fetch brands, stations, and order list in parallel
-        const [brandsRes, stationsRes, ordersRes] = await Promise.all([
-          get<Brand[]>('/brands'),
-          get<Station[]>('/stations'),
-          get<RawOrder[]>('/orders'),
-        ])
-        if (cancelled) return
+      const loadedBrands   = brandsRes.data
+      const loadedStations = stationsRes.data
+      const rawOrders      = ordersRes.data
 
-        const loadedBrands   = brandsRes.data
-        const loadedStations = stationsRes.data
-        const rawOrders      = ordersRes.data
+      setBrands(loadedBrands)
+      setStations(loadedStations)
 
-        setBrands(loadedBrands)
-        setStations(loadedStations)
-
-        // Ensure socket is connected and joined to the correct location room.
-        if (!getSocket()) initSocket()
-        const socket = getSocket()
-        if (socket && loadedBrands.length > 0) {
-          socket.emit('join', loadedBrands[0].locationId)
-        }
-
-        // Sort newest-first, cap at 100 for initial load performance (FR-OD-07)
-        rawOrders.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
-        const toFetch = rawOrders.slice(0, 100)
-
-        // Fetch full detail for each order in parallel
-        const details = await Promise.all(toFetch.map(o => fetchOrderDetail(o.id)))
-        if (cancelled) return
-
-        const loaded = details.filter((d): d is OrderDetail => d !== null)
-        loaded.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
-        setOrders(loaded)
-      } catch (e) {
-        if (!cancelled) {
-          const msg = e instanceof Error ? e.message : 'Failed to load orders.'
-          setError(msg)
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+      // Ensure socket is connected and joined to the correct location room.
+      if (!getSocket()) initSocket()
+      if (loadedBrands.length > 0) {
+        joinLocation(loadedBrands[0].locationId)
       }
-    }
 
-    void load()
-    return () => { cancelled = true }
+      // Sort newest-first, cap at 100 for initial load performance (FR-OD-07)
+      rawOrders.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
+      const toFetch = rawOrders.slice(0, 100)
+
+      // Fetch full detail for each order in parallel
+      const details = await Promise.all(toFetch.map(o => fetchOrderDetail(o.id)))
+      if (cancelledRef?.current) return
+
+      const loaded = details.filter((d): d is OrderDetail => d !== null)
+      loaded.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
+      setOrders(loaded)
+    } catch (e) {
+      if (!cancelledRef?.current) {
+        const msg = e instanceof Error ? e.message : 'Failed to load orders.'
+        setError(msg)
+      }
+    } finally {
+      if (!cancelledRef?.current) setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    const cancelledRef = { current: false }
+    void load(cancelledRef)
+    return () => { cancelledRef.current = true }
+  }, [load])
+
+  // ── Reconnect recovery ─────────────────────────────────────────────────────
+  // A dropped-then-restored socket may have missed order.created/updated
+  // events entirely — refetch to catch up (Business Rule #9).
+  useEffect(() => {
+    return onSocketReconnect(() => { void load() })
+  }, [load])
 
   // ── Socket subscriptions (FR-OD-03, FR-OD-04) ────────────────────────────
   useEffect(() => {
