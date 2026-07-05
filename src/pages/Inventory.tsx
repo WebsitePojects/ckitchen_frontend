@@ -68,12 +68,24 @@ import EmptyState from '../components/common/EmptyState'
 
 // ─── Role helpers ──────────────────────────────────────────────────────────────
 
-/** Roles that can receive stock into MAIN warehouse (FR-IV-08). WAREHOUSE -> WAREHOUSE_MAIN + WAREHOUSE_OUTLET. */
-const CAN_RECEIVE: UserRole[] = ['WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET']
+/**
+ * Roles that can receive stock into MAIN warehouse (FR-IV-08).
+ * Matches backend INVENTORY_ROLES as of 2026-07-05 (ckitchen_backend
+ * src/modules/inventory/routes.ts: `const INVENTORY_ROLES = ["OWNER", "WAREHOUSE_OUTLET"]`)
+ * — WAREHOUSE_MAIN is deliberately withheld server-side pending the D31 matrix
+ * sign-off; do NOT re-add it here until the backend grants it. Widen when D31
+ * matrix lands server-side.
+ */
+const CAN_RECEIVE: UserRole[] = ['WAREHOUSE_OUTLET']
 /** Roles that can request an ITO (FR-IV-04). KITCHEN_STAFF -> KITCHEN_CREW. */
 const CAN_REQUEST_ITO: UserRole[] = ['KITCHEN_CREW']
-/** Roles that can confirm an ITO (FR-IV-04). WAREHOUSE -> WAREHOUSE_MAIN + WAREHOUSE_OUTLET. */
-const CAN_CONFIRM_ITO: UserRole[] = ['WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET']
+/**
+ * Roles that can confirm an ITO (FR-IV-04).
+ * Matches backend INVENTORY_ROLES as of 2026-07-05 (same allow-list as
+ * CAN_RECEIVE above) — WAREHOUSE_MAIN removed until backend grants it; widen
+ * when D31 matrix lands server-side.
+ */
+const CAN_CONFIRM_ITO: UserRole[] = ['WAREHOUSE_OUTLET']
 
 // ─── API types ────────────────────────────────────────────────────────────────
 

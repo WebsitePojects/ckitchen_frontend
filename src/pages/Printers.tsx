@@ -13,7 +13,9 @@
  *   - print.status   → updates a job row in the queue table
  *   - printer.status → updates printer health panel
  *
- * RBAC: OWNER | KITCHEN_CREW | OUTLET_MANAGER may reprint (server-enforced; UI also gated).
+ * RBAC: OWNER | KITCHEN_CREW may reprint (server-enforced; UI also gated).
+ * OUTLET_MANAGER can view this page but not reprint until the backend D31
+ * matrix widens REPRINT_ROLES (see CAN_REPRINT below).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -91,11 +93,13 @@ interface Station {
 
 // ─── RBAC ──────────────────────────────────────────────────────────────────────
 
-// KITCHEN_STAFF -> KITCHEN_CREW (v1/v2 alias). OUTLET_MANAGER is also granted
-// here (beyond the v1 mapping) because PAGE_ROLES['/printers'] already lets
-// OUTLET_MANAGER onto this page — without reprint they'd see a page with a
-// dead button. OWNER (+ legacy SUPER_ADMIN) always passes via `hasRole`.
-const CAN_REPRINT: UserRole[] = ['KITCHEN_CREW', 'OUTLET_MANAGER']
+// Matches backend REPRINT_ROLES as of 2026-07-05 (ckitchen_backend
+// src/modules/printing/routes.ts: `const REPRINT_ROLES = ["OWNER", "KITCHEN_CREW"]`)
+// — OUTLET_MANAGER can still view this page (PAGE_ROLES['/printers']) but the
+// reprint action is hidden/disabled for them until the backend grants it.
+// Widen when D31 matrix lands server-side. OWNER (+ legacy SUPER_ADMIN)
+// always passes via `hasRole`.
+const CAN_REPRINT: UserRole[] = ['KITCHEN_CREW']
 
 // ─── Print-job status badge classes ───────────────────────────────────────────
 

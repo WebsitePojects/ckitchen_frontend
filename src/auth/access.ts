@@ -76,7 +76,13 @@ export const PAGE_ROLES: Record<string, string[]> = {
 
   // Insights
   '/reports': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'PURCHASING', 'ACCOUNTING'],
-  '/audit': ['OUTLET_MANAGER', 'WAREHOUSE_MAIN', 'HR', 'ACCOUNTING'],
+  // Matches backend GET /audit as of 2026-07-05 (ckitchen_backend
+  // src/modules/ems/routes.ts: `requireRole("OWNER", "BRAND_MANAGER")`).
+  // OUTLET_MANAGER/WAREHOUSE_MAIN/HR/ACCOUNTING previously listed here landed
+  // on a page that always 403'd — removed until the backend D31 matrix widens
+  // GET /audit. BRAND_MANAGER already matches AuditTrail.tsx's own hasRole
+  // gate; OWNER passes via canAccess's short-circuit.
+  '/audit': ['BRAND_MANAGER'],
 
   // System
   '/outlets': ['WAREHOUSE_MAIN'],

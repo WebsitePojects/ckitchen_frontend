@@ -67,7 +67,13 @@ const ROLES = [
   'RIDER',
 ] as const
 
+// v1 (legacy) labels/colors, plus v2 (D24/D29) entries (L4) so a v2 role
+// token (e.g. from a future real users-list API, or the backend's actual
+// seed — ckitchen_backend/src/db/seed.ts now seeds v2 role names only) never
+// renders an undefined badge. BRAND_MANAGER is shared between both role
+// generations and already covers its v2 form.
 const ROLE_LABEL: Record<string, string> = {
+  // v1
   SUPER_ADMIN: 'Super Admin',
   BRAND_MANAGER: 'Brand Manager',
   KITCHEN_STAFF: 'Kitchen Staff',
@@ -75,9 +81,19 @@ const ROLE_LABEL: Record<string, string> = {
   SUPPLIER_COORDINATOR: 'Supplier Coord.',
   ACCOUNTANT: 'Accountant',
   RIDER: 'Rider',
+  // v2
+  OWNER: 'Owner',
+  OUTLET_MANAGER: 'Outlet Manager',
+  KITCHEN_CREW: 'Kitchen Crew',
+  WAREHOUSE_MAIN: 'Warehouse (Main)',
+  WAREHOUSE_OUTLET: 'Warehouse (Outlet)',
+  PURCHASING: 'Purchasing',
+  HR: 'HR',
+  ACCOUNTING: 'Accounting',
 }
 
 const ROLE_CLASS: Record<string, string> = {
+  // v1
   SUPER_ADMIN: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
   BRAND_MANAGER: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
   KITCHEN_STAFF: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
@@ -85,6 +101,15 @@ const ROLE_CLASS: Record<string, string> = {
   SUPPLIER_COORDINATOR: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
   ACCOUNTANT: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
   RIDER: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+  // v2
+  OWNER: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  OUTLET_MANAGER: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
+  KITCHEN_CREW: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+  WAREHOUSE_MAIN: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
+  WAREHOUSE_OUTLET: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
+  PURCHASING: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
+  HR: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
+  ACCOUNTING: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
 }
 
 // Permissions matrix — from CK1-API-003 §1 Role Authorization Matrix.

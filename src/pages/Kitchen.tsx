@@ -45,6 +45,9 @@ import {
   DialogDescription,
 } from '../components/ui/dialog'
 import { Button } from '../components/ui/button'
+import { useAuth } from '../auth/AuthContext'
+import type { UserRole } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import { onSocketEvent } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import {
@@ -72,6 +75,20 @@ const NEXT_STAGE: Record<string, string> = {
   PREPARING: 'READY',
   READY:     'COMPLETED',
 }
+
+// ─── RBAC ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Roles that may advance/cancel an order's stage (FR-KD-02, business-rules #2).
+ * Matches backend ORDER_STAGE_ROLES as of 2026-07-05 (ckitchen_backend
+ * src/modules/orders/routes.ts: `const ORDER_STAGE_ROLES = ["OWNER", "KITCHEN_CREW"]`,
+ * used for both POST /orders/:id/advance and /orders/:id/cancel). OUTLET_MANAGER
+ * can view /kitchen (PAGE_ROLES['/kitchen']) but the advance/cancel buttons were
+ * previously ungated, guaranteeing a 403 for that role — hidden here until the
+ * backend D31 matrix widens ORDER_STAGE_ROLES. OWNER (+ legacy SUPER_ADMIN)
+ * always passes via `hasRole`.
+ */
+const ORDER_STAGE_ROLES: UserRole[] = ['KITCHEN_CREW']
 
 // ─── Dark-mode stage color tokens ─────────────────────────────────────────────
 
@@ -136,9 +153,11 @@ interface OrderCardProps {
   onAdvance: (id: string) => void
   onCancel: (id: string, reason: string) => Promise<void>
   advancing: boolean
+  /** Gates the advance/cancel actions to ORDER_STAGE_ROLES (M3) — read-only card otherwise. */
+  canAct: boolean
 }
 
-function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, advancing }: OrderCardProps) {
+function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, advancing, canAct }: OrderCardProps) {
   const style   = STAGE_STYLE[order.status] ?? STAGE_STYLE.NEW
   const next    = NEXT_STAGE[order.status]
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -232,7 +251,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
 
       {/* ── Advance button ── */}
       <div className="px-3 pb-3 pt-2">
-        {next ? (
+        {next && canAct ? (
           <button
             onClick={() => onAdvance(order.id)}
             disabled={advancing}
@@ -263,6 +282,15 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
               </>
             )}
           </button>
+        ) : next ? (
+          // View-only role (M3): the backend's ORDER_STAGE_ROLES would 403 an
+          // advance/cancel call for this account — show status, not a dead button.
+          <div
+            className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-zinc-800/50 text-sm font-semibold text-zinc-500"
+            title="Your role can view this board but not advance orders"
+          >
+            View only
+          </div>
         ) : (
           <div className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-zinc-800/50 text-sm font-semibold text-zinc-600">
             <CheckCircle2 className="h-4 w-4" />
@@ -271,7 +299,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         )}
 
         {/* ── Cancel (requires a reason) — only while the order is still active ── */}
-        {next && (
+        {next && canAct && (
           <button
             onClick={() => setCancelOpen(true)}
             className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-300/80 hover:text-red-200 hover:bg-red-500/10 transition-colors"
@@ -325,6 +353,9 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
 // ─── Kitchen ──────────────────────────────────────────────────────────────────
 
 export default function Kitchen() {
+  const { user } = useAuth()
+  const canAct = hasRole(user?.role, ORDER_STAGE_ROLES)
+
   const [advancing, setAdvancing] = useState<Set<string>>(new Set())
   const [activeStage, setActiveStage] = useState<StageFilter>('ALL')
 
@@ -616,6 +647,7 @@ export default function Kitchen() {
                           onAdvance={id => void handleAdvance(id)}
                           onCancel={handleCancel}
                           advancing={advancing.has(order.id)}
+                          canAct={canAct}
                         />
                       ))
                     )}
