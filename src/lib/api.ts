@@ -46,6 +46,18 @@ function getOutletId(): string | null {
   return id && id !== 'ALL' ? id : null
 }
 
+/**
+ * Fired when the backend 403s a request's `X-Outlet-Id` header (D22
+ * `resolveOutletContext` membership check — a stale persisted selection,
+ * access revoked after the JWT was minted, or a legacy pre-tenancy token
+ * whose effective `outlet_ids` is always `[]`). `OutletContext` listens for
+ * this to clear the selection WITHOUT logging the user out — it's a tenancy
+ * scoping problem, not an auth failure. Kept as a duplicated literal (same
+ * pattern as OUTLET_STORAGE_KEY above) rather than imported, so this plain
+ * axios module never has to import the OutletContext component.
+ */
+const OUTLET_FORBIDDEN_EVENT = 'orion:outlet-forbidden'
+
 // ─── Base client ─────────────────────────────────────────────────────────────
 
 /**
@@ -95,6 +107,24 @@ apiClient.interceptors.response.use(
 
       const body = err.response.data as { error?: ApiError }
       const apiErr = body?.error
+
+      // Outlet membership check failed (D22 resolveOutletContext): the
+      // X-Outlet-Id we sent isn't one this user may act in. Only treat it as
+      // an outlet-scoping issue (not e.g. a role-based 403 on some other
+      // route) when this exact request actually carried the header AND the
+      // message matches the backend's outlet-scope wording — clear the
+      // stale selection so the browser stops resending a doomed header, but
+      // never log the user out over a tenancy mismatch.
+      if (
+        err.response.status === 403 &&
+        apiErr?.code === 'FORBIDDEN' &&
+        apiErr.message?.toLowerCase().includes('outlet') &&
+        (err.response.config?.headers as Record<string, unknown> | undefined)?.['X-Outlet-Id']
+      ) {
+        localStorage.removeItem(OUTLET_STORAGE_KEY)
+        window.dispatchEvent(new Event(OUTLET_FORBIDDEN_EVENT))
+      }
+
       if (apiErr) {
         return Promise.reject(
           new CKApiError(apiErr.code, apiErr.message, apiErr.details, err.response.status),

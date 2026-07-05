@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { apiClient } from '../lib/api'
 import { destroySocket } from '../lib/socket'
+import { decodeJwtPayload } from './jwt'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,11 +33,55 @@ export type UserRole =
   | 'HR'
   | 'ACCOUNTING'
 
+/** Tenancy scope (D22/W1) — mirrors backend modules/auth/roles.ts `OutletScope`. */
+export type OutletScope = 'ALL' | 'ASSIGNED'
+
 export interface AuthUser {
   id: string
   email: string
   name: string
   role: UserRole
+  /**
+   * Tenancy (D22/W1): 'ALL' for HQ roles, 'ASSIGNED' otherwise. Lives ONLY in
+   * the JWT payload — the login/`/auth/me` response's `user` row has no
+   * outlet columns (backend `users` table; see modules/auth/routes.ts
+   * `toPublicUser`) — so this is populated client-side by decoding the JWT
+   * (see `withTenancyClaims` below), not by the response body directly.
+   * Undefined on legacy tokens minted before this claim existed.
+   */
+  outlet_scope?: OutletScope
+  /**
+   * Tenancy (D22/W1): outlet ids this user may act in (from
+   * `user_outlet_access`), decoded from the JWT the same way as
+   * `outlet_scope`. Always an array (possibly empty) when the claim is
+   * present; undefined on legacy tokens.
+   */
+  outlet_ids?: string[]
+}
+
+/** Shape of the tenancy claims as they appear in the JWT payload (D22/W1). */
+interface TenancyClaims {
+  outlet_scope?: OutletScope
+  outlet_ids?: string[]
+}
+
+/**
+ * Merges the JWT's `outlet_scope`/`outlet_ids` claims onto a `user` object
+ * fetched from `/auth/login` or `/auth/me` — those endpoints return the raw
+ * `users` DB row (minus password hash), which has no outlet columns; the
+ * claims only ride the token itself. A token that fails to decode (malformed,
+ * or a pre-tenancy legacy token entirely lacking these fields) leaves `user`
+ * untouched, i.e. both fields stay undefined — the "legacy, no claims" case
+ * downstream contexts (OutletContext) must keep working under.
+ */
+function withTenancyClaims(user: AuthUser, token: string): AuthUser {
+  const claims = decodeJwtPayload<TenancyClaims>(token)
+  if (!claims) return user
+  return {
+    ...user,
+    outlet_scope: claims.outlet_scope,
+    outlet_ids: Array.isArray(claims.outlet_ids) ? claims.outlet_ids : undefined,
+  }
 }
 
 interface AuthState {
@@ -67,18 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // On mount (or token change), validate the stored token via /auth/me
   useEffect(() => {
-    if (!state.token) {
+    const token = state.token
+    if (!token) {
       setState((s) => ({ ...s, loading: false }))
       return
     }
 
     apiClient
       .get<{ user: AuthUser }>('/auth/me', {
-        headers: { Authorization: `Bearer ${state.token}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       .then(({ data }) => {
         // /auth/me returns { user: {...} } — unwrap it (login returns it nested too).
-        setState({ token: state.token, user: data.user, loading: false })
+        setState({ token, user: withTenancyClaims(data.user, token), loading: false })
       })
       .catch(() => {
         // Token invalid or expired — clear it
@@ -94,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       { email, password },
     )
     localStorage.setItem(TOKEN_KEY, data.token)
-    setState({ token: data.token, user: data.user, loading: false })
+    setState({ token: data.token, user: withTenancyClaims(data.user, data.token), loading: false })
   }, [])
 
   const logout = useCallback(async () => {
@@ -110,6 +156,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // not just useSignOut.
     destroySocket()
     localStorage.removeItem(TOKEN_KEY)
+    // Clear the outlet switcher's persisted selection too (context/OutletContext.tsx
+    // OUTLET_STORAGE_KEY) so the next login — possibly a different user with a
+    // different outlet scope — never inherits a stale choice. Literal duplicated
+    // here rather than imported, matching the same key already duplicated in
+    // lib/api.ts, to avoid a circular import between auth/ and context/.
+    localStorage.removeItem('orion.outletId')
     setState({ token: null, user: null, loading: false })
   }, [state.token])
 
