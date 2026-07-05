@@ -1,4 +1,5 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
+import { PLATFORM_NAME } from '../../lib/branding'
 
 interface PageHeaderState {
   title: string
@@ -17,7 +18,7 @@ const PageHeaderContext = createContext<PageHeaderContextValue | null>(null)
  * once near the top of their render.
  */
 export function PageHeaderProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PageHeaderState>({ title: 'CloudKitchen ONE' })
+  const [state, setState] = useState<PageHeaderState>({ title: PLATFORM_NAME })
 
   const value = useMemo<PageHeaderContextValue>(
     () => ({ ...state, setHeader: setState }),

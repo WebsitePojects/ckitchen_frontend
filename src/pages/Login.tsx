@@ -1,8 +1,9 @@
 import { type FormEvent, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChefHat, Loader2, AlertCircle } from 'lucide-react'
+import { Orbit, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { CKApiError } from '../lib/api'
+import { PLATFORM_NAME, PLATFORM_TAGLINE, PLATFORM_ATTRIBUTION } from '../lib/branding'
 
 export default function Login() {
   const { login } = useAuth()
@@ -45,10 +46,10 @@ export default function Login() {
       <div className="relative w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600/15 ring-1 ring-emerald-500/30">
-            <ChefHat className="h-6 w-6 text-emerald-400" aria-hidden />
+            <Orbit className="h-6 w-6 text-emerald-400" aria-hidden />
           </span>
-          <span className="text-2xl font-bold tracking-tight text-zinc-50">CloudKitchen ONE</span>
-          <p className="mt-1 text-sm text-zinc-500">Sign in to your account</p>
+          <span className="text-2xl font-bold tracking-tight text-zinc-50">{PLATFORM_NAME}</span>
+          <p className="mt-1 text-sm text-zinc-500">{PLATFORM_TAGLINE}</p>
         </div>
 
         <form
@@ -126,7 +127,7 @@ export default function Login() {
         </form>
 
         <p className="mt-4 text-center text-xs text-zinc-600">
-          CloudKitchen ONE — Prince IT Solutions
+          {PLATFORM_NAME} — {PLATFORM_ATTRIBUTION}
         </p>
       </div>
     </div>

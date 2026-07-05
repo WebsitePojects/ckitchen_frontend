@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Switch } from '../components/ui/switch'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
+import { PLATFORM_NAME, PLATFORM_ATTRIBUTION } from '../lib/branding'
 
 function ToggleRow({
   icon: Icon,
@@ -132,10 +133,10 @@ export default function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-            <Row label="Product" value="CloudKitchen ONE" />
+            <Row label="Product" value={PLATFORM_NAME} />
             <Row label="Version" value="Prototype" />
             <Row label="Database" value="Supabase (Postgres)" />
-            <Row label="By" value="Prince IT Solutions" />
+            <Row label="By" value={PLATFORM_ATTRIBUTION} />
           </CardContent>
         </Card>
       </div>

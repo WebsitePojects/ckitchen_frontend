@@ -39,6 +39,7 @@ import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import DataTable from '../components/common/DataTable'
 import EmptyState from '../components/common/EmptyState'
+import { PLATFORM_NAME } from '../lib/branding'
 
 // ─── Domain types ──────────────────────────────────────────────────────────────
 
@@ -220,7 +221,7 @@ function ThermalPreview({ job }: { job: PrintJob | null }) {
         {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </div>
       <div className="mt-1 text-center text-[9px] uppercase tracking-widest text-zinc-600">
-        Printed by CloudKitchen Print Agent
+        Printed by {PLATFORM_NAME} Print Agent
       </div>
     </div>
   )

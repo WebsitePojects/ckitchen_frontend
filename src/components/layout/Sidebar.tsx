@@ -1,4 +1,4 @@
-import { ChefHat, LogOut } from 'lucide-react'
+import { Orbit, LogOut } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { Avatar, AvatarFallback } from '../ui/avatar'
@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils'
 import { NAV_ITEMS } from './nav-items'
 import { canAccess } from '../../auth/access'
 import { useSignOut } from './useSignOut'
+import { PLATFORM_NAME } from '../../lib/branding'
 
 function initials(name: string | undefined): string {
   if (!name) return '?'
@@ -36,8 +37,8 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Brand mark */}
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-5">
-        <ChefHat className="h-6 w-6 text-emerald-500" aria-hidden />
-        <span className="text-base font-bold tracking-tight">CloudKitchen ONE</span>
+        <Orbit className="h-6 w-6 text-emerald-500" aria-hidden />
+        <span className="text-base font-bold tracking-tight">{PLATFORM_NAME}</span>
       </div>
 
       {/* Nav */}
