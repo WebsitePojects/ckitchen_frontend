@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import { cn } from '../../lib/utils'
-import { NAV_ITEMS } from './nav-items'
+import { NAV_GROUPS } from './nav-items'
 import { canAccess } from '../../auth/access'
 import { useSignOut } from './useSignOut'
 import { PLATFORM_NAME } from '../../lib/branding'
@@ -42,26 +42,39 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {NAV_ITEMS.filter((item) => user != null && canAccess(user.role, item.to)).map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                'group flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
-                  : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-50',
-              )
-            }
-          >
-            <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden />
-            <span className="truncate">{label}</span>
-          </NavLink>
-        ))}
+      <nav className="flex-1 overflow-y-auto px-3 py-4">
+        {NAV_GROUPS.map((group) => {
+          const items = group.items.filter((item) => user != null && canAccess(user.role, item.to))
+          if (items.length === 0) return null
+          return (
+            <div key={group.label} className="mt-4 first:mt-0">
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {items.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={to === '/'}
+                    onClick={onNavigate}
+                    className={({ isActive }) =>
+                      cn(
+                        'group flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-sm font-medium transition-colors',
+                        isActive
+                          ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
+                          : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-50',
+                      )
+                    }
+                  >
+                    <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden />
+                    <span className="truncate">{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </nav>
 
       {/* User footer */}

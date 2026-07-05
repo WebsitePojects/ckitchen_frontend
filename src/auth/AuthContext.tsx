@@ -13,13 +13,24 @@ import { destroySocket } from '../lib/socket'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type UserRole =
+  // v1 (legacy) — retained so the alias map (auth/access.ts ROLE_ALIASES) can
+  // normalize tokens issued before the v2 role migration lands server-side.
   | 'SUPER_ADMIN'
-  | 'BRAND_MANAGER'
   | 'KITCHEN_STAFF'
   | 'WAREHOUSE'
   | 'SUPPLIER_COORDINATOR'
   | 'ACCOUNTANT'
   | 'RIDER'
+  // v2 (D24/D29) — canonical role set
+  | 'OWNER'
+  | 'OUTLET_MANAGER'
+  | 'BRAND_MANAGER'
+  | 'KITCHEN_CREW'
+  | 'WAREHOUSE_MAIN'
+  | 'WAREHOUSE_OUTLET'
+  | 'PURCHASING'
+  | 'HR'
+  | 'ACCOUNTING'
 
 export interface AuthUser {
   id: string

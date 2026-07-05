@@ -2,14 +2,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireAccess } from './auth/RequireAccess'
+import RoleLanding from './auth/RoleLanding'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
 import Kitchen from './pages/Kitchen'
 import Inventory from './pages/Inventory'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
-import Merchants from './pages/Merchants'
 import Menu from './pages/Menu'
 import Printers from './pages/Printers'
 import UsersPage from './pages/Users'
@@ -34,10 +33,12 @@ export default function App() {
           {/* Protected shell */}
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
+              {/* '/merchants' left the nav post-D30 ("merchant" = Brand) — kept as an
+                  unconditional redirect (outside RequireAccess) so old links don't 404. */}
+              <Route path="merchants" element={<Navigate to="/channel-listings" replace />} />
               <Route element={<RequireAccess />}>
-              <Route index element={<Dashboard />} />
+              <Route index element={<RoleLanding />} />
               <Route path="orders" element={<Orders />} />
-              <Route path="merchants" element={<Merchants />} />
               <Route path="outlets" element={<Outlets />} />
               <Route path="channel-listings" element={<ChannelListings />} />
               <Route path="brands" element={<Brands />} />

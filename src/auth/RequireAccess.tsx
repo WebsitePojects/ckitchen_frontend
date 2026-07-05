@@ -14,7 +14,12 @@ export function RequireAccess() {
   // RequireAuth handles the no-token case upstream; if user is still resolving, render nothing.
   if (!user) return null
 
-  if (!canAccess(user.role, pathname)) {
+  // '/' always renders: the index route is <RoleLanding/>, which itself decides
+  // per-role whether that means the Dashboard or a bounce to the role's actual
+  // landing page (platform-ia-navigation.md §4). Gating '/' here too would
+  // self-redirect roles whose matrix excludes Dashboard (e.g. KITCHEN_CREW)
+  // into an infinite loop back to '/'.
+  if (pathname !== '/' && !canAccess(user.role, pathname)) {
     return <Navigate to="/" replace />
   }
 

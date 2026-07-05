@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   ReceiptText,
-  Store,
   Building2,
   Link2,
   Tags,
@@ -26,24 +25,66 @@ export interface NavItem {
   icon: LucideIcon
 }
 
-/** Sidebar nav — exact order + icons per the UI Reskin Plan. */
-export const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/orders', label: 'Orders', icon: ReceiptText },
-  { to: '/merchants', label: 'Merchant Management', icon: Store },
-  { to: '/outlets', label: 'Outlets', icon: Building2 },
-  { to: '/channel-listings', label: 'Channel Listings', icon: Link2 },
-  { to: '/brands', label: 'Brands', icon: Tags },
-  { to: '/kitchen', label: 'Kitchen Stations', icon: ChefHat },
-  { to: '/printers', label: 'Printers', icon: Printer },
-  { to: '/menu', label: 'Menu Management', icon: UtensilsCrossed },
-  { to: '/inventory', label: 'Inventory', icon: Boxes },
-  { to: '/stock-ledger', label: 'Stock Ledger', icon: ListOrdered },
-  { to: '/master-data', label: 'Master Data', icon: Handshake },
-  { to: '/users', label: 'Users & Roles', icon: Users },
-  { to: '/employees', label: 'Employees', icon: UserCog },
-  { to: '/attendance', label: 'Attendance / DTR', icon: Camera },
-  { to: '/audit', label: 'Audit Log', icon: ScrollText },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/settings', label: 'Settings', icon: Settings },
+export interface NavGroup {
+  label: string
+  items: NavItem[]
+}
+
+/**
+ * Grouped, role-filtered sidebar nav — platform-ia-navigation.md §4. The old
+ * flat 18-item list is retired; '/merchants' ("Merchant Management") has left
+ * the nav entirely post-D30 ("merchant" = Brand) — App.tsx redirects that
+ * route to /channel-listings so old links don't 404.
+ */
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Overview',
+    items: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/orders', label: 'Live Orders', icon: ReceiptText },
+      { to: '/kitchen', label: 'Kitchen (KDS)', icon: ChefHat },
+      { to: '/printers', label: 'Printers & Print Monitor', icon: Printer },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
+      { to: '/brands', label: 'Brands', icon: Tags },
+      { to: '/menu', label: 'Menu', icon: UtensilsCrossed },
+      { to: '/channel-listings', label: 'Channel Listings', icon: Link2 },
+    ],
+  },
+  {
+    label: 'Inventory',
+    items: [
+      { to: '/inventory', label: 'Inventory', icon: Boxes },
+      { to: '/stock-ledger', label: 'Stock Ledger', icon: ListOrdered },
+    ],
+  },
+  {
+    label: 'Purchasing',
+    items: [{ to: '/master-data', label: 'Master Data', icon: Handshake }],
+  },
+  {
+    label: 'People',
+    items: [
+      { to: '/employees', label: 'Employees', icon: UserCog },
+      { to: '/attendance', label: 'Attendance / DTR', icon: Camera },
+      { to: '/users', label: 'Users & Roles', icon: Users },
+    ],
+  },
+  {
+    label: 'Insights',
+    items: [
+      { to: '/reports', label: 'Reports', icon: BarChart3 },
+      { to: '/audit', label: 'Audit Log', icon: ScrollText },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/outlets', label: 'Outlets', icon: Building2 },
+      { to: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
 ]
