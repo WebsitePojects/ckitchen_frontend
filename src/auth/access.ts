@@ -3,9 +3,12 @@ import type { UserRole } from './AuthContext'
 /**
  * v1 -> v2 role alias map (D24/D29). Both role generations are accepted while
  * the backend enum migration + JWT payloads transition — `canAccess` always
- * normalizes through this map first. RIDER intentionally has no v2 target:
- * the role was removed (D29 — client employs no riders) and falls through to
- * whatever the (empty) matrix entry allows, i.e. nothing beyond Attendance.
+ * normalizes through this map first. RIDER intentionally has NO v2 target:
+ * the role was removed (D29 — client employs no riders). It is deliberately
+ * left out of ROLE_ALIASES so `normalizeRole('RIDER')` falls through to the
+ * literal string 'RIDER', which the matrix below grants no access beyond
+ * Attendance + Settings (a stray pre-migration RIDER account is not fully
+ * locked out, but gets no operational access).
  */
 export const ROLE_ALIASES: Record<string, string> = {
   SUPER_ADMIN: 'OWNER',
@@ -63,7 +66,7 @@ export const PAGE_ROLES: Record<string, string[]> = {
 
   // People
   '/employees': ['OUTLET_MANAGER', 'HR'],
-  '/attendance': EVERYONE,
+  '/attendance': [...EVERYONE, 'RIDER'], // + a stray unaliased RIDER account (D29)
   '/users': ['HR'],
 
   // Insights
@@ -72,7 +75,7 @@ export const PAGE_ROLES: Record<string, string[]> = {
 
   // System
   '/outlets': ['WAREHOUSE_MAIN'],
-  '/settings': [], // OWNER only, via the short-circuit
+  '/settings': ['RIDER'], // OWNER only otherwise, via the short-circuit
 }
 
 /**
