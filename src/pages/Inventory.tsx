@@ -4,10 +4,10 @@
  *
  * Features:
  *   FR-IV-01/02  Two-tier view: MAIN + KITCHEN warehouse stock tables
- *   FR-IV-03/04  ITO request (KITCHEN_STAFF|SUPER_ADMIN) + confirm (WAREHOUSE|SUPER_ADMIN)
+ *   FR-IV-03/04  ITO request (KITCHEN_CREW|OWNER) + confirm (WAREHOUSE_MAIN|WAREHOUSE_OUTLET|OWNER)
  *   FR-IV-05     End-of-day consumption log (future: stub button shown)
  *   FR-IV-06/07  Below-threshold rows highlighted red; lowstock.alert toast
- *   FR-IV-08     Receive into MAIN (WAREHOUSE|SUPER_ADMIN)
+ *   FR-IV-08     Receive into MAIN (WAREHOUSE_MAIN|WAREHOUSE_OUTLET|OWNER)
  *   NFR-02       Real-time: stock.updated refreshes tiers; lowstock.alert toasts
  *
  * Business Rules:
@@ -35,6 +35,7 @@ import { onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import { Button } from '../components/ui/button'
 import {
   Dialog,
@@ -67,16 +68,12 @@ import EmptyState from '../components/common/EmptyState'
 
 // ─── Role helpers ──────────────────────────────────────────────────────────────
 
-/** Roles that can receive stock into MAIN warehouse (FR-IV-08) */
-const CAN_RECEIVE: UserRole[] = ['SUPER_ADMIN', 'WAREHOUSE']
-/** Roles that can request an ITO (FR-IV-04) */
-const CAN_REQUEST_ITO: UserRole[] = ['SUPER_ADMIN', 'KITCHEN_STAFF']
-/** Roles that can confirm an ITO (FR-IV-04) */
-const CAN_CONFIRM_ITO: UserRole[] = ['SUPER_ADMIN', 'WAREHOUSE']
-
-function hasRole(role: UserRole | undefined, allowed: UserRole[]): boolean {
-  return !!role && allowed.includes(role)
-}
+/** Roles that can receive stock into MAIN warehouse (FR-IV-08). WAREHOUSE -> WAREHOUSE_MAIN + WAREHOUSE_OUTLET. */
+const CAN_RECEIVE: UserRole[] = ['WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET']
+/** Roles that can request an ITO (FR-IV-04). KITCHEN_STAFF -> KITCHEN_CREW. */
+const CAN_REQUEST_ITO: UserRole[] = ['KITCHEN_CREW']
+/** Roles that can confirm an ITO (FR-IV-04). WAREHOUSE -> WAREHOUSE_MAIN + WAREHOUSE_OUTLET. */
+const CAN_CONFIRM_ITO: UserRole[] = ['WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET']
 
 // ─── API types ────────────────────────────────────────────────────────────────
 

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { get, post } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -111,7 +112,8 @@ const EMPTY_FORM: FormState = {
 
 export default function Employees() {
   const { user } = useAuth()
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  // OWNER-only (+ legacy SUPER_ADMIN, via hasRole's alias normalization).
+  const isSuperAdmin = hasRole(user?.role, [])
 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)

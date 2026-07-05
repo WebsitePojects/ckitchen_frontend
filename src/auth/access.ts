@@ -100,3 +100,18 @@ export function canAccess(role: UserRole, path: string): boolean {
   const allowed = PAGE_ROLES[path]
   return allowed ? allowed.includes(normalized) : false
 }
+
+/**
+ * True if `userRole` (v1 or v2 token) is a member of `allowed` (v2 role
+ * names), after normalizing through ROLE_ALIASES. OWNER (+ legacy
+ * SUPER_ADMIN, via the alias) always passes, mirroring `canAccess`'s
+ * short-circuit. Use this to gate in-page actions (buttons/menus, not nav —
+ * nav goes through `canAccess`) so v2 role tokens don't silently lose
+ * actions that hardcoded v1-only role arrays used to grant.
+ */
+export function hasRole(userRole: UserRole | undefined, allowed: UserRole[]): boolean {
+  if (!userRole) return false
+  const normalized = normalizeRole(userRole)
+  if (normalized === 'OWNER') return true
+  return allowed.includes(normalized as UserRole)
+}

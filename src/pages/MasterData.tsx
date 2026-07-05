@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Building2, Users2, Search, Plus, CircleAlert, CheckCircle2 } from 'lucide-react'
 import { get, post } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -38,7 +39,8 @@ const TABS: { key: Kind; label: string; icon: typeof Building2 }[] = [
 
 export default function MasterData() {
   const { user } = useAuth()
-  const canWrite = user?.role === 'SUPER_ADMIN'
+  // OWNER-only (+ legacy SUPER_ADMIN, via hasRole's alias normalization).
+  const canWrite = hasRole(user?.role, [])
 
   const [kind, setKind] = useState<Kind>('suppliers')
   const [rows, setRows] = useState<Party[]>([])

@@ -8,7 +8,7 @@
  *   FR-MN-04  Channel visibility toggles (local-only; backend has no per-channel field)
  *   FR-MN-05  Stock alerts side panel (low-threshold inventory items)
  *
- * RBAC: Writes (availability PATCH, add item) = SUPER_ADMIN | BRAND_MANAGER.
+ * RBAC: Writes (availability PATCH, add item) = OWNER (+ legacy SUPER_ADMIN) | BRAND_MANAGER.
  * Channel visibility (foodpanda / GrabFood / Direct) is presentational — local state only.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -27,6 +27,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { get, patch, post } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
 import {
@@ -141,8 +142,7 @@ const DEFAULT_CHANNELS = { foodpanda: true, grabfood: true, direct: true }
 
 export default function Menu() {
   const { user } = useAuth()
-  const canWrite =
-    user?.role === 'SUPER_ADMIN' || user?.role === 'BRAND_MANAGER'
+  const canWrite = hasRole(user?.role, ['BRAND_MANAGER'])
 
   // Data state
   const [brands, setBrands] = useState<Brand[]>([])

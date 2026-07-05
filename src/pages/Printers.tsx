@@ -13,7 +13,7 @@
  *   - print.status   → updates a job row in the queue table
  *   - printer.status → updates printer health panel
  *
- * RBAC: SUPER_ADMIN | KITCHEN_STAFF may reprint (server-enforced; UI also gated).
+ * RBAC: OWNER | KITCHEN_CREW | OUTLET_MANAGER may reprint (server-enforced; UI also gated).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -31,6 +31,7 @@ import { onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { PrintStatusPayload, PrinterStatusPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Switch } from '../components/ui/switch'
@@ -90,11 +91,11 @@ interface Station {
 
 // ─── RBAC ──────────────────────────────────────────────────────────────────────
 
-const CAN_REPRINT: UserRole[] = ['SUPER_ADMIN', 'KITCHEN_STAFF']
-
-function hasRole(role: UserRole | undefined, allowed: UserRole[]): boolean {
-  return !!role && allowed.includes(role)
-}
+// KITCHEN_STAFF -> KITCHEN_CREW (v1/v2 alias). OUTLET_MANAGER is also granted
+// here (beyond the v1 mapping) because PAGE_ROLES['/printers'] already lets
+// OUTLET_MANAGER onto this page — without reprint they'd see a page with a
+// dead button. OWNER (+ legacy SUPER_ADMIN) always passes via `hasRole`.
+const CAN_REPRINT: UserRole[] = ['KITCHEN_CREW', 'OUTLET_MANAGER']
 
 // ─── Print-job status badge classes ───────────────────────────────────────────
 

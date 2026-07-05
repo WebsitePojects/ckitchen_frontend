@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ScrollText, Search, ShieldOff } from 'lucide-react'
 import { get } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import { Card } from '../components/ui/card'
@@ -90,9 +91,8 @@ function buildQuery(params: Record<string, string>): string {
 export default function AuditTrail() {
   const { user } = useAuth()
 
-  // Gate: only SUPER_ADMIN and BRAND_MANAGER (mirrors requireRole on the backend)
-  const canView =
-    user?.role === 'SUPER_ADMIN' || user?.role === 'BRAND_MANAGER'
+  // Gate: only OWNER (+ legacy SUPER_ADMIN) and BRAND_MANAGER (mirrors requireRole on the backend)
+  const canView = hasRole(user?.role, ['BRAND_MANAGER'])
 
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
