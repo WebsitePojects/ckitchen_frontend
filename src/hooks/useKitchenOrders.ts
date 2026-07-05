@@ -12,10 +12,31 @@
  * should use the returned `setOrders`. This hook intentionally does NOT
  * expose advance/cancel actions — those are Kitchen-page-specific; the TV
  * board is read-only.
+ *
+ * M2 fix (2026-07-05): this hook used to join `brands[0].locationId`'s socket
+ * room unconditionally — for an outlet-2 KDS/TV viewer that room was simply
+ * wrong (whichever brand happened to sort first), so outlet-2 crew got no
+ * live order/stock/print events for their own outlet. Room selection now
+ * follows OutletContext's `selectedOutletId`: a specific outlet joins exactly
+ * that outlet's room; 'ALL' (HQ-scope viewers per D31) joins every outlet's
+ * room via `joinLocations` (lib/socket.ts) so nothing is missed. Switching
+ * outlets re-runs `load()` (selectedOutletId/outlets are in its deps), which
+ * both re-joins the correct room(s) and refetches — the GET /orders call
+ * already gets `X-Outlet-Id` from the axios interceptor (lib/api.ts, reads
+ * localStorage) when a specific outlet is selected, so the refetched order
+ * list is correctly outlet-scoped too.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { get } from '../lib/api'
-import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
+import {
+  getSocket,
+  initSocket,
+  joinLocation,
+  joinLocations,
+  onSocketEvent,
+  onSocketReconnect,
+} from '../lib/socket'
+import { useOutlet } from '../context/OutletContext'
 import {
   ACTIVE_STATUSES,
   fetchOrderDetail,
@@ -46,6 +67,7 @@ export interface UseKitchenOrdersResult {
 }
 
 export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitchenOrdersResult {
+  const { outlets, selectedOutletId } = useOutlet()
   const [orders, setOrders] = useState<KdsOrder[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [stations, setStations] = useState<Station[]>([])
@@ -67,10 +89,11 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
   }, [])
 
   // ── Initial data load ──────────────────────────────────────────────────────
-  // Wrapped in useCallback (stable identity, no external deps — it fetches
-  // brands/stations/orders fresh from the API every call) so it can also be
-  // re-invoked on socket reconnect to catch up on any missed events
-  // (Business Rule #9).
+  // Wrapped in useCallback so it can also be re-invoked on socket reconnect to
+  // catch up on any missed events (Business Rule #9). Depends on
+  // selectedOutletId/outlets (M2 fix) so switching the outlet switcher both
+  // re-joins the correct socket room(s) AND refetches (the refetch picks up
+  // the new X-Outlet-Id header lib/api.ts's interceptor now sends).
   const load = useCallback(async (cancelledRef?: { current: boolean }) => {
     setLoading(true)
     setError(null)
@@ -86,10 +109,17 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
       setBrands(brandsRes.data)
       setStations(stationsRes.data)
 
-      // Ensure socket connected and joined to the location room.
+      // Ensure socket connected and joined to the room(s) for the SELECTED
+      // outlet (M2 fix) — NOT brands[0].locationId, which was wrong for any
+      // outlet other than whichever brand happened to sort first. A specific
+      // outlet selection joins exactly that outlet's room; 'ALL' (HQ-scope
+      // viewers, D31) joins every outlet's room so no outlet's live events
+      // are missed (Business Rule #9).
       if (!getSocket()) initSocket()
-      if (brandsRes.data.length > 0) {
-        joinLocation(brandsRes.data[0].locationId)
+      if (selectedOutletId === 'ALL') {
+        if (outlets.length > 0) joinLocations(outlets.map(o => o.id))
+      } else {
+        joinLocation(selectedOutletId)
       }
 
       // Fetch full details for active orders.
@@ -115,7 +145,7 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
     } finally {
       if (!cancelledRef?.current) setLoading(false)
     }
-  }, [])
+  }, [selectedOutletId, outlets])
 
   useEffect(() => {
     const cancelledRef = { current: false }

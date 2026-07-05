@@ -78,7 +78,14 @@ export interface ServerEvents {
 let _socket: Socket | null = null
 
 // Room-join + reconnect bookkeeping (module state, mirrors the singleton above).
-let _lastJoinedLocationId: string | null = null
+//
+// M2 fix: a socket can be a member of several location rooms at once (an
+// HQ-scope viewer with 'ALL' outlets selected needs every outlet's room, not
+// just one) — the server's `join` handler (realtime/hub.ts) just calls
+// `socket.join(locationId)`, which is additive and never evicts the socket
+// from a room it already holds. Track the FULL set of rooms the app currently
+// wants so a reconnect re-emits 'join' for all of them, not just the last one.
+let _joinedLocationIds = new Set<string>()
 let _hasConnectedBefore = false
 
 // Handlers notified when the socket reconnects (i.e. `connect` fires again
@@ -111,8 +118,11 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
     _socket = null
   }
 
-  // Fresh session — the "first connect vs reconnect" distinction starts over.
+  // Fresh session — the "first connect vs reconnect" distinction starts over,
+  // and so does room membership bookkeeping (the old socket + its rooms are
+  // gone with the disconnect() above).
   _hasConnectedBefore = false
+  _joinedLocationIds = new Set()
 
   _socket = io(SOCKET_ORIGIN || '/', {
     // Dev: same-origin (Vite proxies /socket.io). Prod: absolute backend origin.
@@ -132,10 +142,11 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
   _socket.on('connect', () => {
     console.log('[socket] connected', _socket?.id)
 
-    // Room join must survive every reconnect, not just the first connect —
-    // re-emit whatever location the app last asked to join.
-    if (_lastJoinedLocationId) {
-      _socket?.emit('join', _lastJoinedLocationId)
+    // Room join(s) must survive every reconnect, not just the first connect —
+    // re-emit 'join' for every location the app currently wants (may be more
+    // than one — see `_joinedLocationIds` above).
+    for (const locationId of _joinedLocationIds) {
+      _socket?.emit('join', locationId)
     }
 
     // If we've connected before, this `connect` is a reconnect after a drop —
@@ -167,15 +178,46 @@ export function getSocket(): Socket | null {
 }
 
 /**
- * Sets the location room the client should be joined to, and (if currently
- * connected) joins it immediately. This is the one place that emits 'join' —
- * pages should call this instead of `socket.emit('join', ...)` directly, so
- * the room join is automatically re-applied after every reconnect.
+ * Sets the location room the client should be joined to (replacing any prior
+ * single-location selection tracked for reconnect purposes), and — if
+ * currently connected — joins it immediately. This is the single-room
+ * counterpart of `joinLocations` below; use that instead when a viewer needs
+ * more than one outlet's room at once (M2 — KDS/TV with 'ALL' outlets
+ * selected). Pages should call one of these instead of
+ * `socket.emit('join', ...)` directly, so the room join is automatically
+ * re-applied after every reconnect.
+ *
+ * NOTE: the backend (realtime/hub.ts) has no 'leave' handler — `socket.join`
+ * is purely additive server-side. Calling this after `joinLocations([...])`
+ * updates what gets re-joined on reconnect, but any previously-joined rooms
+ * the server already added this socket to are NOT actively left; the socket
+ * keeps receiving their events until it disconnects. Acceptable for now (no
+ * server-side support to do otherwise) — see M2 fix notes in
+ * useKitchenOrders.ts.
  */
 export function joinLocation(locationId: string): void {
-  _lastJoinedLocationId = locationId
+  _joinedLocationIds = new Set([locationId])
   if (_socket?.connected) {
     _socket.emit('join', locationId)
+  }
+}
+
+/**
+ * Sets the FULL list of location rooms the client should be joined to
+ * (replacing whatever was joined before for reconnect-tracking purposes), and
+ * — if currently connected — joins each of them immediately. Used by
+ * HQ-scope viewers (OutletContext `selectedOutletId === 'ALL'`) that need
+ * live events from every outlet at once, e.g. the KDS/TV board
+ * (useKitchenOrders.ts) — see M2 fix.
+ *
+ * Same reconnect + no-leave caveats as `joinLocation` above.
+ */
+export function joinLocations(locationIds: string[]): void {
+  _joinedLocationIds = new Set(locationIds)
+  if (_socket?.connected) {
+    for (const locationId of locationIds) {
+      _socket.emit('join', locationId)
+    }
   }
 }
 
@@ -210,7 +252,7 @@ export function destroySocket(): void {
     _socket.disconnect()
     _socket = null
   }
-  _lastJoinedLocationId = null
+  _joinedLocationIds = new Set()
   _hasConnectedBefore = false
 }
 
