@@ -13,10 +13,15 @@
  *   GET /analytics/aggregators?from&to   → { aggregator, order_count, revenue }
  *   GET /analytics/margins?from&to       → { brand_id, name, revenue, recipe_cost_total, margin }
  *
+ * Sales Report (W3a, D33 #10) — RBAC OWNER/ACCOUNTING only (backend requireRole):
+ *   GET /reports/sales?from&to&group_by=day|brand|outlet|aggregator
+ *     → { from, to, group_by, rows: [{key, orders_count, gross_sales, net_sales}], totals }
+ *   GET /reports/sales/export?format=xlsx|pdf&from&to&group_by → file download
+ *
  * Chart library: recharts (already installed) — dark-styled.
  * All numeric renders: (v ?? 0).toLocaleString() — no raw .toLocaleString() on unknown.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -30,17 +35,26 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import type { ColumnDef } from '@tanstack/react-table'
+import { isAxiosError } from 'axios'
+import { toast } from 'sonner'
 import {
   AlertTriangle,
   BarChart3,
   CalendarDays,
   DollarSign,
+  FileSpreadsheet,
+  FileText,
   ReceiptText,
   Star,
   TrendingUp,
 } from 'lucide-react'
-import { get } from '../lib/api'
+import { apiClient, get } from '../lib/api'
+import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
 import {
   Select,
   SelectContent,
@@ -53,7 +67,8 @@ import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
-import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE } from '../lib/theme'
+import DataTable from '../components/common/DataTable'
+import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE, aggregatorLabel } from '../lib/theme'
 
 // ─── API response types (snake_case — as the backend sends them) ───────────────
 
@@ -780,9 +795,311 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
   )
 }
 
+// ─── Section: Sales Report (client req #10, D33 / backend W3a) ────────────────
+//
+// Gated separately from the rest of /reports: PAGE_ROLES allows OUTLET_MANAGER /
+// BRAND_MANAGER / PURCHASING / ACCOUNTING onto this page, but the backend's
+// GET /reports/sales* routes only allow OWNER + ACCOUNTING (requireRole). This
+// section is hidden (not rendered) for roles the API would 403 — see the
+// `hasRole(user?.role, ['ACCOUNTING'])` gate at the bottom of this file.
+
+type SalesGroupBy = 'day' | 'brand' | 'outlet' | 'aggregator'
+
+interface ApiSalesRow {
+  key: string
+  orders_count: number
+  gross_sales: number
+  net_sales: number
+}
+
+interface ApiSalesReport {
+  from: string
+  to: string
+  group_by: SalesGroupBy
+  rows: ApiSalesRow[]
+  totals: ApiSalesRow
+}
+
+const SALES_GROUP_BY_OPTIONS: { value: SalesGroupBy; label: string }[] = [
+  { value: 'day', label: 'Day' },
+  { value: 'brand', label: 'Brand' },
+  { value: 'outlet', label: 'Outlet' },
+  { value: 'aggregator', label: 'Aggregator' },
+]
+
+function salesGroupByLabel(groupBy: SalesGroupBy): string {
+  return SALES_GROUP_BY_OPTIONS.find(o => o.value === groupBy)?.label ?? groupBy
+}
+
+/** Row `key` is a raw date/name/aggregator-code string — render it per group_by. */
+function formatSalesRowKey(key: string, groupBy: SalesGroupBy): string {
+  if (groupBy === 'day') {
+    const d = new Date(`${key}T00:00:00Z`)
+    if (Number.isNaN(d.getTime())) return key
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+  }
+  if (groupBy === 'aggregator') {
+    return aggregatorLabel(key)
+  }
+  return key
+}
+
+/** Current UTC calendar month as YYYY-MM-DD bounds — mirrors the backend's default (routes.ts currentMonthRange). */
+function currentMonthRange(): { from: string; to: string } {
+  const now = new Date()
+  const from = new Date(now.getFullYear(), now.getMonth(), 1)
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { from: isoDate(from), to: isoDate(to) }
+}
+
+/** Pulls `filename="..."` out of a Content-Disposition header; falls back if absent/unparseable. */
+function filenameFromContentDisposition(header: string | undefined, fallback: string): string {
+  if (!header) return fallback
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header)
+  return match?.[1] ?? fallback
+}
+
+/**
+ * Triggers a browser download from an in-memory Blob. Needed because the export
+ * endpoint requires the JWT + X-Outlet-Id headers (via apiClient) — a plain
+ * <a href="/api/...">  link can't carry those, so the file must be fetched as a
+ * blob first and then "downloaded" via a throwaway object URL + anchor click.
+ */
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = window.URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  window.URL.revokeObjectURL(url)
+}
+
+/**
+ * With `responseType: 'blob'`, axios also delivers ERROR bodies as a Blob
+ * (not JSON) — so the api.ts response interceptor's normal `{ error }` unwrap
+ * never fires and `err.message` is just axios's generic "Request failed with
+ * status code 4xx/5xx". Re-parse the blob as the CK1-API-003 §1 error shape
+ * here so the export failure toast shows the real backend reason (e.g. the
+ * 400 "'from' must not be after 'to'" validation message).
+ */
+async function resolveExportErrorMessage(err: unknown): Promise<string> {
+  if (isAxiosError(err) && err.response?.data instanceof Blob) {
+    try {
+      const text = await err.response.data.text()
+      const parsed = JSON.parse(text) as { error?: { message?: string } }
+      if (parsed?.error?.message) return parsed.error.message
+    } catch {
+      // Not JSON (or empty) — fall through to the generic message below.
+    }
+  }
+  return err instanceof Error ? err.message : 'Export failed.'
+}
+
+function SalesReportSection() {
+  const monthDefaults = currentMonthRange()
+
+  // Draft controls (edited freely; only take effect on "Apply")
+  const [fromInput, setFromInput] = useState(monthDefaults.from)
+  const [toInput, setToInput] = useState(monthDefaults.to)
+  const [groupByInput, setGroupByInput] = useState<SalesGroupBy>('day')
+  const [rangeError, setRangeError] = useState<string | null>(null)
+
+  // Applied filters — what was actually fetched
+  const [appliedFrom, setAppliedFrom] = useState(monthDefaults.from)
+  const [appliedTo, setAppliedTo] = useState(monthDefaults.to)
+  const [appliedGroupBy, setAppliedGroupBy] = useState<SalesGroupBy>('day')
+
+  const [report, setReport] = useState<ApiSalesReport | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    get<ApiSalesReport>(
+      `/reports/sales?from=${appliedFrom}&to=${appliedTo}&group_by=${appliedGroupBy}`,
+    )
+      .then(res => { if (!cancelled) setReport(res.data) })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load sales report.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [appliedFrom, appliedTo, appliedGroupBy])
+
+  const handleApply = useCallback(() => {
+    if (fromInput && toInput && fromInput > toInput) {
+      setRangeError("'From' must not be after 'To'.")
+      return
+    }
+    setRangeError(null)
+    setAppliedFrom(fromInput)
+    setAppliedTo(toInput)
+    setAppliedGroupBy(groupByInput)
+  }, [fromInput, toInput, groupByInput])
+
+  const handleExport = useCallback(async (format: 'xlsx' | 'pdf') => {
+    setExporting(format)
+    try {
+      const res = await apiClient.get('/reports/sales/export', {
+        params: { from: appliedFrom, to: appliedTo, group_by: appliedGroupBy, format },
+        responseType: 'blob',
+      })
+      const fallback = `orion-sales.${format}`
+      const disposition = (res.headers as Record<string, string> | undefined)?.['content-disposition']
+      const filename = filenameFromContentDisposition(disposition, fallback)
+      triggerBlobDownload(res.data as Blob, filename)
+    } catch (e) {
+      const message = await resolveExportErrorMessage(e)
+      toast.error('Export failed', { description: message })
+    } finally {
+      setExporting(null)
+    }
+  }, [appliedFrom, appliedTo, appliedGroupBy])
+
+  const columns = useMemo<ColumnDef<ApiSalesRow, unknown>[]>(() => [
+    {
+      id: 'key',
+      header: salesGroupByLabel(appliedGroupBy),
+      cell: ({ row }) => (
+        <span className="font-medium text-zinc-200">
+          {formatSalesRowKey(row.original.key, appliedGroupBy)}
+        </span>
+      ),
+    },
+    {
+      id: 'orders_count',
+      accessorKey: 'orders_count',
+      header: 'Orders',
+      cell: ({ getValue }) => <span className="tabular-nums">{fmtNum(getValue<number>())}</span>,
+    },
+    {
+      id: 'gross_sales',
+      accessorKey: 'gross_sales',
+      header: 'Gross Sales',
+      cell: ({ getValue }) => <span className="tabular-nums">{fmtPHP(getValue<number>())}</span>,
+    },
+    {
+      id: 'net_sales',
+      accessorKey: 'net_sales',
+      header: 'Net Sales',
+      cell: ({ getValue }) => <span className="tabular-nums">{fmtPHP(getValue<number>())}</span>,
+    },
+  ], [appliedGroupBy])
+
+  return (
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-zinc-100">Sales Report</CardTitle>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Gross + net sales for the selected range — grouped by day, brand, outlet, or aggregator
+        </p>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Controls row */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="sales-from" className="text-xs text-zinc-500">From</label>
+            <Input
+              id="sales-from"
+              type="date"
+              value={fromInput}
+              onChange={e => setFromInput(e.target.value)}
+              className="h-9 w-36 [color-scheme:dark]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="sales-to" className="text-xs text-zinc-500">To</label>
+            <Input
+              id="sales-to"
+              type="date"
+              value={toInput}
+              onChange={e => setToInput(e.target.value)}
+              className="h-9 w-36 [color-scheme:dark]"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-zinc-500">Group by</label>
+            <Select value={groupByInput} onValueChange={v => setGroupByInput(v as SalesGroupBy)}>
+              <SelectTrigger className="h-9 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SALES_GROUP_BY_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button size="sm" onClick={handleApply} className="h-9">Apply</Button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport('xlsx')}
+              disabled={exporting !== null}
+              className="h-9"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden />
+              {exporting === 'xlsx' ? 'Exporting…' : 'Export Excel'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport('pdf')}
+              disabled={exporting !== null}
+              className="h-9"
+            >
+              <FileText className="h-3.5 w-3.5" aria-hidden />
+              {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+            </Button>
+          </div>
+        </div>
+
+        {rangeError && <p className="text-xs text-red-400">{rangeError}</p>}
+
+        <p className="text-xs text-zinc-600">
+          Net = gross minus aggregator commission; commission rates default to 0 until configured.
+        </p>
+
+        {/* KPI ribbon */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-[90px] rounded-xl" />
+            ))}
+          </div>
+        ) : (
+          <KpiRibbon className="grid-cols-1 sm:grid-cols-3 xl:grid-cols-3">
+            <KpiCard icon={ReceiptText} label="Orders" value={fmtNum(report?.totals.orders_count)} />
+            <KpiCard icon={DollarSign} label="Gross Sales" value={fmtPHP(report?.totals.gross_sales)} />
+            <KpiCard icon={TrendingUp} label="Net Sales" value={fmtPHP(report?.totals.net_sales)} />
+          </KpiRibbon>
+        )}
+
+        {error && <p className="py-2 text-center text-sm text-red-400">{error}</p>}
+
+        <DataTable<ApiSalesRow>
+          columns={columns}
+          data={report?.rows ?? []}
+          loading={loading}
+          emptyTitle="No sales in this range"
+          emptyDescription="No completed orders match the selected filters — try widening the date range."
+          pageSize={10}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Main Analytics page ───────────────────────────────────────────────────────
 
 export default function Analytics() {
+  const { user } = useAuth()
   const defaults = defaultRange()
 
   const [preset, setPreset]         = useState<RangePreset>('30d')
@@ -874,6 +1191,12 @@ export default function Analytics() {
         <AggregatorSplitSection from={appliedFrom} to={appliedTo} />
         <BrandMarginsSection    from={appliedFrom} to={appliedTo} />
       </div>
+
+      {/* ── Sales Report (client req #10) — OWNER/ACCOUNTING only; the backend
+          403s BRAND_MANAGER/OUTLET_MANAGER/PURCHASING on /reports/sales*, so
+          this section is hidden (not disabled) for everyone else who can
+          otherwise reach /reports. ── */}
+      {hasRole(user?.role, ['ACCOUNTING']) && <SalesReportSection />}
     </div>
   )
 }
