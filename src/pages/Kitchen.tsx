@@ -14,7 +14,11 @@
  * Business Rule #8 : lowstock.alert toasted prominently (sonner)
  *
  * Tablet-first layout: buttons large/touch-friendly, columns responsive.
- * Fix: orders fetched with comma-separated status (single param, backend compatible).
+ *
+ * Data loading + realtime order state live in ../hooks/useKitchenOrders (shared
+ * with the TV board, src/pages/Tv.tsx — platform-ia-navigation.md §6) so this
+ * page owns only Kitchen-specific concerns: station grouping, advance/cancel
+ * actions, stage tabs, and the stock/lowstock toasts.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -26,10 +30,12 @@ import {
   Flame,
   LayoutGrid,
   PackageCheck,
+  Tv,
   X,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import { get, post } from '../lib/api'
+import { post } from '../lib/api'
 import {
   Dialog,
   DialogContent,
@@ -38,189 +44,26 @@ import {
   DialogTitle,
   DialogDescription,
 } from '../components/ui/dialog'
-import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
+import { Button } from '../components/ui/button'
+import { onSocketEvent } from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
-import type { Brand, Station } from './Dashboard'
+import {
+  ACTIVE_STATUSES,
+  OVERDUE_MINS,
+  elapsedMMSS,
+  elapsedMins,
+  formatTime,
+  timerStart,
+  type KdsOrder,
+  type OrderStatus,
+} from '../lib/kds'
+import { useKitchenOrders } from '../hooks/useKitchenOrders'
+import type { Brand } from './Dashboard'
 import PageHeader from '../components/common/PageHeader'
 import BrandChip from '../components/common/BrandChip'
 import AggregatorBadge from '../components/common/AggregatorBadge'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
-
-// ─── Config ──────────────────────────────────────────────────────────────────
-
-/** Orders older than this many minutes are considered overdue (FR-KD-05). */
-const OVERDUE_MINS = 15
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type OrderStatus = 'NEW' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
-
-/** Active statuses shown on the KDS (COMPLETED/CANCELLED are excluded from the board) */
-const ACTIVE_STATUSES: OrderStatus[] = ['NEW', 'PREPARING', 'READY']
-
-interface KdsOrderItem {
-  qty: number
-  name: string
-  notes?: string | null
-  stationId: string
-}
-
-interface KdsOrder {
-  id: string
-  brandId: string
-  aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
-  externalRef: string
-  customerName: string | null
-  status: OrderStatus
-  total: string
-  placedAt: string
-  prepAt: string | null
-  items: KdsOrderItem[]
-  stationIds: string[]
-}
-
-// ─── Raw API shapes ───────────────────────────────────────────────────────────
-
-interface RawPrintJobPayload {
-  station?: string
-  items?: Array<{ qty: number; name: string; notes?: string | null }>
-  [key: string]: unknown
-}
-
-interface RawPrintJob {
-  id: string
-  status: 'PENDING' | 'PRINTED' | 'FAILED'
-  stationId: string
-  error: string | null
-  payload: RawPrintJobPayload | null
-}
-
-interface RawOrderItem {
-  id: string
-  menuItemId: string
-  qty: number
-  stationId: string
-  notes: string | null
-}
-
-interface RawOrderDetail {
-  id: string
-  brandId: string
-  aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
-  externalRef: string
-  customerName: string | null
-  status: OrderStatus
-  total: string
-  placedAt: string
-  prepAt?: string | null
-  items: RawOrderItem[]
-  print_jobs: RawPrintJob[]
-}
-
-interface RawOrderSummary {
-  id: string
-  status: OrderStatus
-  placedAt: string
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Build KdsOrderItems from print-job payloads and raw order items.
- * Print-job payloads carry item names; raw order items carry stationId.
- */
-function buildItems(rawItems: RawOrderItem[], printJobs: RawPrintJob[]): KdsOrderItem[] {
-  const seen = new Map<string, KdsOrderItem>()
-  for (const job of printJobs) {
-    for (const pi of job.payload?.items ?? []) {
-      const key = `${pi.name}|${job.stationId}`
-      if (seen.has(key)) {
-        const ex = seen.get(key)!
-        seen.set(key, { ...ex, qty: ex.qty + pi.qty })
-      } else {
-        seen.set(key, {
-          qty: pi.qty,
-          name: pi.name,
-          notes: pi.notes ?? null,
-          stationId: job.stationId,
-        })
-      }
-    }
-  }
-
-  if (seen.size === 0) {
-    return rawItems.map(ri => ({
-      qty: ri.qty,
-      name: ri.menuItemId,
-      notes: ri.notes,
-      stationId: ri.stationId,
-    }))
-  }
-
-  return [...seen.values()]
-}
-
-function toKdsOrder(raw: RawOrderDetail): KdsOrder {
-  const items = buildItems(raw.items, raw.print_jobs)
-  const stationIds = [...new Set(items.map(i => i.stationId).filter(Boolean))]
-  return {
-    id: raw.id,
-    brandId: raw.brandId,
-    aggregator: raw.aggregator,
-    externalRef: raw.externalRef,
-    customerName: raw.customerName,
-    status: raw.status,
-    total: raw.total,
-    placedAt: raw.placedAt,
-    prepAt: raw.prepAt ?? null,
-    items,
-    stationIds,
-  }
-}
-
-async function fetchOrderDetail(id: string): Promise<KdsOrder | null> {
-  try {
-    const { data } = await get<RawOrderDetail>(`/orders/${id}`)
-    return toKdsOrder(data)
-  } catch {
-    return null
-  }
-}
-
-/** Elapsed milliseconds from the given ISO timestamp to now. */
-function elapsedMs(iso: string): number {
-  return Date.now() - new Date(iso).getTime()
-}
-
-/** Elapsed minutes from the given ISO timestamp to now. */
-function elapsedMins(iso: string): number {
-  return elapsedMs(iso) / 60_000
-}
-
-/** Live mm:ss timer label — used on the KDS card. For >= 1 h: Xh YYm format. */
-function elapsedMMSS(iso: string): string {
-  const totalSecs = Math.floor(elapsedMs(iso) / 1000)
-  if (totalSecs < 0) return '00:00'
-  const mins = Math.floor(totalSecs / 60)
-  const secs = totalSecs % 60
-  if (mins < 60) {
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-  }
-  const hours = Math.floor(mins / 60)
-  const remainMins = mins % 60
-  return `${hours}h ${String(remainMins).padStart(2, '0')}m`
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-/** Returns the timestamp to use for elapsed / overdue check. */
-function timerStart(order: KdsOrder): string {
-  if (order.status === 'PREPARING' && order.prepAt) return order.prepAt
-  return order.placedAt
-}
 
 // ─── Stage config ─────────────────────────────────────────────────────────────
 
@@ -482,145 +325,21 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
 // ─── Kitchen ──────────────────────────────────────────────────────────────────
 
 export default function Kitchen() {
-  const [orders,    setOrders]    = useState<KdsOrder[]>([])
-  const [brands,    setBrands]    = useState<Brand[]>([])
-  const [stations,  setStations]  = useState<Station[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState<string | null>(null)
   const [advancing, setAdvancing] = useState<Set<string>>(new Set())
-  const [now,       setNow]       = useState(() => Date.now())
   const [activeStage, setActiveStage] = useState<StageFilter>('ALL')
 
-  const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
-
-  // ── Tick every second for mm:ss timers (single shared interval) ───────────
-
-  useEffect(() => {
-    const handle = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(handle)
-  }, [])
-
-  // ── Initial data load ──────────────────────────────────────────────────────
-  // Wrapped in useCallback (stable identity, no external deps — it fetches
-  // brands/stations/orders fresh from the API every call) so it can also be
-  // re-invoked on socket reconnect to catch up on any missed events
-  // (Business Rule #9).
-
-  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [brandsRes, stationsRes, ordersRes] = await Promise.all([
-        get<Brand[]>('/brands'),
-        get<Station[]>('/stations'),
-        // Fix: comma-separated single param — backend now accepts this form
-        get<RawOrderSummary[]>('/orders?status=NEW,PREPARING,READY'),
-      ])
-      if (cancelledRef?.current) return
-
-      setBrands(brandsRes.data)
-      setStations(stationsRes.data)
-
-      // Ensure socket connected and joined to the location room
-      if (!getSocket()) initSocket()
-      if (brandsRes.data.length > 0) {
-        joinLocation(brandsRes.data[0].locationId)
-      }
-
-      // Fetch full details for active orders
-      const summaries = ordersRes.data.filter(
-        o => (ACTIVE_STATUSES as string[]).includes(o.status),
-      )
-      const details = await Promise.all(summaries.map(o => fetchOrderDetail(o.id)))
-      if (cancelledRef?.current) return
-
-      const active = details.filter((d): d is KdsOrder => d !== null)
-      // Sort: NEW first, then PREPARING, then READY; within stage oldest first (longest wait)
-      active.sort((a, b) => {
-        const stageOrder: Record<string, number> = { NEW: 0, PREPARING: 1, READY: 2, COMPLETED: 3 }
-        const sd = (stageOrder[a.status] ?? 0) - (stageOrder[b.status] ?? 0)
-        if (sd !== 0) return sd
-        return new Date(a.placedAt).getTime() - new Date(b.placedAt).getTime()
+  const { orders, setOrders, stations, brandMap, loading, error, now } = useKitchenOrders({
+    // Page-specific side effect (toast) on top of the hook's own state update —
+    // the TV board (src/pages/Tv.tsx) shares the same hook but skips toasts.
+    onOrderCreated: (detail) => {
+      toast.info(`New order: ${detail.externalRef}`, {
+        description: detail.customerName ? `Customer: ${detail.customerName}` : undefined,
       })
-      setOrders(active)
-    } catch (e) {
-      if (!cancelledRef?.current) {
-        setError(e instanceof Error ? e.message : 'Failed to load kitchen orders.')
-      }
-    } finally {
-      if (!cancelledRef?.current) setLoading(false)
-    }
-  }, [])
+    },
+  })
 
+  // ── Kitchen-only socket subscriptions (stock/low-stock toasts) ────────────
   useEffect(() => {
-    const cancelledRef = { current: false }
-    void load(cancelledRef)
-    return () => { cancelledRef.current = true }
-  }, [load])
-
-  // ── Reconnect recovery ─────────────────────────────────────────────────────
-  // A dropped-then-restored socket may have missed order.created/updated
-  // events entirely — refetch to catch up (Business Rule #9).
-  useEffect(() => {
-    return onSocketReconnect(() => { void load() })
-  }, [load])
-
-  // ── Socket subscriptions ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    // order.created → fetch detail and add to active list
-    const unsubCreated = onSocketEvent('order.created', payload => {
-      const orderId = payload.order_id
-      if (!orderId) return
-      void fetchOrderDetail(orderId).then(detail => {
-        if (!detail) return
-        if (!(ACTIVE_STATUSES as string[]).includes(detail.status)) return
-        setOrders(prev => {
-          if (prev.some(o => o.id === detail.id)) return prev
-          return [detail, ...prev]
-        })
-        toast.info(`New order: ${detail.externalRef}`, {
-          description: detail.customerName ? `Customer: ${detail.customerName}` : undefined,
-        })
-      })
-    })
-
-    // order.updated → update status in place; remove if COMPLETED/CANCELLED
-    const unsubUpdated = onSocketEvent('order.updated', payload => {
-      const orderId = payload.order_id
-      if (!orderId) return
-      const newStatus = payload.status
-
-      if (!(ACTIVE_STATUSES as string[]).includes(newStatus)) {
-        setOrders(prev => prev.filter(o => o.id !== orderId))
-        return
-      }
-
-      setOrders(prev => {
-        const existing = prev.find(o => o.id === orderId)
-        if (existing) {
-          return prev.map(o =>
-            o.id === orderId
-              ? {
-                  ...o,
-                  status: newStatus,
-                  prepAt: newStatus === 'PREPARING' && !o.prepAt
-                    ? new Date().toISOString()
-                    : o.prepAt,
-                }
-              : o,
-          )
-        }
-        // Not in list yet — fetch and add
-        void fetchOrderDetail(orderId).then(detail => {
-          if (!detail) return
-          if (!(ACTIVE_STATUSES as string[]).includes(detail.status)) return
-          setOrders(p => p.some(o => o.id === detail.id) ? p : [detail, ...p])
-        })
-        return prev
-      })
-    })
-
     // stock.updated (Business Rule #2 — surfaces result of PREPARING deduction)
     const unsubStock = onSocketEvent('stock.updated', (payload: StockPayload) => {
       if (payload.warehouseType === 'KITCHEN' && payload.quantity < 20) {
@@ -641,8 +360,6 @@ export default function Kitchen() {
     })
 
     return () => {
-      unsubCreated()
-      unsubUpdated()
       unsubStock()
       unsubLowstock()
     }
@@ -685,7 +402,7 @@ export default function Kitchen() {
         return next
       })
     }
-  }, [])
+  }, [setOrders])
 
   // ── Cancel handler (reason required; backend records it + audits) ────────────
   const handleCancel = useCallback(async (orderId: string, reason: string) => {
@@ -699,7 +416,7 @@ export default function Kitchen() {
       })
       throw e // let the dialog keep itself open on failure
     }
-  }, [])
+  }, [setOrders])
 
   // ── Station-grouped view ───────────────────────────────────────────────────
 
@@ -758,12 +475,20 @@ export default function Kitchen() {
           title="Kitchen Display"
           subtitle="Station-grouped · real-time · tablet-ready"
           actions={
-            overdueCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-400 ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                {overdueCount} overdue (&gt;{OVERDUE_MINS}m)
-              </span>
-            ) : undefined
+            <div className="flex items-center gap-2">
+              {overdueCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-400 ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {overdueCount} overdue (&gt;{OVERDUE_MINS}m)
+                </span>
+              )}
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/tv" target="_blank" rel="noopener noreferrer" aria-label="Open TV Mode board in a new tab">
+                  <Tv className="h-3.5 w-3.5" />
+                  TV Mode
+                </Link>
+              </Button>
+            </div>
           }
         />
 
