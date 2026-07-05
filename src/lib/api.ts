@@ -34,6 +34,18 @@ function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
 
+// Outlet context switcher (platform-ia-navigation.md §5). Read directly from
+// localStorage — same pattern as getToken() above — rather than threading
+// React context into this plain axios module. 'ALL' (or unset) means no
+// outlet filter; the backend doesn't scope by it yet (D22 is a separate
+// backend-wave item), so this header is inert until that lands.
+const OUTLET_STORAGE_KEY = 'orion.outletId'
+
+function getOutletId(): string | null {
+  const id = localStorage.getItem(OUTLET_STORAGE_KEY)
+  return id && id !== 'ALL' ? id : null
+}
+
 // ─── Base client ─────────────────────────────────────────────────────────────
 
 /**
@@ -53,11 +65,15 @@ export const apiClient: AxiosInstance = axios.create({
   timeout: 20_000,
 })
 
-// Attach stored JWT on every request (unless the caller already set one)
+// Attach stored JWT + selected outlet on every request (unless the caller already set one)
 apiClient.interceptors.request.use((config) => {
   const token = getToken()
   if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  const outletId = getOutletId()
+  if (outletId && !config.headers['X-Outlet-Id']) {
+    config.headers['X-Outlet-Id'] = outletId
   }
   return config
 })

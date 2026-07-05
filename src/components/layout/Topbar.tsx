@@ -1,5 +1,6 @@
-import { Bell, CalendarDays, Menu, SlidersHorizontal } from 'lucide-react'
+import { Bell, Building2, CalendarDays, Menu, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
+import { useOutlet, type SelectedOutlet } from '../../context/OutletContext'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import { Button } from '../ui/button'
 import {
@@ -10,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { Sheet, SheetContent, SheetTitle } from '../ui/sheet'
 import { usePageHeaderContext } from './PageHeaderContext'
 import Sidebar from './Sidebar'
@@ -31,6 +33,13 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
   const { title, subtitle } = usePageHeaderContext()
   const { user } = useAuth()
   const signOut = useSignOut()
+  const { outlets, selectedOutletId, setSelectedOutletId, isHqScope } = useOutlet()
+
+  // HQ-scope roles (D31) always get the switcher (plus "All outlets"); scoped
+  // roles only see it once there's more than one outlet to choose from —
+  // otherwise their single outlet is auto-selected and the control stays
+  // hidden (platform-ia-navigation.md §5).
+  const showOutletSwitcher = isHqScope || outlets.length > 1
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-card px-4 sm:px-6">
@@ -50,6 +59,30 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
           <Sidebar onNavigate={() => onMobileNavChange(false)} />
         </SheetContent>
       </Sheet>
+
+      {/* Outlet context switcher (platform-ia-navigation.md §5) */}
+      {showOutletSwitcher && (
+        <Select
+          value={selectedOutletId}
+          onValueChange={(value) => setSelectedOutletId(value as SelectedOutlet)}
+        >
+          <SelectTrigger
+            className="h-8 w-auto min-w-[7.5rem] max-w-[11rem] shrink-0 gap-1.5 border-border bg-secondary/50 px-2.5 text-xs text-zinc-300"
+            aria-label="Select outlet"
+          >
+            <Building2 className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+            <SelectValue placeholder="Outlet" />
+          </SelectTrigger>
+          <SelectContent>
+            {isHqScope && <SelectItem value="ALL">All outlets</SelectItem>}
+            {outlets.map((outlet) => (
+              <SelectItem key={outlet.id} value={outlet.id}>
+                {outlet.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       {/* Title / subtitle */}
       <div className="min-w-0 flex-1">
