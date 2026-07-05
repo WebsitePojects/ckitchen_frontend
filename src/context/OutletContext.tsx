@@ -162,9 +162,10 @@ export function OutletProvider({ children }: { children: ReactNode }) {
         setSelectedOutletId(allowedOutlets[0].id)
       } else if (persisted !== null) {
         // No allowed outlet at all (e.g. unprovisioned access) — nothing
-        // safe to select; clear so we stop sending a doomed header.
-        localStorage.removeItem(OUTLET_STORAGE_KEY)
-        setSelectedOutletIdState('ALL')
+        // safe to select; fall back to 'ALL' (no header) and persist that
+        // fallback (L1) so localStorage — which lib/api.ts reads directly for
+        // the X-Outlet-Id header — always agrees with what the switcher shows.
+        setSelectedOutletId('ALL')
       }
       return
     }
@@ -179,10 +180,21 @@ export function OutletProvider({ children }: { children: ReactNode }) {
   // membership check) — clear the stale selection and fall back to the
   // default WITHOUT logging the user out (see lib/api.ts's response
   // interceptor for the dispatch + why this isn't an auth failure).
+  //
+  // L1 fix: lib/api.ts's outlet-header interceptor reads OUTLET_STORAGE_KEY
+  // directly from localStorage on every request — it does NOT go through
+  // React state. Previously this handler cleared localStorage but only ever
+  // updated React state (setSelectedOutletIdState), so the switcher UI could
+  // show a freshly-recomputed default while every subsequent request kept
+  // sending no header (or, worse, a header that no longer matched what the
+  // UI displayed) — "UI state == header state" broke exactly when it mattered
+  // most (right after a 403). setSelectedOutletId (not the *State variant)
+  // both updates React state AND persists to localStorage, and defaultSelection()
+  // reads isHqScope/allowedOutlets from the current closure (recomputed from
+  // the CURRENT claims/outlets on every render via the effect's deps below).
   useEffect(() => {
     function handleForbidden() {
-      localStorage.removeItem(OUTLET_STORAGE_KEY)
-      setSelectedOutletIdState(defaultSelection())
+      setSelectedOutletId(defaultSelection())
     }
     window.addEventListener(OUTLET_FORBIDDEN_EVENT, handleForbidden)
     return () => window.removeEventListener(OUTLET_FORBIDDEN_EVENT, handleForbidden)
