@@ -7,6 +7,7 @@ import { OutletProvider } from './context/OutletContext'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
 import Kitchen from './pages/Kitchen'
+import Tv from './pages/Tv'
 import Inventory from './pages/Inventory'
 import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
@@ -57,6 +58,13 @@ export default function App() {
                 <Route path="reports" element={<Analytics />} />
                 <Route path="settings" element={<Settings />} />
                 </Route>
+              </Route>
+
+              {/* TV display board (D32) — fullscreen, no AppShell chrome (no
+                  sidebar/topbar), but still authenticated + role-gated via
+                  RequireAccess (platform-ia-navigation.md §6). */}
+              <Route element={<RequireAccess />}>
+                <Route path="tv" element={<Tv />} />
               </Route>
             </Route>
 

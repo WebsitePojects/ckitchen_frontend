@@ -51,6 +51,11 @@ export const PAGE_ROLES: Record<string, string[]> = {
   '/orders': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW', 'ACCOUNTING'],
   '/kitchen': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
   '/printers': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
+  // TV display board (D32) — big-screen KDS/ops view. Same viewers as '/kitchen'
+  // plus OWNER (already covered by canAccess's short-circuit). Deliberately not
+  // in nav-items.ts / the sidebar — reached only via Kitchen's "TV Mode" button
+  // or a direct URL on the outlet's TV browser.
+  '/tv': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
 
   // Catalog
   '/brands': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
