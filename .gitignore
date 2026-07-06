@@ -11,3 +11,10 @@ coverage/
 .vite/
 .DS_Store
 Thumbs.db
+
+# Playwright E2E (W4b) — keep the suite, not the run artifacts
+e2e/artifacts/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
