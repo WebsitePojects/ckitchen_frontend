@@ -22,6 +22,18 @@ test.describe('Per-role tour (9 roles)', () => {
         }
       })
 
+      // Console-error / uncaught-exception sweep (feature-gaps.md wants a
+      // harsh pass — surface real browser console errors, not just HTTP
+      // status codes). Logged + soft-asserted so one console.error doesn't
+      // hide the rest of the roles.
+      const consoleErrors: string[] = []
+      page.on('console', (msg) => {
+        if (msg.type() === 'error') consoleErrors.push(msg.text())
+      })
+      page.on('pageerror', (err) => {
+        consoleErrors.push(`[uncaught] ${err.message}`)
+      })
+
       await loginUI(page, account)
       expect(new URL(page.url()).pathname).toBe(account.landing)
 
@@ -55,6 +67,11 @@ test.describe('Per-role tour (9 roles)', () => {
       }
 
       expect.soft(forbidden, `${roleKey}: sidebar link(s) that 403 — RBAC drift between nav-items.ts and backend requireRole`).toEqual([])
+
+      if (consoleErrors.length > 0) {
+        console.log(`[role-tour] ${roleKey} console errors: ${JSON.stringify(consoleErrors)}`)
+      }
+      expect.soft(consoleErrors, `${roleKey}: browser console errors during the tour`).toEqual([])
     })
   }
 })
