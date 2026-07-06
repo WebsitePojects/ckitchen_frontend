@@ -91,6 +91,31 @@ export function deltaDirection(value: number): DeltaDirection {
   return 'flat'
 }
 
-// ─── Chart palette (Tremor charts, added in later reskin passes) ──────────────
+// ─── Chart palette (LOCKED by Fable via dataviz validator, 2026-07-06 — W4a) ──
+//
+// Chart-color-by-job ruling (.claude/context/ui-refinement-w4.md "Chart color
+// system"):
+//   1. Single-measure charts (revenue/orders per brand, orders-over-time,
+//      peak-hours) -> ONE hue, CHART_SINGLE. Never rainbow one measure across
+//      brands/hours; highlight only the weakest brand / peak hour (red/amber).
+//   2. Aggregator split (donut/pie) -> AGGREGATOR_COLOR (fixed brand colors)
+//      + direct labels/legend, never this array.
+//   3. Genuine multi-series categorical (distinct entities in one chart) ->
+//      CHART_CATEGORICAL, fixed slot order, validated for dark-surface
+//      contrast + CVD-safe adjacency.
 
-export const CHART_PALETTE = ['#10B981', '#14B8A6', '#06B6D4', '#F59E0B', '#8B5CF6'] as const
+/** Single-measure chart hue — brand emerald. Use for bars/areas of ONE measure only. */
+export const CHART_SINGLE = '#10B981'
+
+/**
+ * Validated dark categorical palette (blue, yellow, violet, magenta, green,
+ * aqua, orange, red) — L-band PASS, chroma PASS, CVD worst-adjacent dE 40.5
+ * PASS, contrast >=3:1 PASS on surface #1a1a19. Fixed slot order; pair with
+ * direct labels/legend once 4+ series are shown in one chart.
+ */
+export const CHART_CATEGORICAL = [
+  '#3987e5', '#c98500', '#9085e9', '#d55181', '#008300', '#199e70', '#d95926', '#e66767',
+] as const
+
+/** @deprecated back-compat alias — migrate call sites to CHART_SINGLE or CHART_CATEGORICAL per the ruling above. */
+export const CHART_PALETTE = CHART_CATEGORICAL
