@@ -78,8 +78,11 @@ export default {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' },
         },
+        // Deliberately subtle — starts at 70% opacity (not 0) so a mid-animation
+        // frame (e.g. a screenshot or a slow first paint) never reads as a
+        // blank/broken page; it only softens the arrival, never hides content.
         'fade-in-up': {
-          from: { opacity: '0', transform: 'translateY(8px)' },
+          from: { opacity: '0.7', transform: 'translateY(6px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
       },
