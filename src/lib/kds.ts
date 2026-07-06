@@ -12,6 +12,15 @@ import { get } from './api'
 /** Orders older than this many minutes are considered overdue (FR-KD-05). */
 export const OVERDUE_MINS = 15
 
+/**
+ * A NEW order older than this many hours is treated as "stale" (abandoned/never
+ * cooked), NOT "overdue". In a long-lived pilot, demo/test orders that never
+ * advance would otherwise pile into the "overdue" alert and bury genuinely-late
+ * fresh orders (W4b gap #7). Stale orders get their own muted visual + are
+ * excluded from the overdue count.
+ */
+export const STALE_HOURS = 24
+
 export type OrderStatus = 'NEW' | 'PREPARING' | 'READY' | 'COMPLETED' | 'CANCELLED'
 
 /** Active statuses shown on the KDS / TV board (COMPLETED/CANCELLED are excluded). */
@@ -178,6 +187,16 @@ export function formatTime(iso: string): string {
 export function timerStart(order: KdsOrder): string {
   if (order.status === 'PREPARING' && order.prepAt) return order.prepAt
   return order.placedAt
+}
+
+/** A NEW order abandoned for > STALE_HOURS — shown muted, not counted as overdue. */
+export function isStale(order: KdsOrder): boolean {
+  return order.status === 'NEW' && elapsedMins(timerStart(order)) > STALE_HOURS * 60
+}
+
+/** Genuinely late (past OVERDUE_MINS) but NOT stale — this is what the overdue alert counts. */
+export function isOverdue(order: KdsOrder): boolean {
+  return !isStale(order) && elapsedMins(timerStart(order)) > OVERDUE_MINS
 }
 
 /** Short, glanceable order number for big-type display (TV board) — last 6 chars of the aggregator's external ref, uppercased. */

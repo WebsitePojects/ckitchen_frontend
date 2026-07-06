@@ -53,9 +53,11 @@ import type { LowStockAlert, StockPayload } from '../lib/socket'
 import {
   ACTIVE_STATUSES,
   OVERDUE_MINS,
+  STALE_HOURS,
   elapsedMMSS,
-  elapsedMins,
   formatTime,
+  isOverdue as isOrderOverdue,
+  isStale as isOrderStale,
   timerStart,
   type KdsOrder,
   type OrderStatus,
@@ -177,8 +179,8 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
     }
   }
   const start   = timerStart(order)
-  const mins    = elapsedMins(start)
-  const isOverdue = mins >= OVERDUE_MINS && order.status !== 'COMPLETED'
+  const stale   = isOrderStale(order)
+  const isOverdue = isOrderOverdue(order) && order.status !== 'COMPLETED'
   const elapsed = elapsedMMSS(start)
 
   // Items relevant to THIS station only; fall back to all items
@@ -194,6 +196,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         isOverdue
           ? 'animate-pulse ring-2 ring-red-500/60 ring-offset-2 ring-offset-[#0A0F0D] border-red-500/60'
           : '',
+        stale ? 'opacity-60' : '',
       ].join(' ')}
       style={{ borderLeftColor: brand?.color ?? '#52525B', borderLeftWidth: 3 }}
     >
@@ -205,6 +208,14 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
           {order.externalRef}
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {stale && (
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500 ring-1 ring-inset ring-zinc-700"
+              title={`No activity for over ${STALE_HOURS}h — likely abandoned`}
+            >
+              Stale
+            </span>
+          )}
           {isOverdue && (
             <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-label="Overdue" />
           )}
@@ -491,7 +502,8 @@ export default function Kitchen() {
   )
 
   const overdueCount = useMemo(
-    () => orders.filter(o => elapsedMins(timerStart(o)) >= OVERDUE_MINS && o.status !== 'COMPLETED').length,
+    // Stale (abandoned NEW) orders are excluded — they get their own muted tag (gap #7).
+    () => orders.filter(o => isOrderOverdue(o) && o.status !== 'COMPLETED').length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [orders, now],
   )
@@ -599,7 +611,7 @@ export default function Kitchen() {
             {stations.map(station => {
               const col = stationOrders.get(station.id) ?? []
               const colOverdue = col.filter(
-                o => elapsedMins(timerStart(o)) >= OVERDUE_MINS && o.status !== 'COMPLETED',
+                o => isOrderOverdue(o) && o.status !== 'COMPLETED',
               ).length
 
               return (

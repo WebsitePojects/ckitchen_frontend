@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, LogIn, LogOut, Search, UserCheck, CircleAlert, CheckCircle2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Camera, LogIn, LogOut, RefreshCw, Search, UserCheck, CircleAlert, CheckCircle2 } from 'lucide-react'
+
+/**
+ * 1×1 transparent PNG — the placeholder "photo" sent when the camera is
+ * unavailable so a staffer can still clock in (gap #3). The backend requires a
+ * non-empty photo (Cloudinary upload); this keeps that contract intact while the
+ * FLAG_NOTE marks the punch for later review.
+ */
+const PLACEHOLDER_PHOTO =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+const FLAG_NOTE = 'Camera unavailable — punched without photo (flagged for review)'
 import { get, post } from '../lib/api'
 import PageHeader from '../components/common/PageHeader'
 import { Card } from '../components/ui/card'
@@ -54,25 +64,28 @@ export default function Attendance() {
       .catch(() => setEmployees([]))
   }, [])
 
-  // ── Start webcam; stop on unmount ──────────────────────────────────────────
-  useEffect(() => {
-    let active = true
-    navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-      .then((stream) => {
-        if (!active) {
-          stream.getTracks().forEach((t) => t.stop())
-          return
-        }
-        streamRef.current = stream
-        if (videoRef.current) videoRef.current.srcObject = stream
-      })
-      .catch(() => setCamError('Camera unavailable — grant camera permission to capture attendance photos.'))
-    return () => {
-      active = false
-      streamRef.current?.getTracks().forEach((t) => t.stop())
+  // ── Start webcam (reusable so "Retry camera" can re-attempt) ────────────────
+  const startCamera = useCallback(async () => {
+    setCamError(null)
+    // Drop any prior stream before re-acquiring.
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    try {
+      const stream = await navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      if (!stream) throw new Error('no camera')
+      streamRef.current = stream
+      if (videoRef.current) videoRef.current.srcObject = stream
+    } catch {
+      setCamError('Camera unavailable — grant camera permission, or clock in without a photo (flagged for review).')
     }
   }, [])
+
+  useEffect(() => {
+    void startCamera()
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [startCamera])
 
   const selected = useMemo(() => employees.find((e) => e.id === employeeId) ?? null, [employees, employeeId])
 
@@ -103,15 +116,25 @@ export default function Attendance() {
     return canvas.toDataURL('image/jpeg', 0.6) // ~tens of KB, well under the 8 MB cap
   }
 
-  async function punch(type: 'TIME_IN' | 'TIME_OUT') {
+  async function punch(type: 'TIME_IN' | 'TIME_OUT', opts?: { noPhoto?: boolean }) {
     setMsg(null)
     if (!employeeId) return setMsg({ err: 'Select an employee first.' })
-    const photo = captureFrame()
+    // Fallback path (gap #3): camera unavailable → placeholder photo + flag note,
+    // so a broken webcam at an outlet never blocks a required daily clock-in.
+    const noPhoto = opts?.noPhoto ?? false
+    const photo = noPhoto ? PLACEHOLDER_PHOTO : captureFrame()
     if (!photo) return setMsg({ err: 'Camera not ready — cannot capture photo proof.' })
     setSubmitting(type)
     try {
-      await post<Punch>('/ems/attendance', { employee_id: employeeId, type, photo })
-      setMsg({ ok: `${type === 'TIME_IN' ? 'Timed in' : 'Timed out'}: ${selected?.fullName} — ${new Date().toLocaleTimeString()}` })
+      await post<Punch>('/ems/attendance', {
+        employee_id: employeeId,
+        type,
+        photo,
+        ...(noPhoto ? { note: FLAG_NOTE } : {}),
+      })
+      setMsg({
+        ok: `${type === 'TIME_IN' ? 'Timed in' : 'Timed out'}: ${selected?.fullName} — ${new Date().toLocaleTimeString()}${noPhoto ? ' (no photo, flagged)' : ''}`,
+      })
       loadPunches(employeeId)
     } catch (e) {
       setMsg({ err: e instanceof Error ? e.message : 'Punch failed.' })
@@ -130,9 +153,12 @@ export default function Attendance() {
           <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-border bg-black">
             <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
             {camError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
                 <Camera className="h-8 w-8 text-zinc-500" />
                 <p className="text-sm text-zinc-400">{camError}</p>
+                <Button size="sm" variant="outline" onClick={() => void startCamera()}>
+                  <RefreshCw className="mr-2 h-4 w-4" /> Retry camera
+                </Button>
               </div>
             )}
             <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
@@ -174,23 +200,30 @@ export default function Attendance() {
 
             <div className="grid grid-cols-2 gap-3">
               <Button
-                onClick={() => punch('TIME_IN')}
-                disabled={!employeeId || submitting !== null || !!camError}
-                className="bg-emerald-600 text-white hover:bg-emerald-500"
+                onClick={() => punch('TIME_IN', { noPhoto: !!camError })}
+                disabled={!employeeId || submitting !== null}
+                className={camError
+                  ? 'bg-amber-600 text-white hover:bg-amber-500'
+                  : 'bg-emerald-600 text-white hover:bg-emerald-500'}
               >
                 <LogIn className="mr-2 h-4 w-4" />
-                {submitting === 'TIME_IN' ? 'Submitting…' : 'Time In'}
+                {submitting === 'TIME_IN' ? 'Submitting…' : camError ? 'Time In (no photo)' : 'Time In'}
               </Button>
               <Button
-                onClick={() => punch('TIME_OUT')}
-                disabled={!employeeId || submitting !== null || !!camError}
+                onClick={() => punch('TIME_OUT', { noPhoto: !!camError })}
+                disabled={!employeeId || submitting !== null}
                 variant="outline"
                 className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
               >
                 <LogOut className="mr-2 h-4 w-4" />
-                {submitting === 'TIME_OUT' ? 'Submitting…' : 'Time Out'}
+                {submitting === 'TIME_OUT' ? 'Submitting…' : camError ? 'Time Out (no photo)' : 'Time Out'}
               </Button>
             </div>
+            {camError && (
+              <p className="text-xs text-amber-400/80">
+                Camera unavailable — punches will be recorded without a photo and flagged for review.
+              </p>
+            )}
 
             {msg?.ok && (
               <p className="flex items-center gap-2 text-sm text-emerald-400">

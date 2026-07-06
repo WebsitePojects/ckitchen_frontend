@@ -47,7 +47,13 @@ const EVERYONE: string[] = [
  */
 export const PAGE_ROLES: Record<string, string[]> = {
   // Overview
-  '/': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET', 'PURCHASING', 'HR', 'ACCOUNTING'],
+  // Only roles that actually LAND on the Dashboard get the nav link. Roles with a
+  // ROLE_LANDING override (WAREHOUSE_MAIN/WAREHOUSE_OUTLET/PURCHASING/HR/ACCOUNTING)
+  // were bounced straight back to their landing page every time they clicked
+  // "Dashboard" (W4b gap #5 — a visible dead link), so they're excluded here.
+  // OWNER lands on '/' via canAccess's short-circuit; OUTLET_MANAGER/BRAND_MANAGER
+  // have no override, so '/' is their real home.
+  '/': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
   '/orders': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW', 'ACCOUNTING'],
   '/kitchen': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
   '/printers': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
@@ -59,11 +65,14 @@ export const PAGE_ROLES: Record<string, string[]> = {
 
   // Catalog
   '/brands': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
-  '/menu': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'], // KITCHEN_CREW = read-only (UI does not yet distinguish)
+  // KITCHEN_CREW is read-only here: Menu.tsx gates every write (add item, availability
+  // edits) behind `hasRole(role, ['BRAND_MANAGER'])`, so kitchen crew view but can't mutate.
+  '/menu': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'],
   '/channel-listings': ['BRAND_MANAGER'],
 
-  // Inventory
-  '/inventory': ['OUTLET_MANAGER', 'KITCHEN_CREW', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET', 'PURCHASING'], // KITCHEN_CREW = read-only
+  // Inventory — KITCHEN_CREW is read-only except requesting an ITO (a legitimate kitchen
+  // replenishment action); Inventory.tsx gates receive/confirm-ITO/adjust to warehouse roles.
+  '/inventory': ['OUTLET_MANAGER', 'KITCHEN_CREW', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET', 'PURCHASING'],
   '/stock-ledger': ['OUTLET_MANAGER', 'KITCHEN_CREW', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET', 'PURCHASING', 'ACCOUNTING'],
 
   // Purchasing

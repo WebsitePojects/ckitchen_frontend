@@ -1244,10 +1244,16 @@ export default function Analytics() {
       </div>
 
       {/* ── Sales Report (client req #10) — OWNER/ACCOUNTING only; the backend
-          403s BRAND_MANAGER/OUTLET_MANAGER/PURCHASING on /reports/sales*, so
-          this section is hidden (not disabled) for everyone else who can
-          otherwise reach /reports. ── */}
-      {hasRole(user?.role, ['ACCOUNTING']) && <SalesReportSection />}
+          403s BRAND_MANAGER/OUTLET_MANAGER/PURCHASING on /reports/sales*. Rather
+          than silently omit it (W4b gap #4 — reads as "export is missing"), show
+          an explanatory note to the other /reports roles. ── */}
+      {hasRole(user?.role, ['ACCOUNTING']) ? (
+        <SalesReportSection />
+      ) : (
+        <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+          Sales figures and Excel/PDF export are limited to Accounting.
+        </div>
+      )}
     </div>
   )
 }
