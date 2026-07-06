@@ -23,6 +23,8 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -68,7 +70,7 @@ import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
 import DataTable from '../components/common/DataTable'
-import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE, aggregatorLabel } from '../lib/theme'
+import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE, CHART_SINGLE, aggregatorLabel } from '../lib/theme'
 
 // ─── API response types (snake_case — as the backend sends them) ───────────────
 
@@ -132,13 +134,13 @@ function fmtPct(v: number | null | undefined): string {
   return `${(v ?? 0).toFixed(1)}%`
 }
 
-// ─── Chart shared styles ───────────────────────────────────────────────────────
+// ─── Chart shared styles (matches Dashboard.tsx — W4a cross-page consistency) ──
 
-const CHART_GRID   = '#27332C'
+const CHART_GRID   = '#27272a'
 const CHART_TICK   = '#71717A'
 const TOOLTIP_STYLE: React.CSSProperties = {
-  backgroundColor: '#121A17',
-  border: '1px solid #27332C',
+  backgroundColor: '#18181b',
+  border: '1px solid #27272a',
   borderRadius: 8,
   fontSize: 12,
   color: '#F4F4F5',
@@ -243,10 +245,12 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
   const weakest  = data.find(b => b.is_weakest)
   const topBrand = data[0]  // API returns ranked top→weak
 
-  const chartData = data.map((b, i) => ({
+  // Single-measure bar (revenue per brand) — ONE hue (CHART_SINGLE), never a
+  // rainbow across brands; the only highlight is the weakest brand in red.
+  const chartData = data.map((b) => ({
     name:     b.name,
     revenue:  b.revenue ?? 0,
-    color:    b.is_weakest ? '#EF4444' : CHART_PALETTE[i % CHART_PALETTE.length],
+    color:    b.is_weakest ? '#EF4444' : CHART_SINGLE,
     isWeak:   b.is_weakest,
     brand_id: b.brand_id,
   }))
@@ -347,7 +351,7 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
                         <div className="flex items-center gap-2">
                           <span
                             className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                            style={{ backgroundColor: chartData[idx]?.color ?? CHART_PALETTE[0] }}
+                            style={{ backgroundColor: chartData[idx]?.color ?? CHART_SINGLE }}
                           />
                           <span className="font-medium text-zinc-200">{b.name}</span>
                         </div>
@@ -473,8 +477,8 @@ function OrdersByHourSection({ date }: { date: string }) {
                     key={entry.hour}
                     fill={
                       hasPeak && entry.hour === peak.hour
-                        ? '#F59E0B'         // amber — peak hour highlighted
-                        : CHART_PALETTE[0]  // emerald — normal hours
+                        ? '#F59E0B'      // amber — peak hour highlighted
+                        : CHART_SINGLE   // single-measure chart: one hue for all other hours
                     }
                   />
                 ))}
@@ -929,6 +933,15 @@ function SalesReportSection() {
     return () => { cancelled = true }
   }, [appliedFrom, appliedTo, appliedGroupBy])
 
+  // Sales-over-time chart — only meaningful when day-grouped; sorted
+  // chronologically (row order from the API isn't guaranteed).
+  const salesChartData = useMemo(() => {
+    if (!report || report.group_by !== 'day') return []
+    return [...report.rows]
+      .sort((a, b) => a.key.localeCompare(b.key))
+      .map(r => ({ label: formatSalesRowKey(r.key, 'day'), net_sales: r.net_sales, gross_sales: r.gross_sales }))
+  }, [report])
+
   const handleApply = useCallback(() => {
     if (fromInput && toInput && fromInput > toInput) {
       setRangeError("'From' must not be after 'To'.")
@@ -1079,6 +1092,44 @@ function SalesReportSection() {
             <KpiCard icon={DollarSign} label="Gross Sales" value={fmtPHP(report?.totals.gross_sales)} />
             <KpiCard icon={TrendingUp} label="Net Sales" value={fmtPHP(report?.totals.net_sales)} />
           </KpiRibbon>
+        )}
+
+        {/* Sales-over-time — day-grouped only (client req #10); single hue */}
+        {appliedGroupBy === 'day' && (
+          loading ? (
+            <ChartSkeleton />
+          ) : salesChartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={salesChartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                <defs>
+                  <linearGradient id="salesOverTimeFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_SINGLE} stopOpacity={0.35} />
+                    <stop offset="95%" stopColor={CHART_SINGLE} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 10, fill: CHART_TICK }}
+                  tickLine={false}
+                  axisLine={{ stroke: CHART_GRID }}
+                  interval="preserveStartEnd"
+                />
+                <YAxis
+                  tickFormatter={v => `₱${((v as number) / 1000).toFixed(0)}k`}
+                  tick={{ fontSize: 11, fill: CHART_TICK }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                />
+                <Tooltip
+                  formatter={(v) => [fmtPHP(Number(v)), 'Net Sales']}
+                  contentStyle={TOOLTIP_STYLE}
+                />
+                <Area type="monotone" dataKey="net_sales" stroke={CHART_SINGLE} strokeWidth={2} fill="url(#salesOverTimeFill)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : null
         )}
 
         {error && <p className="py-2 text-center text-sm text-red-400">{error}</p>}
