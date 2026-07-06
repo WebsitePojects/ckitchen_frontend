@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -36,6 +37,7 @@ import type { LowStockAlert, StockPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
+import { useOutlet } from '../context/OutletContext'
 import { Button } from '../components/ui/button'
 import {
   Dialog,
@@ -759,27 +761,70 @@ function ItoList({
 export default function Inventory() {
   const { user } = useAuth()
   const role = user?.role
+  const { selectedOutletId } = useOutlet()
+  const queryClient = useQueryClient()
 
-  // — Stock tiers
-  const [mainStock, setMainStock] = useState<StockLine[]>([])
-  const [kitchenStock, setKitchenStock] = useState<StockLine[]>([])
-  const [mainLoading, setMainLoading] = useState(true)
-  const [kitchenLoading, setKitchenLoading] = useState(true)
-  const [mainError, setMainError] = useState<string | null>(null)
-  const [kitchenError, setKitchenError] = useState<string | null>(null)
+  // ── Cache-first reads (perf) ─────────────────────────────────────────────
+  // Query keys include selectedOutletId — GET /inventory and GET /itos are
+  // outlet-scoped server-side (X-Outlet-Id / resolveOutletContext), so a
+  // stale outlet's stock must never be shown after switching outlets; keying
+  // by outlet gives each outlet its own cache entry instead of one shared
+  // (and potentially wrong) entry. Same 'inventory'/'KITCHEN' key as
+  // Menu.tsx's stock-alerts panel, so the two pages share one cache entry.
 
-  // — Ingredients list (for receive + ITO forms)
-  const [ingredients, setIngredients] = useState<Ingredient[]>([])
+  const {
+    data: mainStock = [],
+    isLoading: mainLoading,
+    error: mainQueryError,
+  } = useQuery({
+    queryKey: ['inventory', 'MAIN', selectedOutletId],
+    queryFn: async () => (await get<StockLine[]>('/inventory?warehouse=MAIN')).data,
+  })
+  const mainError = mainQueryError
+    ? mainQueryError instanceof Error ? mainQueryError.message : 'Failed to load MAIN stock.'
+    : null
+
+  const {
+    data: kitchenStock = [],
+    isLoading: kitchenLoading,
+    error: kitchenQueryError,
+  } = useQuery({
+    queryKey: ['inventory', 'KITCHEN', selectedOutletId],
+    queryFn: async () => (await get<StockLine[]>('/inventory?warehouse=KITCHEN')).data,
+  })
+  const kitchenError = kitchenQueryError
+    ? kitchenQueryError instanceof Error ? kitchenQueryError.message : 'Failed to load KITCHEN stock.'
+    : null
+
+  const {
+    data: itos = [],
+    isLoading: itosLoading,
+    error: itosQueryError,
+  } = useQuery({
+    queryKey: ['itos', selectedOutletId],
+    queryFn: async () => {
+      const { data } = await get<Ito[]>('/itos')
+      // Show most recent first (GET /itos has no requestedAt column — use createdAt)
+      data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      return data
+    },
+  })
+  const itosError = itosQueryError
+    ? itosQueryError instanceof Error ? itosQueryError.message : 'Failed to load ITOs.'
+    : null
+
+  // Ingredients are global master data (no outlet scoping server-side) —
+  // shared across every page that reads them (Menu.tsx's add-item form etc).
+  const { data: ingredients = [] } = useQuery({
+    queryKey: ['ingredients'],
+    queryFn: async () => (await get<Ingredient[]>('/ingredients')).data,
+  })
   // Lookup map for resolving ITO line-item ingredient names (GET /itos has no join)
   const ingredientsById = useMemo(
     () => new Map(ingredients.map(ing => [ing.id, ing])),
     [ingredients],
   )
 
-  // — ITOs
-  const [itos, setItos] = useState<Ito[]>([])
-  const [itosLoading, setItosLoading] = useState(true)
-  const [itosError, setItosError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<Set<string>>(new Set())
 
   // — Low-stock alert ingredient IDs (for extra row highlight beyond API flag)
@@ -789,68 +834,22 @@ export default function Inventory() {
   const [showReceive, setShowReceive] = useState(false)
   const [showRequestIto, setShowRequestIto] = useState(false)
 
-  // ── Fetch helpers ───────────────────────────────────────────────────────────
+  // ── Refetch helpers ──────────────────────────────────────────────────────
+  // Invalidate + refetch (rather than local setState) so the shared cache
+  // entries stay correct for every page/component reading the same key.
 
-  const fetchMainStock = useCallback(async () => {
-    setMainLoading(true)
-    setMainError(null)
-    try {
-      const { data } = await get<StockLine[]>('/inventory?warehouse=MAIN')
-      setMainStock(data)
-    } catch (e) {
-      setMainError(e instanceof Error ? e.message : 'Failed to load MAIN stock.')
-    } finally {
-      setMainLoading(false)
-    }
-  }, [])
-
-  const fetchKitchenStock = useCallback(async () => {
-    setKitchenLoading(true)
-    setKitchenError(null)
-    try {
-      const { data } = await get<StockLine[]>('/inventory?warehouse=KITCHEN')
-      setKitchenStock(data)
-    } catch (e) {
-      setKitchenError(e instanceof Error ? e.message : 'Failed to load KITCHEN stock.')
-    } finally {
-      setKitchenLoading(false)
-    }
-  }, [])
-
-  const fetchItos = useCallback(async () => {
-    setItosLoading(true)
-    setItosError(null)
-    try {
-      const { data } = await get<Ito[]>('/itos')
-      // Show most recent first (GET /itos has no requestedAt column — use createdAt)
-      data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      setItos(data)
-    } catch (e) {
-      setItosError(e instanceof Error ? e.message : 'Failed to load ITOs.')
-    } finally {
-      setItosLoading(false)
-    }
-  }, [])
-
-  const fetchIngredients = useCallback(async () => {
-    try {
-      const { data } = await get<Ingredient[]>('/ingredients')
-      setIngredients(data)
-    } catch {
-      // Non-critical; forms will show empty dropdowns
-    }
-  }, [])
-
-  // ── Initial load ─────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    void Promise.all([
-      fetchMainStock(),
-      fetchKitchenStock(),
-      fetchItos(),
-      fetchIngredients(),
-    ])
-  }, [fetchMainStock, fetchKitchenStock, fetchItos, fetchIngredients])
+  const refetchMainStock = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['inventory', 'MAIN', selectedOutletId] }),
+    [queryClient, selectedOutletId],
+  )
+  const refetchKitchenStock = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['inventory', 'KITCHEN', selectedOutletId] }),
+    [queryClient, selectedOutletId],
+  )
+  const refetchItos = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['itos', selectedOutletId] }),
+    [queryClient, selectedOutletId],
+  )
 
   // ── Socket subscriptions ─────────────────────────────────────────────────────
 
@@ -858,9 +857,9 @@ export default function Inventory() {
     // stock.updated — refresh the affected warehouse tier
     const unsubStock = onSocketEvent('stock.updated', (payload: StockPayload) => {
       if (payload.warehouseType === 'MAIN') {
-        void fetchMainStock()
+        void refetchMainStock()
       } else if (payload.warehouseType === 'KITCHEN') {
-        void fetchKitchenStock()
+        void refetchKitchenStock()
       }
     })
 
@@ -878,19 +877,19 @@ export default function Inventory() {
       unsubStock()
       unsubLowstock()
     }
-  }, [fetchMainStock, fetchKitchenStock])
+  }, [refetchMainStock, refetchKitchenStock])
 
   // ── Socket reconnect refetch ─────────────────────────────────────────────────
   // On reconnect, refetch both stock tiers + ITOs (ingredients rarely change and
-  // are non-critical — see fetchIngredients comment above).
+  // are non-critical — no refetch needed here).
   useEffect(() => {
     const unsubReconnect = onSocketReconnect(() => {
-      void Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])
+      void Promise.all([refetchMainStock(), refetchKitchenStock(), refetchItos()])
     })
     return () => {
       unsubReconnect()
     }
-  }, [fetchMainStock, fetchKitchenStock, fetchItos])
+  }, [refetchMainStock, refetchKitchenStock, refetchItos])
 
   // ── ITO confirm handler ──────────────────────────────────────────────────────
 
@@ -900,7 +899,7 @@ export default function Inventory() {
       await post(`/itos/${itoId}/confirm`)
       toast.success('ITO confirmed — stock moved MAIN → KITCHEN.')
       // Refresh both tiers + ITO list (atomic move per Business Rule #4)
-      await Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])
+      await Promise.all([refetchMainStock(), refetchKitchenStock(), refetchItos()])
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to confirm ITO.')
     } finally {
@@ -934,7 +933,7 @@ export default function Inventory() {
   // ── Refresh handler ───────────────────────────────────────────────────────────
 
   function refreshAll() {
-    void Promise.all([fetchMainStock(), fetchKitchenStock(), fetchItos()])
+    void Promise.all([refetchMainStock(), refetchKitchenStock(), refetchItos()])
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -1145,7 +1144,7 @@ export default function Inventory() {
           </DialogHeader>
           <ReceiveForm
             ingredients={ingredients}
-            onSuccess={() => void fetchMainStock()}
+            onSuccess={() => void refetchMainStock()}
             onClose={() => setShowReceive(false)}
           />
         </DialogContent>
@@ -1164,7 +1163,7 @@ export default function Inventory() {
           </DialogHeader>
           <ItoRequestForm
             ingredients={ingredients}
-            onSuccess={() => void fetchItos()}
+            onSuccess={() => void refetchItos()}
             onClose={() => setShowRequestIto(false)}
           />
         </DialogContent>

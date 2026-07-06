@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -27,6 +28,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { get, patch, post } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
+import { useOutlet } from '../context/OutletContext'
 import { hasRole } from '../auth/access'
 import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
@@ -99,14 +101,19 @@ interface Station {
   defaultPrinterId: string | null
 }
 
-interface InventoryItem {
+/**
+ * GET /inventory?warehouse=KITCHEN row shape — matches Inventory.tsx's
+ * `StockLine` (ckitchen_backend src/modules/inventory/routes.ts nests
+ * ingredient fields under `ingredient`, not flat `name`/`qty`/`threshold`
+ * as this interface previously assumed). Same shape/query key as
+ * Inventory.tsx's KITCHEN tier so the two pages share one cache entry.
+ */
+interface StockLine {
   id: string
-  name: string
-  qty: number
-  unit: string
-  threshold: number
+  ingredientId: string
+  quantity: string
+  ingredient: { id: string; name: string; unit: string; unitCost: string; lowStockThreshold: string }
   below_threshold: boolean
-  warehouse: string
 }
 
 // ─── Availability cycle helpers ───────────────────────────────────────────────
@@ -143,19 +150,76 @@ const DEFAULT_CHANNELS = { foodpanda: true, grabfood: true, direct: true }
 export default function Menu() {
   const { user } = useAuth()
   const canWrite = hasRole(user?.role, ['BRAND_MANAGER'])
+  const { selectedOutletId } = useOutlet()
+  const queryClient = useQueryClient()
 
-  // Data state
-  const [brands, setBrands] = useState<Brand[]>([])
+  // Data state (brand selector)
   const [selectedBrandId, setSelectedBrandId] = useState<string>('')
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
-  const [stations, setStations] = useState<Station[]>([])
-  const [lowStockItems, setLowStockItems] = useState<InventoryItem[]>([])
 
-  // UI state
-  const [loadingBrands, setLoadingBrands] = useState(true)
-  const [loadingMenu, setLoadingMenu] = useState(false)
-  const [errorBrands, setErrorBrands] = useState<string | null>(null)
-  const [errorMenu, setErrorMenu] = useState<string | null>(null)
+  // ── Cache-first reads (perf) ────────────────────────────────────────────
+  // Same query keys as Brands.tsx / Inventory.tsx so navigating between
+  // those pages and Menu reuses one cache entry instead of refetching.
+  const {
+    data: brands = [],
+    isLoading: loadingBrands,
+    error: brandsQueryError,
+  } = useQuery({
+    queryKey: ['brands', selectedOutletId],
+    queryFn: async () => (await get<Brand[]>('/brands')).data,
+  })
+  const errorBrands = brandsQueryError
+    ? brandsQueryError instanceof Error ? brandsQueryError.message : 'Failed to load brands.'
+    : null
+
+  const { data: stations = [] } = useQuery({
+    queryKey: ['stations', selectedOutletId],
+    queryFn: async () => (await get<Station[]>('/stations')).data,
+  })
+
+  const { data: kitchenStock = [] } = useQuery({
+    queryKey: ['inventory', 'KITCHEN', selectedOutletId],
+    queryFn: async () => (await get<StockLine[]>('/inventory?warehouse=KITCHEN')).data,
+  })
+  const lowStockItems = useMemo(() => kitchenStock.filter(i => i.below_threshold), [kitchenStock])
+
+  // Default to the first brand once the brand list loads.
+  useEffect(() => {
+    if (!selectedBrandId && brands.length > 0) {
+      setSelectedBrandId(brands[0].id)
+    }
+  }, [brands, selectedBrandId])
+
+  const menuQueryKey = useMemo(
+    () => ['menu', selectedOutletId, selectedBrandId] as const,
+    [selectedOutletId, selectedBrandId],
+  )
+
+  const {
+    data: menuItems = [],
+    isLoading: loadingMenu,
+    error: menuQueryError,
+  } = useQuery({
+    queryKey: menuQueryKey,
+    queryFn: async () => {
+      const res = await get<MenuItem[]>(`/brands/${selectedBrandId}/menu`)
+      // Attach default channel visibility (local only, not persisted)
+      return (res.data ?? []).map(item => ({ ...item, _channels: { ...DEFAULT_CHANNELS } }))
+    },
+    enabled: !!selectedBrandId,
+  })
+  const errorMenu = menuQueryError
+    ? menuQueryError instanceof Error ? menuQueryError.message : 'Failed to load menu.'
+    : null
+
+  /** Imperative cache update for optimistic add/toggle/cycle — mirrors the
+   *  old `setMenuItems(prev => ...)` local-state pattern, but writes through
+   *  the query cache so the change survives a re-navigation. */
+  const setMenuItems = useCallback(
+    (updater: (prev: MenuItem[]) => MenuItem[]) => {
+      queryClient.setQueryData<MenuItem[]>(menuQueryKey, prev => updater(prev ?? []))
+    },
+    [queryClient, menuQueryKey],
+  )
 
   // Add item dialog state
   const [addOpen, setAddOpen] = useState(false)
@@ -176,82 +240,6 @@ export default function Menu() {
     () => new Map(stations.map((s) => [s.id, s.name])),
     [stations],
   )
-
-  // ── Initial load: brands + stations + inventory alerts ─────────────────────
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
-      setLoadingBrands(true)
-      setErrorBrands(null)
-
-      try {
-        const [brandsRes, stationsRes, invRes] = await Promise.all([
-          get<Brand[]>('/brands'),
-          get<Station[]>('/stations'),
-          get<InventoryItem[]>('/inventory?warehouse=KITCHEN').catch(() => ({ data: [] as InventoryItem[] })),
-        ])
-
-        if (cancelled) return
-
-        const loadedBrands = brandsRes.data
-        setBrands(loadedBrands)
-        setStations(stationsRes.data)
-
-        // Low-stock alerts
-        const below = (invRes.data ?? []).filter((i) => i.below_threshold)
-        setLowStockItems(below)
-
-        // Default to first brand
-        if (loadedBrands.length > 0) {
-          setSelectedBrandId(loadedBrands[0].id)
-        }
-      } catch (e) {
-        if (!cancelled) {
-          const msg = e instanceof Error ? e.message : 'Failed to load brands.'
-          setErrorBrands(msg)
-        }
-      } finally {
-        if (!cancelled) setLoadingBrands(false)
-      }
-    }
-
-    void load()
-    return () => { cancelled = true }
-  }, [])
-
-  // ── Load menu when brand changes ──────────────────────────────────────────
-  useEffect(() => {
-    if (!selectedBrandId) return
-
-    let cancelled = false
-
-    async function loadMenu() {
-      setLoadingMenu(true)
-      setErrorMenu(null)
-
-      try {
-        const res = await get<MenuItem[]>(`/brands/${selectedBrandId}/menu`)
-        if (cancelled) return
-        // Attach default channel visibility (local only)
-        const items = (res.data ?? []).map((item) => ({
-          ...item,
-          _channels: { ...DEFAULT_CHANNELS },
-        }))
-        setMenuItems(items)
-      } catch (e) {
-        if (!cancelled) {
-          const msg = e instanceof Error ? e.message : 'Failed to load menu.'
-          setErrorMenu(msg)
-        }
-      } finally {
-        if (!cancelled) setLoadingMenu(false)
-      }
-    }
-
-    void loadMenu()
-    return () => { cancelled = true }
-  }, [selectedBrandId])
 
   // ── KPI counts ────────────────────────────────────────────────────────────
   const kpi = useMemo(
@@ -869,9 +857,9 @@ export default function Menu() {
                     >
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-zinc-200">{item.name}</p>
+                        <p className="truncate text-xs font-medium text-zinc-200">{item.ingredient.name}</p>
                         <p className="mt-0.5 tabular-nums text-[11px] text-zinc-500">
-                          {item.qty} {item.unit} (threshold: {item.threshold} {item.unit})
+                          {item.quantity} {item.ingredient.unit} (threshold: {item.ingredient.lowStockThreshold} {item.ingredient.unit})
                         </p>
                       </div>
                     </li>

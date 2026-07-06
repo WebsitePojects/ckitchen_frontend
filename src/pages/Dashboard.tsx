@@ -13,6 +13,7 @@
  * Business Rule #9: real-time within ~2 s; distinct audible alert.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Area,
   AreaChart,
@@ -43,6 +44,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { get } from '../lib/api'
 import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
+import { useOutlet } from '../context/OutletContext'
 import { Button } from '../components/ui/button'
 import {
   Select,
@@ -270,9 +272,8 @@ interface Filters {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
+  const { selectedOutletId } = useOutlet()
   const [orders, setOrders]     = useState<OrderDetail[]>([])
-  const [brands, setBrands]     = useState<Brand[]>([])
-  const [stations, setStations] = useState<Station[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [muted, setMuted]       = useState(false)
@@ -282,45 +283,41 @@ export default function Dashboard() {
   const mutedRef = useRef(muted)
   mutedRef.current = muted
 
+  // ── Cache-first summary data (perf) ─────────────────────────────────────
+  // Brands/stations rarely change — same query keys as Brands.tsx / Menu.tsx
+  // / Inventory.tsx so navigating here reuses their cache entry instead of
+  // refetching. This is the "Dashboard summary data" half of the migration;
+  // the order feed below stays on the realtime socket-driven path (Business
+  // Rule #9), NOT useQuery.
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands', selectedOutletId],
+    queryFn: async () => (await get<Brand[]>('/brands')).data,
+  })
+  const { data: stations = [] } = useQuery({
+    queryKey: ['stations', selectedOutletId],
+    queryFn: async () => (await get<Station[]>('/stations')).data,
+  })
+
   const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
 
-  // ── Initial data load ──────────────────────────────────────────────────────
+  // ── Initial data load (orders — the realtime feed) ─────────────────────────
   // Wrapped in useCallback (stable identity, no external deps — it fetches
-  // brands/stations/orders fresh from the API every call) so it can also be
-  // re-invoked on socket reconnect to catch up on any missed events
-  // (Business Rule #9).
+  // orders fresh from the API every call) so it can also be re-invoked on
+  // socket reconnect to catch up on any missed events (Business Rule #9).
+  // Perf fix (N+1 KDS fetch): this used to fetch a plain order-summary list,
+  // sort/cap it at 100, then `Promise.all(toFetch.map(o =>
+  // fetchOrderDetail(o.id)))` — up to 100 extra sequential-latency round
+  // trips just to hydrate items/print_jobs for the feed. `?detail=1`
+  // bulk-hydrates every order's items[]/print_jobs[] in the SAME response
+  // (O(1) extra queries server-side — see listOrdersWithDetail in
+  // ckitchen_backend's orders/service.ts), so this is now a single request.
   const load = useCallback(async (cancelledRef?: { current: boolean }) => {
     setLoading(true)
     setError(null)
 
     try {
-      // Perf fix (N+1 KDS fetch): this used to fetch a plain order-summary
-      // list, sort/cap it at 100, then `Promise.all(toFetch.map(o =>
-      // fetchOrderDetail(o.id)))` — up to 100 extra sequential-latency round
-      // trips just to hydrate items/print_jobs for the feed. `?detail=1`
-      // bulk-hydrates every order's items[]/print_jobs[] in the SAME
-      // response (O(1) extra queries server-side — see listOrdersWithDetail
-      // in ckitchen_backend's orders/service.ts), so this is now a single
-      // request for brands/stations/orders instead of 1 + 1 + 1 + N.
-      const [brandsRes, stationsRes, ordersRes] = await Promise.all([
-        get<Brand[]>('/brands'),
-        get<Station[]>('/stations'),
-        get<RawOrderDetail[]>('/orders?detail=1'),
-      ])
+      const { data: rawOrders } = await get<RawOrderDetail[]>('/orders?detail=1')
       if (cancelledRef?.current) return
-
-      const loadedBrands   = brandsRes.data
-      const loadedStations = stationsRes.data
-      const rawOrders      = ordersRes.data
-
-      setBrands(loadedBrands)
-      setStations(loadedStations)
-
-      // Ensure socket is connected and joined to the correct location room.
-      if (!getSocket()) initSocket()
-      if (loadedBrands.length > 0) {
-        joinLocation(loadedBrands[0].locationId)
-      }
 
       // Sort newest-first, cap at 100 for initial load performance (FR-OD-07)
       // — same cap as before, just applied to the already-detailed rows
@@ -344,12 +341,29 @@ export default function Dashboard() {
     return () => { cancelledRef.current = true }
   }, [load])
 
+  // ── Socket connect + room join ──────────────────────────────────────────
+  // Runs whenever `brands` (from the cache-first query above) changes — this
+  // covers the initial load regardless of whether brands or orders resolves
+  // first, now that they're no longer a single Promise.all.
+  useEffect(() => {
+    if (brands.length === 0) return
+    if (!getSocket()) initSocket()
+    joinLocation(brands[0].locationId)
+  }, [brands])
+
   // ── Reconnect recovery ─────────────────────────────────────────────────────
   // A dropped-then-restored socket may have missed order.created/updated
-  // events entirely — refetch to catch up (Business Rule #9).
+  // events entirely — refetch orders AND rejoin the room (a reconnected
+  // socket has left every room server-side) to catch up (Business Rule #9).
   useEffect(() => {
-    return onSocketReconnect(() => { void load() })
-  }, [load])
+    return onSocketReconnect(() => {
+      if (brands.length > 0) {
+        if (!getSocket()) initSocket()
+        joinLocation(brands[0].locationId)
+      }
+      void load()
+    })
+  }, [load, brands])
 
   // ── Socket subscriptions (FR-OD-03, FR-OD-04) ────────────────────────────
   useEffect(() => {

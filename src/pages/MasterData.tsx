@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Building2, Users2, Search, Plus, CircleAlert, CheckCircle2 } from 'lucide-react'
 import { get, post } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
@@ -43,9 +44,6 @@ export default function MasterData() {
   const canWrite = hasRole(user?.role, [])
 
   const [kind, setKind] = useState<Kind>('suppliers')
-  const [rows, setRows] = useState<Party[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   const [adding, setAdding] = useState(false)
@@ -53,23 +51,28 @@ export default function MasterData() {
   const [msg, setMsg] = useState<{ ok?: string; err?: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
-  function load(k: Kind) {
-    setLoading(true)
-    get<Party[]>(`/${k}`)
-      .then((r) => {
-        setRows(r.data)
-        setError(null)
-      })
-      .catch((e) => setError(e?.message ?? 'Failed to load'))
-      .finally(() => setLoading(false))
-  }
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
+  // Cache-first (perf): suppliers/customers are global master data, not
+  // outlet-scoped (no X-Outlet-Id filtering server-side) — so the key is
+  // just the tab kind. Switching tabs shows the other list instantly if it
+  // was already fetched this session.
+  const {
+    data: rows = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ['masterdata', kind],
+    queryFn: async () => (await get<Party[]>(`/${kind}`)).data,
+  })
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Failed to load') : null
+
+  function switchKind(k: Kind) {
+    setKind(k)
     setSearch('')
     setAdding(false)
     setMsg(null)
-    load(kind)
-  }, [kind])
+  }
 
   const stats = useMemo(
     () => ({ total: rows.length, active: rows.filter((r) => r.isActive).length }),
@@ -108,7 +111,7 @@ export default function MasterData() {
       setMsg({ ok: `${kind === 'suppliers' ? 'Supplier' : 'Customer'} ${form.code.toUpperCase()} added.` })
       setForm({ code: '', name: '', contact_phone: '', payment_term_days: '' })
       setAdding(false)
-      load(kind)
+      void queryClient.invalidateQueries({ queryKey: ['masterdata', kind] })
     } catch (e) {
       setMsg({ err: e instanceof Error ? e.message : 'Save failed.' })
     } finally {
@@ -130,7 +133,7 @@ export default function MasterData() {
           return (
             <button
               key={t.key}
-              onClick={() => setKind(t.key)}
+              onClick={() => switchKind(t.key)}
               className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
                 active ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-400 hover:text-zinc-200'
               }`}

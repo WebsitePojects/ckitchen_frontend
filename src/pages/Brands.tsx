@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Tags, CheckCircle2, XCircle, Store, History } from 'lucide-react'
 import { get } from '../lib/api'
+import { useOutlet } from '../context/OutletContext'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -78,9 +80,24 @@ function toDailyWindows(events: ActivityEvent[]): { day: string; windows: Window
 }
 
 export default function Brands() {
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { selectedOutletId } = useOutlet()
+
+  // Cache-first (perf): navigating back to Brands from another page shows
+  // the last-fetched list instantly instead of a fresh loading spinner.
+  // Keyed by selectedOutletId per the outlet-cache-correctness rule — GET
+  // /brands isn't currently outlet-filtered server-side (it returns every
+  // brand regardless of X-Outlet-Id), but keying by outlet anyway means this
+  // stays correct for free if/when that filtering lands, at the cost of one
+  // extra (identical) fetch per outlet switch today.
+  const {
+    data: brands = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ['brands', selectedOutletId],
+    queryFn: async () => (await get<Brand[]>('/brands')).data,
+  })
+  const error = queryError ? (queryError instanceof Error ? queryError.message : 'Failed to load brands') : null
 
   // Per-brand activity dialog state
   const [activityBrand, setActivityBrand] = useState<Brand | null>(null)
@@ -100,17 +117,6 @@ export default function Brands() {
   }
 
   const dailyWindows = useMemo(() => toDailyWindows(activity), [activity])
-
-  useEffect(() => {
-    let alive = true
-    get<Brand[]>('/brands')
-      .then((r) => alive && setBrands(r.data))
-      .catch((e) => alive && setError(e?.message ?? 'Failed to load brands'))
-      .finally(() => alive && setLoading(false))
-    return () => {
-      alive = false
-    }
-  }, [])
 
   const active = useMemo(() => brands.filter((b) => b.isActive).length, [brands])
 
