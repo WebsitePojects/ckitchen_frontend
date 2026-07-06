@@ -16,23 +16,38 @@ interface KpiCardProps {
   className?: string
 }
 
-/** KPI stat card — icon, label, big tabular-nums value, optional delta + chart slot. */
+/** Soft tinted delta-chip background, keyed to the same direction as DELTA_COLOR. */
+const DELTA_CHIP_BG: Record<'up' | 'down' | 'flat', string> = {
+  up: 'bg-emerald-500/10',
+  down: 'bg-red-500/10',
+  flat: 'bg-zinc-500/10',
+}
+
+/** KPI stat card — tinted icon square, label, big tabular-nums value, optional delta chip + chart slot. */
 export default function KpiCard({ icon: Icon, label, value, deltaPct, children, className }: KpiCardProps) {
   const direction = deltaPct === undefined ? 'flat' : deltaDirection(deltaPct)
   const DeltaIcon = direction === 'down' ? TrendingDown : TrendingUp
 
   return (
-    <Card className={cn('border-border bg-card', className)}>
+    <Card hoverable className={cn('border-border bg-card', className)}>
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</span>
-          <Icon className="h-4 w-4 text-emerald-500" aria-hidden />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/20">
+            <Icon className="h-4 w-4 text-emerald-400" aria-hidden />
+          </span>
         </div>
 
-        <div className="mt-2 flex items-baseline gap-2">
+        <div className="mt-3 flex items-baseline gap-2">
           <span className="text-2xl font-bold tabular-nums text-zinc-50 sm:text-3xl">{value}</span>
           {deltaPct !== undefined && (
-            <span className={cn('flex items-center gap-0.5 text-xs font-semibold tabular-nums', DELTA_COLOR[direction])}>
+            <span
+              className={cn(
+                'flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
+                DELTA_CHIP_BG[direction],
+                DELTA_COLOR[direction],
+              )}
+            >
               <DeltaIcon className="h-3.5 w-3.5" aria-hidden />
               {Math.abs(deltaPct).toFixed(1)}%
             </span>
