@@ -104,7 +104,11 @@ export interface RawOrderSummary {
  */
 function buildItems(rawItems: RawOrderItem[], printJobs: RawPrintJob[]): KdsOrderItem[] {
   const seen = new Map<string, KdsOrderItem>()
-  for (const job of printJobs) {
+  // Defensive: a malformed/partial order (missing print_jobs) must never crash
+  // the whole KDS board with "X is not iterable".
+  const jobs = Array.isArray(printJobs) ? printJobs : []
+  const items = Array.isArray(rawItems) ? rawItems : []
+  for (const job of jobs) {
     for (const pi of job.payload?.items ?? []) {
       const key = `${pi.name}|${job.stationId}`
       if (seen.has(key)) {
@@ -122,7 +126,7 @@ function buildItems(rawItems: RawOrderItem[], printJobs: RawPrintJob[]): KdsOrde
   }
 
   if (seen.size === 0) {
-    return rawItems.map(ri => ({
+    return items.map(ri => ({
       qty: ri.qty,
       name: ri.menuItemId,
       notes: ri.notes,

@@ -133,8 +133,10 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
 
       // Backend already filtered to status=NEW,PREPARING,READY, but keep the
       // client-side ACTIVE_STATUSES filter as a defensive belt-and-suspenders
-      // (matches the previous behavior exactly).
-      const active = ordersRes.data
+      // (matches the previous behavior exactly). Defensive: guard against a
+      // non-array body (cold-backend partial / proxy error page) so the whole
+      // board never crashes with "X is not iterable".
+      const active = (Array.isArray(ordersRes.data) ? ordersRes.data : [])
         .filter(o => (ACTIVE_STATUSES as string[]).includes(o.status))
         .map(toKdsOrder)
       // Sort: NEW first, then PREPARING, then READY; within stage oldest first (longest wait).

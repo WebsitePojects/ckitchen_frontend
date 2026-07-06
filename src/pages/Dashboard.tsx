@@ -150,7 +150,9 @@ interface RawOrderDetail extends RawOrder {
  */
 function aggregateItems(printJobs: RawPrintJob[]): KotItem[] {
   const map = new Map<string, KotItem>()
-  for (const job of printJobs) {
+  // Defensive: a malformed/partial payload could have print_jobs missing — never
+  // let one bad order crash the whole dashboard with "X is not iterable".
+  for (const job of Array.isArray(printJobs) ? printJobs : []) {
     for (const item of job.payload?.items ?? []) {
       const existing = map.get(item.name)
       if (existing) {
@@ -174,7 +176,7 @@ function toOrderDetail(data: RawOrderDetail): OrderDetail {
     total: data.total,
     placedAt: data.placedAt,
     items: aggregateItems(data.print_jobs),
-    printJobs: data.print_jobs.map(j => ({
+    printJobs: (Array.isArray(data.print_jobs) ? data.print_jobs : []).map(j => ({
       id: j.id,
       status: j.status,
       stationId: j.stationId,
@@ -319,11 +321,15 @@ export default function Dashboard() {
       const { data: rawOrders } = await get<RawOrderDetail[]>('/orders?detail=1')
       if (cancelledRef?.current) return
 
+      // Defensive: never assume the body is an array (a proxy/edge error page, a
+      // partial response on a cold backend, etc. could yield a non-array) — a
+      // bad body must not crash the dashboard with "X is not iterable".
+      const list = Array.isArray(rawOrders) ? rawOrders : []
       // Sort newest-first, cap at 100 for initial load performance (FR-OD-07)
       // — same cap as before, just applied to the already-detailed rows
       // instead of gating which orders get a follow-up detail fetch.
-      rawOrders.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
-      const loaded = rawOrders.slice(0, 100).map(toOrderDetail)
+      list.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
+      const loaded = list.slice(0, 100).map(toOrderDetail)
       setOrders(loaded)
     } catch (e) {
       if (!cancelledRef?.current) {
