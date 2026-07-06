@@ -14,6 +14,22 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import {
+  BarChart3,
   Bell,
   BellOff,
   CheckCircle2,
@@ -35,6 +51,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Skeleton } from '../components/ui/skeleton'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -42,7 +60,9 @@ import DataTable from '../components/common/DataTable'
 import StatusBadge from '../components/common/StatusBadge'
 import AggregatorBadge from '../components/common/AggregatorBadge'
 import BrandChip from '../components/common/BrandChip'
+import EmptyState from '../components/common/EmptyState'
 import SimulatorPanel from '../components/SimulatorPanel'
+import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_SINGLE, type Aggregator } from '../lib/theme'
 
 // ─── Public types (consumed by SimulatorPanel) ────────────────────────────────
 
@@ -211,6 +231,25 @@ function formatElapsed(isoStart: string): string {
   if (mins < 60) return `${mins}m`
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
+
+function hourLabel(h: number): string {
+  if (h === 0)  return '12am'
+  if (h < 12)   return `${h}am`
+  if (h === 12) return '12pm'
+  return `${h - 12}pm`
+}
+
+// ─── Chart shared styles (LOCKED W4a palette — see lib/theme.ts) ──────────────
+// Same grid/tooltip/skeleton treatment as Analytics.tsx for cross-page consistency.
+
+const CHART_GRID = '#27272a'
+const CHART_TICK = '#71717A' // zinc-500
+const CHART_TOOLTIP_STYLE = {
+  background: '#18181b',
+  border: '1px solid #27272a',
+  borderRadius: 8,
+}
+const CHART_CURSOR_FILL = 'rgba(16,185,129,0.06)'
 
 // ─── Filters interface ────────────────────────────────────────────────────────
 
@@ -387,6 +426,44 @@ export default function Dashboard() {
     [orders],
   )
 
+  // ── Chart data (derived client-side from the already-loaded `orders` +
+  //    `brands` state — no extra endpoints/GETs) ─────────────────────────────
+
+  /** Today's orders bucketed by hour-of-day (local time), 24-hour scaffold. */
+  const hourlyData = useMemo(() => {
+    const todayKey = new Date().toDateString()
+    const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }))
+    for (const o of orders) {
+      const placed = new Date(o.placedAt)
+      if (placed.toDateString() !== todayKey) continue
+      buckets[placed.getHours()].count += 1
+    }
+    return buckets
+  }, [orders])
+  const hasOrdersToday = hourlyData.some(d => d.count > 0)
+
+  /** Aggregator split across the loaded order set (fixed brand colors, D-locked). */
+  const aggregatorData = useMemo(() => {
+    const counts: Record<Aggregator, number> = { FOODPANDA: 0, GRABFOOD: 0, OTHER: 0 }
+    for (const o of orders) {
+      const key = (o.aggregator in counts ? o.aggregator : 'OTHER') as Aggregator
+      counts[key] += 1
+    }
+    return (Object.keys(counts) as Aggregator[])
+      .map(agg => ({ aggregator: agg, name: AGGREGATOR_LABEL[agg], value: counts[agg], color: AGGREGATOR_COLOR[agg] }))
+      .filter(d => d.value > 0)
+  }, [orders])
+
+  /** Top 6 brands by order count (single-hue bar — never rainbow one measure). */
+  const topBrandsData = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const o of orders) counts.set(o.brandId, (counts.get(o.brandId) ?? 0) + 1)
+    return [...counts.entries()]
+      .map(([brandId, count]) => ({ brandId, name: brandMap.get(brandId)?.name ?? 'Unknown', count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6)
+  }, [orders, brandMap])
+
   const hasActiveFilters = !!(filters.brand_id || filters.aggregator || filters.status || filters.station_id)
 
   function clearFilters() {
@@ -556,6 +633,163 @@ export default function Dashboard() {
           value={stageCounts.COMPLETED}
         />
       </KpiRibbon>
+
+      {/* ── Charts (W4a — Dashboard's biggest gap; derived client-side from the
+          orders/brands state already fetched above, no new endpoints) ────── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+
+        {/* Orders today, by hour — single-measure area, brand emerald */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-zinc-100">Orders Today</CardTitle>
+            <p className="mt-0.5 text-xs text-zinc-500">Hourly order volume, today</p>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[240px] w-full rounded-xl" />
+            ) : !hasOrdersToday ? (
+              <EmptyState
+                icon={BarChart3}
+                title="No orders today yet"
+                description="Today's orders will appear here by hour."
+                className="border-none bg-transparent py-10"
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={hourlyData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                  <defs>
+                    <linearGradient id="ordersTodayFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_SINGLE} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={CHART_SINGLE} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                  <XAxis
+                    dataKey="hour"
+                    tickFormatter={hourLabel}
+                    tick={{ fontSize: 10, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={{ stroke: CHART_GRID }}
+                    interval={2}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={28}
+                  />
+                  <Tooltip
+                    labelFormatter={label => hourLabel(Number(label))}
+                    formatter={(v) => [`${v} orders`, '']}
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                  />
+                  <Area type="monotone" dataKey="count" stroke={CHART_SINGLE} strokeWidth={2} fill="url(#ordersTodayFill)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Aggregator split — fixed brand colors + legend + direct labels */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-zinc-100">Aggregator Split</CardTitle>
+            <p className="mt-0.5 text-xs text-zinc-500">Loaded orders by platform</p>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[240px] w-full rounded-xl" />
+            ) : aggregatorData.length === 0 ? (
+              <EmptyState
+                icon={BarChart3}
+                title="No orders yet"
+                description="Platform share appears once orders come in."
+                className="border-none bg-transparent py-10"
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={aggregatorData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={56}
+                    outerRadius={86}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                    label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                    labelLine={false}
+                  >
+                    {aggregatorData.map(entry => (
+                      <Cell key={entry.aggregator} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name) => [`${value} orders`, String(name)]}
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                  />
+                  <Legend
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => (
+                      <span style={{ fontSize: 12, color: '#A1A1AA' }}>{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top brands by order count — single-measure bar, brand emerald */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-zinc-100">Top Brands</CardTitle>
+            <p className="mt-0.5 text-xs text-zinc-500">Orders by brand, top 6</p>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-[240px] w-full rounded-xl" />
+            ) : topBrandsData.length === 0 ? (
+              <EmptyState
+                icon={BarChart3}
+                title="No orders yet"
+                description="Brand ranking appears once orders come in."
+                className="border-none bg-transparent py-10"
+              />
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={topBrandsData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 10, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={{ stroke: CHART_GRID }}
+                    interval={0}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={28}
+                  />
+                  <Tooltip
+                    formatter={(v) => [`${v} orders`, 'Orders']}
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                    cursor={{ fill: CHART_CURSOR_FILL }}
+                  />
+                  <Bar dataKey="count" fill={CHART_SINGLE} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ── Feed + Simulator ────────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-col gap-4 lg:flex-row">
