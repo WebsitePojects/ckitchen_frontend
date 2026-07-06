@@ -40,8 +40,9 @@ import { useOutlet } from '../context/OutletContext'
 import {
   ACTIVE_STATUSES,
   fetchOrderDetail,
+  toKdsOrder,
   type KdsOrder,
-  type RawOrderSummary,
+  type RawOrderDetail,
 } from '../lib/kds'
 import type { Brand, Station } from '../pages/Dashboard'
 
@@ -98,11 +99,19 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
     setLoading(true)
     setError(null)
     try {
+      // Perf fix (N+1 KDS fetch): this used to be a summary call
+      // (`/orders?status=...`) followed by `Promise.all(summaries.map(o =>
+      // fetchOrderDetail(o.id)))` — one extra round-trip PER ORDER on the
+      // board. The backend's `?detail=1` bulk-hydrates items[]/print_jobs[]
+      // for every matching order in the SAME response (O(1) extra queries
+      // server-side, not one per order — see listOrdersWithDetail in
+      // ckitchen_backend's orders/service.ts), so this is now a single call
+      // for brands/stations/orders instead of 2 + N.
       const [brandsRes, stationsRes, ordersRes] = await Promise.all([
         get<Brand[]>('/brands'),
         get<Station[]>('/stations'),
         // Comma-separated single param — backend accepts this form.
-        get<RawOrderSummary[]>('/orders?status=NEW,PREPARING,READY'),
+        get<RawOrderDetail[]>('/orders?status=NEW,PREPARING,READY&detail=1'),
       ])
       if (cancelledRef?.current) return
 
@@ -122,14 +131,12 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
         joinLocation(selectedOutletId)
       }
 
-      // Fetch full details for active orders.
-      const summaries = ordersRes.data.filter(
-        o => (ACTIVE_STATUSES as string[]).includes(o.status),
-      )
-      const details = await Promise.all(summaries.map(o => fetchOrderDetail(o.id)))
-      if (cancelledRef?.current) return
-
-      const active = details.filter((d): d is KdsOrder => d !== null)
+      // Backend already filtered to status=NEW,PREPARING,READY, but keep the
+      // client-side ACTIVE_STATUSES filter as a defensive belt-and-suspenders
+      // (matches the previous behavior exactly).
+      const active = ordersRes.data
+        .filter(o => (ACTIVE_STATUSES as string[]).includes(o.status))
+        .map(toKdsOrder)
       // Sort: NEW first, then PREPARING, then READY; within stage oldest first (longest wait).
       active.sort((a, b) => {
         const stageOrder: Record<string, number> = { NEW: 0, PREPARING: 1, READY: 2, COMPLETED: 3 }

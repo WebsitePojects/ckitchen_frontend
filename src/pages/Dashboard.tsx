@@ -161,26 +161,33 @@ function aggregateItems(printJobs: RawPrintJob[]): KotItem[] {
   return [...map.values()]
 }
 
+function toOrderDetail(data: RawOrderDetail): OrderDetail {
+  return {
+    id: data.id,
+    brandId: data.brandId,
+    aggregator: data.aggregator,
+    externalRef: data.externalRef,
+    customerName: data.customerName,
+    status: data.status,
+    total: data.total,
+    placedAt: data.placedAt,
+    items: aggregateItems(data.print_jobs),
+    printJobs: data.print_jobs.map(j => ({
+      id: j.id,
+      status: j.status,
+      stationId: j.stationId,
+      error: j.error,
+    })),
+  }
+}
+
+/** Per-event detail fetch (order.created/order.updated socket handlers) — one request per
+ *  live event is fine (Business Rule #9); the N+1 this file used to have was the INITIAL
+ *  load fetching this once per order on the board (see load() below, now a single bulk call). */
 async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
   try {
     const { data } = await get<RawOrderDetail>(`/orders/${id}`)
-    return {
-      id: data.id,
-      brandId: data.brandId,
-      aggregator: data.aggregator,
-      externalRef: data.externalRef,
-      customerName: data.customerName,
-      status: data.status,
-      total: data.total,
-      placedAt: data.placedAt,
-      items: aggregateItems(data.print_jobs),
-      printJobs: data.print_jobs.map(j => ({
-        id: j.id,
-        status: j.status,
-        stationId: j.stationId,
-        error: j.error,
-      })),
-    }
+    return toOrderDetail(data)
   } catch {
     return null
   }
@@ -287,11 +294,18 @@ export default function Dashboard() {
     setError(null)
 
     try {
-      // Fetch brands, stations, and order list in parallel
+      // Perf fix (N+1 KDS fetch): this used to fetch a plain order-summary
+      // list, sort/cap it at 100, then `Promise.all(toFetch.map(o =>
+      // fetchOrderDetail(o.id)))` — up to 100 extra sequential-latency round
+      // trips just to hydrate items/print_jobs for the feed. `?detail=1`
+      // bulk-hydrates every order's items[]/print_jobs[] in the SAME
+      // response (O(1) extra queries server-side — see listOrdersWithDetail
+      // in ckitchen_backend's orders/service.ts), so this is now a single
+      // request for brands/stations/orders instead of 1 + 1 + 1 + N.
       const [brandsRes, stationsRes, ordersRes] = await Promise.all([
         get<Brand[]>('/brands'),
         get<Station[]>('/stations'),
-        get<RawOrder[]>('/orders'),
+        get<RawOrderDetail[]>('/orders?detail=1'),
       ])
       if (cancelledRef?.current) return
 
@@ -309,15 +323,10 @@ export default function Dashboard() {
       }
 
       // Sort newest-first, cap at 100 for initial load performance (FR-OD-07)
+      // — same cap as before, just applied to the already-detailed rows
+      // instead of gating which orders get a follow-up detail fetch.
       rawOrders.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
-      const toFetch = rawOrders.slice(0, 100)
-
-      // Fetch full detail for each order in parallel
-      const details = await Promise.all(toFetch.map(o => fetchOrderDetail(o.id)))
-      if (cancelledRef?.current) return
-
-      const loaded = details.filter((d): d is OrderDetail => d !== null)
-      loaded.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
+      const loaded = rawOrders.slice(0, 100).map(toOrderDetail)
       setOrders(loaded)
     } catch (e) {
       if (!cancelledRef?.current) {

@@ -71,7 +71,12 @@ interface RawOrderItem {
   notes: string | null
 }
 
-interface RawOrderDetail {
+/**
+ * Shape of one element of `GET /orders?detail=1` (and `GET /orders/:id`) —
+ * exported so callers (useKitchenOrders.ts) can type the bulk-detail
+ * response without redeclaring this shape.
+ */
+export interface RawOrderDetail {
   id: string
   brandId: string
   aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
@@ -128,7 +133,13 @@ function buildItems(rawItems: RawOrderItem[], printJobs: RawPrintJob[]): KdsOrde
   return [...seen.values()]
 }
 
-function toKdsOrder(raw: RawOrderDetail): KdsOrder {
+/**
+ * Convert one raw order-detail element (from `?detail=1` or `/orders/:id`)
+ * into the KDS's normalized shape. Exported so useKitchenOrders.ts can map
+ * the bulk `?detail=1` array directly, instead of the old per-order
+ * `fetchOrderDetail` fan-out.
+ */
+export function toKdsOrder(raw: RawOrderDetail): KdsOrder {
   const items = buildItems(raw.items, raw.print_jobs)
   const stationIds = [...new Set(items.map(i => i.stationId).filter(Boolean))]
   return {
