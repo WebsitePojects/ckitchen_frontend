@@ -87,4 +87,47 @@
     @apply bg-background text-foreground;
     font-feature-settings: 'tnum' 1;
   }
+
+  /* Tailwind's preflight resets native <button> cursor to `default` (removing
+     the browser's own pointer cursor). Restore it app-wide instead of adding
+     `cursor-pointer` to every button one at a time (W4a design rule #2). */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Respect the OS-level reduced-motion preference (W4a design rule #1). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ─── Thin, zinc-toned scrollbars, app-wide (W4a design rule #5) ─────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
 }

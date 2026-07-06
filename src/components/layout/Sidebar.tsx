@@ -60,7 +60,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn(
-                        'group flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-sm font-medium transition-colors',
+                        'group flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                         isActive
                           ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
                           : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-50',
@@ -94,7 +94,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
         </div>
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg border border-sidebar-border px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+          className="flex w-full items-center gap-2 rounded-lg border border-sidebar-border px-3 py-2 text-xs font-medium text-zinc-400 transition-colors duration-200 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
         >
           <LogOut className="h-4 w-4" aria-hidden />
           Sign out

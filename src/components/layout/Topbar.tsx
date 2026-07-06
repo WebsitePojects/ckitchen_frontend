@@ -95,7 +95,7 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
         {/* Date-range chip (presentational) */}
         <button
           type="button"
-          className="hidden items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-50 sm:flex"
+          className="hidden items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors duration-200 hover:text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 sm:flex"
         >
           <CalendarDays className="h-3.5 w-3.5" aria-hidden />
           Last 30 days

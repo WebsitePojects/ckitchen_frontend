@@ -107,14 +107,14 @@ export default function SimulatorPanel({ brands }: Props) {
                 <button
                   type="button"
                   onClick={selectAll}
-                  className="text-xs text-emerald-500 hover:text-emerald-400"
+                  className="rounded text-xs text-emerald-500 transition-colors duration-200 hover:text-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   All
                 </button>
                 <button
                   type="button"
                   onClick={clearAll}
-                  className="text-xs text-zinc-500 hover:text-zinc-300"
+                  className="rounded text-xs text-zinc-500 transition-colors duration-200 hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   None
                 </button>
@@ -135,8 +135,9 @@ export default function SimulatorPanel({ brands }: Props) {
                     onClick={() => toggleBrand(brand.id)}
                     disabled={running}
                     className={[
-                      'rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition',
+                      'rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 transition duration-200',
                       'disabled:cursor-not-allowed disabled:opacity-50',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                       selected
                         ? 'text-white ring-transparent'
                         : 'bg-transparent text-zinc-400 ring-zinc-700 hover:ring-zinc-500',

@@ -456,7 +456,8 @@ export default function Menu() {
               onClick={() => void cycleAvailability(row.original)}
               title={canWrite ? `Click to cycle: currently ${AVAIL_LABEL[av]}` : AVAIL_LABEL[av]}
               className={cn(
-                'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition-colors',
+                'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition-colors duration-200',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                 availBadgeClass(av),
                 !canWrite && 'cursor-default',
               )}
@@ -709,7 +710,7 @@ export default function Menu() {
                 <button
                   type="button"
                   onClick={() => setAddImageUrl('')}
-                  className="text-xs text-zinc-500 hover:text-red-400"
+                  className="rounded text-xs text-zinc-500 transition-colors duration-200 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   Remove
                 </button>

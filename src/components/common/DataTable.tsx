@@ -98,7 +98,7 @@ export default function DataTable<T>({
                         <button
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="flex items-center gap-1 hover:text-zinc-200"
+                          className="flex items-center gap-1 rounded transition-colors duration-200 hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {sortState === 'asc' ? (

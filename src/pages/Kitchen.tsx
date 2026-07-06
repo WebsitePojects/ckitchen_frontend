@@ -262,6 +262,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
               'transition-colors duration-150 select-none',
               'min-h-[52px]',        // large touch target
               'disabled:opacity-50 disabled:cursor-not-allowed',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
               style.btnClass,
             ].join(' ')}
           >
@@ -302,7 +303,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         {next && canAct && (
           <button
             onClick={() => setCancelOpen(true)}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-300/80 hover:text-red-200 hover:bg-red-500/10 transition-colors"
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-300/80 hover:text-red-200 hover:bg-red-500/10 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             <X className="h-3.5 w-3.5" />
             Cancel order
@@ -332,14 +333,14 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
             <button
               onClick={() => { setCancelOpen(false); setCancelReason('') }}
               disabled={cancelling}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-400 transition-colors duration-200 hover:text-zinc-200 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
             >
               Keep order
             </button>
             <button
               onClick={() => void submitCancel()}
               disabled={cancelling || cancelReason.trim().length === 0}
-              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition-colors duration-200 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
             >
               {cancelling ? 'Cancelling…' : 'Cancel order'}
             </button>
@@ -537,6 +538,7 @@ export default function Kitchen() {
                 className={[
                   'flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold',
                   'transition-colors duration-150 select-none min-h-[40px]',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                   isActive
                     ? 'bg-emerald-600/20 text-emerald-400 ring-1 ring-inset ring-emerald-500/40'
                     : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200',

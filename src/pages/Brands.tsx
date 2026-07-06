@@ -164,7 +164,7 @@ export default function Brands() {
                 </div>
                 <button
                   onClick={() => openActivity(b)}
-                  className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-zinc-800/60 transition-colors"
+                  className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 transition-colors duration-200 hover:bg-zinc-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   <History className="h-3.5 w-3.5" />
                   Activity history
