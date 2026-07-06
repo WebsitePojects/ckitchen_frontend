@@ -1,8 +1,8 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Orbit, Loader2, AlertCircle } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { CKApiError } from '../lib/api'
+import { CKApiError, warmUpApi } from '../lib/api'
 import { PLATFORM_NAME, PLATFORM_TAGLINE, PLATFORM_ATTRIBUTION } from '../lib/branding'
 
 export default function Login() {
@@ -16,11 +16,24 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // When a submit takes long, the API is likely cold-starting (Render free tier,
+  // ~50s wake). Show that instead of a silent spinner so it doesn't read as broken.
+  const [slowHint, setSlowHint] = useState(false)
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Start waking the backend as soon as the login page loads, so it's usually
+  // warm by the time the user finishes typing (fixes the cold-start timeout).
+  useEffect(() => {
+    warmUpApi()
+    return () => { if (slowTimer.current) clearTimeout(slowTimer.current) }
+  }, [])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setSlowHint(false)
     setSubmitting(true)
+    slowTimer.current = setTimeout(() => setSlowHint(true), 6_000)
     try {
       await login(email.trim(), password)
       navigate(from, { replace: true })
@@ -29,6 +42,8 @@ export default function Login() {
       else if (err instanceof Error) setError(err.message)
       else setError('Login failed. Please try again.')
     } finally {
+      if (slowTimer.current) clearTimeout(slowTimer.current)
+      setSlowHint(false)
       setSubmitting(false)
     }
   }
@@ -116,6 +131,12 @@ export default function Login() {
                 'Sign in'
               )}
             </button>
+
+            {slowHint && (
+              <p className="text-center text-xs text-zinc-500">
+                Waking up the server — this can take up to a minute on first use. Hang tight.
+              </p>
+            )}
           </div>
 
           {import.meta.env.DEV && (

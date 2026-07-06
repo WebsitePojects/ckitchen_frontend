@@ -71,11 +71,31 @@ const OUTLET_FORBIDDEN_EVENT = 'orion:outlet-forbidden'
 const env = import.meta.env as unknown as Record<string, string | undefined>
 const API_ORIGIN = String(env.VITE_API_URL || env.VITE_API_PROXY_TARGET || '').replace(/\/+$/, '')
 
+/**
+ * Request timeout. The API runs on Render's free tier, which spins the service
+ * DOWN after ~15 min idle and takes ~50s to cold-start (measured: 52s). The old
+ * 20s timeout was shorter than that wake time, so the first request after idle
+ * (usually login) failed with "timeout of 20000ms exceeded" even though the
+ * backend was fine — it just wasn't awake yet. 60s covers the cold start with
+ * margin while still bounding a genuinely hung request. See warmUpApi() below,
+ * which starts the wake early so users rarely wait the full time.
+ */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_ORIGIN}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 20_000,
+  timeout: 60_000,
 })
+
+/**
+ * Fire-and-forget wake-up ping. Call on app/login mount so Render starts spinning
+ * up BEFORE the user submits credentials — by the time they finish typing, the
+ * service is usually warm. Swallows all errors (it's purely opportunistic).
+ */
+export function warmUpApi(): void {
+  apiClient
+    .get('/health', { timeout: 60_000 })
+    .catch(() => { /* opportunistic — ignore */ })
+}
 
 // Attach stored JWT + selected outlet on every request (unless the caller already set one)
 apiClient.interceptors.request.use((config) => {
