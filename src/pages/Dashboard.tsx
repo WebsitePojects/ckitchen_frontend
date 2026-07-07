@@ -279,7 +279,9 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [muted, setMuted]       = useState(false)
-  const [filters, setFilters]   = useState<Filters>({ brand_id: '', aggregator: '', status: '', station_id: '' })
+  // Default the feed to NEW orders (user directive 2026-07-07): the dashboard's
+  // job is incoming work; switch to All/other statuses via the filter row.
+  const [filters, setFilters]   = useState<Filters>({ brand_id: '', aggregator: '', status: 'NEW', station_id: '' })
 
   // Keep muted state accessible inside stale socket callbacks
   const mutedRef = useRef(muted)
@@ -325,11 +327,12 @@ export default function Dashboard() {
       // partial response on a cold backend, etc. could yield a non-array) — a
       // bad body must not crash the dashboard with "X is not iterable".
       const list = Array.isArray(rawOrders) ? rawOrders : []
-      // Sort newest-first, cap at 100 for initial load performance (FR-OD-07)
-      // — same cap as before, just applied to the already-detailed rows
-      // instead of gating which orders get a follow-up detail fetch.
+      // Sort newest-first. Show ALL orders (user directive 2026-07-07) — the old
+      // 100-row cap hid older orders from the table. NOTE: at nationwide scale this
+      // must become server-side pagination (scalability-plan.md P0); acceptable now
+      // that the staging DB is cleaned and the demo dataset is small.
       list.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
-      const loaded = list.slice(0, 100).map(toOrderDetail)
+      const loaded = list.map(toOrderDetail)
       setOrders(loaded)
     } catch (e) {
       if (!cancelledRef?.current) {
