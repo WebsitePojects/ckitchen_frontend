@@ -1,4 +1,4 @@
-import { Bell, Building2, CalendarDays, Menu, SlidersHorizontal } from 'lucide-react'
+import { Building2, Menu } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { useOutlet, type SelectedOutlet } from '../../context/OutletContext'
 import { Avatar, AvatarFallback } from '../ui/avatar'
@@ -91,27 +91,7 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
       </div>
 
       {/* Right cluster */}
-      <div className="flex shrink-0 items-center gap-2">
-        {/* Date-range chip (presentational) */}
-        <button
-          type="button"
-          className="hidden items-center gap-1.5 rounded-lg border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors duration-200 hover:text-zinc-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 sm:flex"
-        >
-          <CalendarDays className="h-3.5 w-3.5" aria-hidden />
-          Last 30 days
-        </button>
-
-        {/* Filters (presentational) */}
-        <Button variant="outline" size="sm" className="hidden gap-1.5 sm:flex">
-          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-          Filters
-        </Button>
-
-        {/* Notifications (presentational) */}
-        <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
-          <Bell className="h-4.5 w-4.5" />
-        </Button>
-
+      <div className="flex shrink-0 items-center">
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -11,6 +11,7 @@ const PLACEHOLDER_PHOTO =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 const FLAG_NOTE = 'Camera unavailable — punched without photo (flagged for review)'
 import { get, post } from '../lib/api'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -144,7 +145,7 @@ export default function Attendance() {
   }
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader title="Attendance / DTR" subtitle="Photo-verified time clock — select your name, face the camera, punch in or out" />
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -269,6 +270,6 @@ export default function Attendance() {
           )}
         </Card>
       </div>
-    </div>
+    </PageContainer>
   )
 }

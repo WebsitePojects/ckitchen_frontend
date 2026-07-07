@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { Construction } from 'lucide-react'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import { usePageHeader } from '../components/layout/PageHeaderContext'
@@ -15,13 +16,13 @@ export default function ComingSoon({ title, subtitle, icon }: ComingSoonProps) {
   usePageHeader(title, subtitle)
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <PageContainer>
       <PageHeader title={title} subtitle={subtitle} />
       <EmptyState
         icon={icon ?? Construction}
         title="Coming soon"
         description={`${title} is being built. Check back shortly.`}
       />
-    </div>
+    </PageContainer>
   )
 }

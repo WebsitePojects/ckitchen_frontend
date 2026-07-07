@@ -15,6 +15,7 @@ import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
+import PageContainer from '../components/layout/PageContainer'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
@@ -280,7 +281,7 @@ export default function Employees() {
   ) : null
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader
         title="Employees"
         subtitle="Manage staff records across all departments"
@@ -372,6 +373,6 @@ export default function Employees() {
           </Table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }

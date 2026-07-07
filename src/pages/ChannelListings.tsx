@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Link2 } from 'lucide-react'
 import { get } from '../lib/api'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -91,7 +92,7 @@ export default function ChannelListings() {
   }, [listings])
 
   return (
-    <div className="space-y-5 p-4 sm:p-6">
+    <PageContainer>
       <PageHeader
         title="Channel Listings"
         subtitle="Each brand's Foodpanda, GrabFood, or delivery-platform merchant listing"
@@ -155,6 +156,6 @@ export default function ChannelListings() {
           </Table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }

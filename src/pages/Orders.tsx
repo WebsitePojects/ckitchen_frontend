@@ -17,6 +17,7 @@ import StatusBadge from '../components/common/StatusBadge'
 import AggregatorBadge from '../components/common/AggregatorBadge'
 import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
+import PageContainer from '../components/layout/PageContainer'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import {
@@ -186,7 +187,7 @@ export default function Orders() {
   }, [orders, brands, statusFilter, search])
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader title="Orders" subtitle="Every order across all brands and platforms" />
 
       <KpiRibbon>
@@ -265,6 +266,6 @@ export default function Orders() {
           </Table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }

@@ -3,6 +3,7 @@ import { ScrollText, Search, ShieldOff } from 'lucide-react'
 import { get } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
 import { Card } from '../components/ui/card'
@@ -158,7 +159,7 @@ export default function AuditTrail() {
 
   if (!canView) {
     return (
-      <div className="space-y-5">
+      <PageContainer>
         <PageHeader
           title="Audit Log"
           subtitle="System-wide action trail"
@@ -168,12 +169,12 @@ export default function AuditTrail() {
           title="Admins only"
           description="You need SUPER_ADMIN or BRAND_MANAGER access to view the audit log."
         />
-      </div>
+      </PageContainer>
     )
   }
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader
         title="Audit Log"
         subtitle="System-wide action trail — newest first"
@@ -302,6 +303,6 @@ export default function AuditTrail() {
           </div>
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }

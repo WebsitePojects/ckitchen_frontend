@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Tags, CheckCircle2, XCircle, Store, History } from 'lucide-react'
 import { get } from '../lib/api'
 import { useOutlet } from '../context/OutletContext'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -121,7 +122,7 @@ export default function Brands() {
   const active = useMemo(() => brands.filter((b) => b.isActive).length, [brands])
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader title="Brands" subtitle="Every food brand under this cloud kitchen" />
 
       <KpiRibbon>
@@ -222,6 +223,6 @@ export default function Brands() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   )
 }

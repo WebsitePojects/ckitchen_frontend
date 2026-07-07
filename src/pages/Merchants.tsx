@@ -60,6 +60,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -542,7 +543,7 @@ export default function Merchants() {
 
   if (error) {
     return (
-      <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
+      <PageContainer>
         <PageHeader
           title="Merchant & Food Brand Management"
           subtitle="Manage all merchants, brands, channel listings, kitchen stations and printer mappings"
@@ -553,14 +554,14 @@ export default function Merchants() {
             Make sure the backend is running on :4000
           </p>
         </div>
-      </div>
+      </PageContainer>
     )
   }
 
   // ── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="flex min-h-full flex-col gap-6 px-4 py-6 sm:px-6">
+    <PageContainer>
 
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <PageHeader
@@ -784,6 +785,6 @@ export default function Merchants() {
         }
         pageSize={10}
       />
-    </div>
+    </PageContainer>
   )
 }

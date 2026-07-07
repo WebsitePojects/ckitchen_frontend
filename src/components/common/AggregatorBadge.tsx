@@ -11,7 +11,7 @@ export default function AggregatorBadge({ aggregator, className }: AggregatorBad
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+        'inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
         aggregatorBadgeClass(aggregator),
         className,
       )}

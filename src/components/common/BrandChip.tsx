@@ -1,3 +1,5 @@
+import { cn } from '../../lib/utils'
+
 interface BrandLike {
   name: string
   color?: string | null
@@ -13,8 +15,12 @@ export default function BrandChip({ brand, className }: BrandChipProps) {
   const color = brand?.color ?? '#71717A' // zinc-500 fallback
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white ${className ?? ''}`}
+      className={cn(
+        'inline-flex max-w-[12rem] items-center truncate whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white',
+        className,
+      )}
       style={{ backgroundColor: color }}
+      title={brand?.name ?? 'Unknown Brand'}
     >
       {brand?.name ?? 'Unknown Brand'}
     </span>

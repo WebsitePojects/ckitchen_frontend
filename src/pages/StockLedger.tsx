@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ListOrdered, ArrowDownToLine, ArrowUpFromLine, Layers, Search } from 'lucide-react'
 import { get } from '../lib/api'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -105,7 +106,7 @@ export default function StockLedger() {
   }, [entries, ingredients, search])
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader title="Stock Ledger" subtitle="Every inventory movement — the single source of truth" />
 
       <KpiRibbon>
@@ -189,6 +190,6 @@ export default function StockLedger() {
           </Table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }

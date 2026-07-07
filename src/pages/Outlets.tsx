@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, CheckCircle2, Home, Plus, Warehouse } from 'lucide-react'
 import { get, post } from '../lib/api'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -143,7 +144,7 @@ export default function Outlets() {
   }
 
   return (
-    <div className="space-y-5 p-4 sm:p-6">
+    <PageContainer>
       <PageHeader
         title="Outlets"
         subtitle="Physical operating sites with their own warehouse and in-house inventory"
@@ -313,6 +314,6 @@ export default function Outlets() {
           </Table>
         )}
       </Card>
-    </div>
+    </PageContainer>
   )
 }
