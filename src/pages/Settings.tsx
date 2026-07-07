@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
   SlidersHorizontal,
   Bell,
@@ -7,13 +8,20 @@ import {
   Printer,
   Info,
   Clock,
+  ShieldCheck,
+  ArrowRight,
 } from 'lucide-react'
+import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Switch } from '../components/ui/switch'
 import { Input } from '../components/ui/input'
 import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
 import { PLATFORM_NAME, PLATFORM_ATTRIBUTION } from '../lib/branding'
+import { useAuth } from '../auth/AuthContext'
+import { hasRole, canAccess } from '../auth/access'
+import { NAV_GROUPS } from '../components/layout/nav-items'
 
 function ToggleRow({
   icon: Icon,
@@ -42,6 +50,73 @@ function ToggleRow({
   )
 }
 
+// ---------------------------------------------------------------------------
+// Access Control — the one section of Settings that is actually live. OWNER
+// gets a pointer into the real RBAC editor (Users & Roles → Permissions
+// Matrix, ckitchen_frontend/src/pages/Users.tsx). Everyone else sees a
+// read-only summary of their OWN access, sourced from the bundled frontend
+// PAGE_ROLES map (auth/access.ts) rather than the backend — GET /admin/rbac
+// is OWNER-only (403s for anyone else), so there is no live matrix a
+// non-OWNER account could fetch here even read-only.
+// ---------------------------------------------------------------------------
+
+function AccessControlCard() {
+  const { user } = useAuth()
+  const isOwner = hasRole(user?.role, ['OWNER'])
+
+  const accessiblePages = useMemo(
+    () => NAV_GROUPS.flatMap((g) => g.items).filter((i) => user != null && canAccess(user.role, i.to)),
+    [user],
+  )
+
+  return (
+    <Card className="border-border bg-card lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+          <ShieldCheck className="h-4 w-4 text-emerald-500" /> Access Control
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {isOwner ? (
+          <>
+            <p className="text-zinc-400">
+              Manage which roles can reach which pages, plus per-user accounts, outlet access, password resets,
+              and account status, from Users &amp; Roles.
+            </p>
+            <Button asChild size="sm" variant="outline" className="gap-1.5">
+              <Link to="/users?tab=matrix">
+                Open Permissions Matrix
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="text-zinc-400">
+              Your role (<span className="text-zinc-200">{user?.role ? user.role.replace(/_/g, ' ') : '—'}</span>)
+              can access:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {accessiblePages.length === 0 ? (
+                <span className="text-xs text-zinc-600">No pages configured for this role.</span>
+              ) : (
+                accessiblePages.map((p) => (
+                  <Badge key={p.to} variant="outline" className="border-zinc-700 text-zinc-300">
+                    {p.label}
+                  </Badge>
+                ))
+              )}
+            </div>
+            <p className="pt-1 text-xs text-zinc-600">
+              Page access is enforced server-side. Contact an OWNER to request a change.
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function Settings() {
   const [t, setT] = useState({
     sound: true,
@@ -52,10 +127,13 @@ export default function Settings() {
   const set = (k: keyof typeof t) => (v: boolean) => setT((s) => ({ ...s, [k]: v }))
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader title="Settings" subtitle="System configuration" />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* Access Control — live */}
+        <AccessControlCard />
+
         {/* General */}
         <Card className="border-border bg-card">
           <CardHeader>
@@ -141,8 +219,11 @@ export default function Settings() {
         </Card>
       </div>
 
-      <p className="text-xs text-zinc-600">Settings are presentational in the prototype.</p>
-    </div>
+      <p className="text-xs text-zinc-600">
+        General, notification, integration, and print-agent settings are presentational in the prototype. Access
+        Control above is live — role-based page permissions are enforced server-side.
+      </p>
+    </PageContainer>
   )
 }
 
