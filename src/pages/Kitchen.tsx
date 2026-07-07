@@ -285,7 +285,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
             ) : next === 'COMPLETED' ? (
               <>
                 <CheckCircle2 className="h-4 w-4" />
-                Mark Ready
+                Complete
               </>
             ) : (
               <>

@@ -235,6 +235,22 @@ export default function Menu() {
   const [addImageUrl, setAddImageUrl] = useState('')
   const [addUploading, setAddUploading] = useState(false)
 
+  // Edit item dialog state — parallel to the Add form above, pre-filled from
+  // the row being edited. `editOriginal` is kept alongside the editable
+  // fields so the submit handler can PATCH only what actually changed.
+  const [editOpen, setEditOpen] = useState(false)
+  const [editOriginal, setEditOriginal] = useState<MenuItem | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPrice, setEditPrice] = useState('')
+  const [editPrep, setEditPrep] = useState('')
+  const [editStation, setEditStation] = useState('')
+  const [editAvailability, setEditAvailability] = useState<Availability>('AVAILABLE')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [editItemNo, setEditItemNo] = useState('')
+  const [editRemarks, setEditRemarks] = useState('')
+  const [editImageUrl, setEditImageUrl] = useState('')
+  const [editUploading, setEditUploading] = useState(false)
+
   // Station lookup map
   const stationMap = useMemo(
     () => new Map(stations.map((s) => [s.id, s.name])),
@@ -360,6 +376,153 @@ export default function Menu() {
     setAddRemarks('')
     setAddImageUrl('')
   }
+
+  // ── Edit item ──────────────────────────────────────────────────────────────
+
+  /** Opens the Edit dialog pre-filled with the row's current values. */
+  const openEditDialog = useCallback((item: MenuItem) => {
+    setEditOriginal(item)
+    setEditName(item.name)
+    setEditPrice(item.price)
+    setEditPrep(item.prepTimeMin != null ? String(item.prepTimeMin) : '')
+    setEditStation(item.stationId || '')
+    setEditAvailability(item.availability)
+    setEditItemNo(item.itemNo ?? '')
+    setEditRemarks(item.remarks ?? '')
+    setEditImageUrl(item.imageUrl ?? '')
+    setEditOpen(true)
+  }, [])
+
+  function resetEditForm() {
+    setEditOriginal(null)
+    setEditName('')
+    setEditPrice('')
+    setEditPrep('')
+    setEditStation('')
+    setEditAvailability('AVAILABLE')
+    setEditItemNo('')
+    setEditRemarks('')
+    setEditImageUrl('')
+  }
+
+  /** Same Cloudinary upload flow as Add, targeting the Edit form's photo field. */
+  async function handleEditPhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setEditUploading(true)
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Could not read the file.'))
+        reader.readAsDataURL(file)
+      })
+      const res = await post<{ url: string }>('/menu/upload-photo', { data_url: dataUrl })
+      setEditImageUrl(res.data.url)
+      toast.success('Photo uploaded')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed.'
+      toast.error('Photo upload failed', { description: msg })
+    } finally {
+      setEditUploading(false)
+    }
+  }
+
+  /**
+   * PATCH /menu/:id with only the fields that actually changed. `station_id`
+   * on the backend's update schema is `.optional()` but NOT `.nullable()` —
+   * unlike item_no/remarks/image_url it can't be explicitly cleared via this
+   * endpoint, so an empty/"_none" selection is simply omitted rather than
+   * sent as null (which the backend would reject as a validation error).
+   */
+  async function handleEditItem(e: FormEvent) {
+    e.preventDefault()
+    if (!editOriginal) return
+    setEditSubmitting(true)
+
+    const payload: Record<string, unknown> = {}
+
+    const trimmedName = editName.trim()
+    if (trimmedName !== editOriginal.name) payload.name = trimmedName
+
+    const trimmedPrice = editPrice.trim()
+    if (trimmedPrice !== editOriginal.price) payload.price = trimmedPrice
+
+    const prep = Number(editPrep) || 0
+    if (prep !== (editOriginal.prepTimeMin ?? 0)) payload.prep_time_min = prep
+
+    const stationVal = editStation && editStation !== '_none' ? editStation : ''
+    if (stationVal && stationVal !== (editOriginal.stationId ?? '')) {
+      payload.station_id = stationVal
+    }
+
+    if (editAvailability !== editOriginal.availability) payload.availability = editAvailability
+
+    const trimmedItemNo = editItemNo.trim()
+    if (trimmedItemNo !== (editOriginal.itemNo ?? '')) payload.item_no = trimmedItemNo || null
+
+    const trimmedRemarks = editRemarks.trim()
+    if (trimmedRemarks !== (editOriginal.remarks ?? '')) payload.remarks = trimmedRemarks || null
+
+    if (editImageUrl !== (editOriginal.imageUrl ?? '')) payload.image_url = editImageUrl || null
+
+    if (Object.keys(payload).length === 0) {
+      setEditSubmitting(false)
+      setEditOpen(false)
+      return
+    }
+
+    try {
+      const res = await patch<MenuItem>(`/menu/${editOriginal.id}`, payload)
+      const updated: MenuItem = { ...res.data, _channels: editOriginal._channels ?? { ...DEFAULT_CHANNELS } }
+      setMenuItems((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+      toast.success(`"${updated.name}" updated`)
+      setEditOpen(false)
+      resetEditForm()
+    } catch (err) {
+      // Surfaces the backend's descriptive 409 (duplicate product no.) or other errors as-is.
+      const msg = err instanceof Error ? err.message : 'Failed to update item.'
+      toast.error('Update failed', { description: msg })
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  // ── Duplicate item ─────────────────────────────────────────────────────────
+
+  /**
+   * POST /brands/{id}/menu with a copy of the row. `item_no` is intentionally
+   * NOT copied — it's unique per brand, so the duplicate starts without a
+   * product number until the user assigns one via Edit.
+   */
+  const handleDuplicate = useCallback(
+    async (item: MenuItem) => {
+      if (!canWrite) {
+        toast.error('Permission denied', { description: 'You need BRAND_MANAGER or SUPER_ADMIN role.' })
+        return
+      }
+      if (!selectedBrandId) return
+      try {
+        const res = await post<MenuItem>(`/brands/${selectedBrandId}/menu`, {
+          name: `${item.name} (copy)`,
+          price: item.price,
+          prep_time_min: item.prepTimeMin || undefined,
+          station_id: item.stationId || undefined,
+          availability: item.availability,
+          remarks: item.remarks ?? undefined,
+          image_url: item.imageUrl ?? undefined,
+        })
+        const newItem: MenuItem = { ...res.data, _channels: { ...DEFAULT_CHANNELS } }
+        setMenuItems((prev) => [newItem, ...prev])
+        toast.success(`"${newItem.name}" duplicated`)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to duplicate item.'
+        toast.error('Duplicate failed', { description: msg })
+      }
+    },
+    [canWrite, selectedBrandId],
+  )
 
   // ── Table columns ─────────────────────────────────────────────────────────
   const columns = useMemo<ColumnDef<MenuItem, unknown>[]>(
@@ -513,22 +676,16 @@ export default function Menu() {
             <DropdownMenuContent align="end" className="w-36">
               <DropdownMenuItem
                 className="gap-2 text-xs"
-                onSelect={() =>
-                  toast.info('Edit coming soon', {
-                    description: `Editing "${row.original.name}" is not yet wired to a backend endpoint.`,
-                  })
-                }
+                disabled={!canWrite}
+                onSelect={() => openEditDialog(row.original)}
               >
                 <Pencil className="h-3 w-3" />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="gap-2 text-xs"
-                onSelect={() =>
-                  toast.info('Duplicate coming soon', {
-                    description: 'POST /brands/{id}/menu with a copy of this item.',
-                  })
-                }
+                disabled={!canWrite}
+                onSelect={() => void handleDuplicate(row.original)}
               >
                 <Plus className="h-3 w-3" />
                 Duplicate
@@ -538,7 +695,7 @@ export default function Menu() {
         ),
       },
     ],
-    [stationMap, cycleAvailability, toggleChannel, canWrite],
+    [stationMap, cycleAvailability, toggleChannel, canWrite, openEditDialog, handleDuplicate],
   )
 
   // ── Add Item Dialog ───────────────────────────────────────────────────────
@@ -730,6 +887,186 @@ export default function Menu() {
     </Dialog>
   )
 
+  // ── Edit Item Dialog ──────────────────────────────────────────────────────
+  // Parallel to addItemDialog above (same field markup/order) — no
+  // DialogTrigger of its own; opened imperatively via openEditDialog() from
+  // the row actions dropdown, same pattern as Kitchen.tsx's cancel-reason
+  // dialog.
+  const editItemDialog = (
+    <Dialog
+      open={editOpen}
+      onOpenChange={(open) => {
+        setEditOpen(open)
+        if (!open) resetEditForm()
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Menu Item</DialogTitle>
+          <DialogDescription>
+            Update{' '}
+            <span className="font-semibold text-zinc-200">{editOriginal?.name ?? 'this item'}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(e) => void handleEditItem(e)} className="space-y-4">
+          {/* Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Name</label>
+            <Input
+              required
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="e.g. Chicken Inasal"
+            />
+          </div>
+
+          {/* Price */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Price (₱)</label>
+            <Input
+              required
+              type="number"
+              min="0"
+              step="0.01"
+              value={editPrice}
+              onChange={(e) => setEditPrice(e.target.value)}
+              placeholder="e.g. 150.00"
+            />
+          </div>
+
+          {/* Prep time */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Prep Time (min)</label>
+            <Input
+              type="number"
+              min="0"
+              value={editPrep}
+              onChange={(e) => setEditPrep(e.target.value)}
+              placeholder="e.g. 15"
+            />
+          </div>
+
+          {/* Station */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Kitchen Station</label>
+            <Select value={editStation} onValueChange={setEditStation}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select station…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">— None —</SelectItem>
+                {stations.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Availability */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Availability</label>
+            <Select
+              value={editAvailability}
+              onValueChange={(v) => setEditAvailability(v as Availability)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AVAILABLE">Available</SelectItem>
+                <SelectItem value="PAUSED">Paused</SelectItem>
+                <SelectItem value="SOLD_OUT">Sold Out</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Product number (MOTM) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Product No. (optional)</label>
+            <Input
+              value={editItemNo}
+              maxLength={32}
+              onChange={(e) => setEditItemNo(e.target.value)}
+              placeholder="e.g. SKU-001 (unique per brand)"
+            />
+          </div>
+
+          {/* Remarks (MOTM) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Remarks (optional)</label>
+            <textarea
+              value={editRemarks}
+              maxLength={500}
+              rows={2}
+              onChange={(e) => setEditRemarks(e.target.value)}
+              placeholder="Notes about this item…"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            />
+          </div>
+
+          {/* Photo (MOTM) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Photo (optional)</label>
+            <div className="flex items-center gap-3">
+              {editImageUrl ? (
+                <img
+                  src={thumb(editImageUrl)}
+                  alt="menu item preview"
+                  className="h-14 w-14 rounded-lg object-cover ring-1 ring-border"
+                />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-800 text-zinc-600">
+                  <UtensilsCrossed className="h-5 w-5" />
+                </div>
+              )}
+              <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-zinc-800/60">
+                {editUploading ? 'Uploading…' : editImageUrl ? 'Replace photo' : 'Upload photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={editUploading}
+                  onChange={(e) => void handleEditPhotoChange(e)}
+                />
+              </label>
+              {editImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setEditImageUrl('')}
+                  className="rounded text-xs text-zinc-500 transition-colors duration-200 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(false)}
+              disabled={editSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={editSubmitting || editUploading}
+              className="bg-emerald-600 text-white hover:bg-emerald-500"
+            >
+              {editSubmitting ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+
   // ── Render: brand load error ───────────────────────────────────────────────
   if (errorBrands) {
     return (
@@ -870,6 +1207,9 @@ export default function Menu() {
           </Card>
         </aside>
       </div>
+
+      {/* Edit dialog — no DialogTrigger; opened via openEditDialog() from row actions */}
+      {editItemDialog}
     </div>
   )
 }

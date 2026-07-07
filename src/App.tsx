@@ -6,6 +6,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { RequireAccess } from './auth/RequireAccess'
 import RoleLanding from './auth/RoleLanding'
 import { OutletProvider } from './context/OutletContext'
+import { SimulatorProvider } from './context/SimulatorContext'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
 import Kitchen from './pages/Kitchen'
@@ -31,6 +32,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <OutletProvider>
+      <SimulatorProvider>
         <BrowserRouter>
           <Routes>
             {/* Public */}
@@ -75,6 +77,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+      </SimulatorProvider>
       </OutletProvider>
     </AuthProvider>
     </QueryClientProvider>

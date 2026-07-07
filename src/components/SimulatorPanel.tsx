@@ -6,12 +6,18 @@
  *
  * SUPER_ADMIN only on the backend; the panel is visible to all authenticated
  * users in the prototype (RBAC enforced server-side per Business Rule #10).
+ *
+ * `running`/`loading`/`error` now live in SimulatorContext (mounted at the
+ * app root — see App.tsx), not local state: this panel lives on the
+ * Dashboard, so navigating away and back used to unmount/remount it and
+ * lose track of an already-running backend simulator. The context hydrates
+ * from GET /simulator/status on load, so returning here reflects the real
+ * backend state instead of always showing "Start".
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Activity, Play, Square } from 'lucide-react'
-import { post } from '../lib/api'
 import type { Brand } from '../pages/Dashboard'
-import type { CKApiError } from '../lib/api'
+import { useSimulator } from '../context/SimulatorContext'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
@@ -20,11 +26,28 @@ interface Props {
 }
 
 export default function SimulatorPanel({ brands }: Props) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [rate, setRate]               = useState<number>(20)
-  const [running, setRunning]         = useState(false)
-  const [loading, setLoading]         = useState(false)
-  const [error, setError]             = useState<string | null>(null)
+  const { running, brandIds: ctxBrandIds, rate: ctxRate, loading, error, start, stop } = useSimulator()
+
+  const [selectedIds, setSelectedIds] = useState<string[]>(ctxBrandIds)
+  const [rate, setRate]               = useState<number>(ctxRate)
+  // Validation errors (empty selection / out-of-range rate) are checked
+  // client-side before ever calling the context — kept local since they're
+  // not API failures. Rendered alongside the context's `error` below.
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Sync local selection/rate from the context whenever it reports the
+  // simulator as running — covers both the initial GET /simulator/status
+  // hydration (which resolves asynchronously, after this panel's first
+  // render) and a fresh mount while it was already running (e.g. navigated
+  // away and back). Without this, the brand chips/rate input would show
+  // empty/default values even though the simulator is actually running with
+  // a real brand selection.
+  useEffect(() => {
+    if (running) {
+      setSelectedIds(ctxBrandIds)
+      setRate(ctxRate)
+    }
+  }, [running, ctxBrandIds, ctxRate])
 
   function toggleBrand(id: string) {
     setSelectedIds(prev =>
@@ -42,38 +65,20 @@ export default function SimulatorPanel({ brands }: Props) {
 
   async function handleStart() {
     if (selectedIds.length === 0) {
-      setError('Select at least one brand to simulate.')
+      setValidationError('Select at least one brand to simulate.')
       return
     }
     if (Number.isNaN(rate) || rate < 0.1 || rate > 60) {
-      setError('Rate must be a number between 0.1 and 60 orders/min.')
+      setValidationError('Rate must be a number between 0.1 and 60 orders/min.')
       return
     }
-    setLoading(true)
-    setError(null)
-    try {
-      await post('/simulator/start', { brand_ids: selectedIds, rate_per_min: rate })
-      setRunning(true)
-    } catch (e) {
-      const ce = e as CKApiError
-      setError(ce?.message ?? 'Failed to start simulator.')
-    } finally {
-      setLoading(false)
-    }
+    setValidationError(null)
+    await start(selectedIds, rate)
   }
 
   async function handleStop() {
-    setLoading(true)
-    setError(null)
-    try {
-      await post('/simulator/stop')
-      setRunning(false)
-    } catch (e) {
-      const ce = e as CKApiError
-      setError(ce?.message ?? 'Failed to stop simulator.')
-    } finally {
-      setLoading(false)
-    }
+    setValidationError(null)
+    await stop()
   }
 
   const activeBrands = brands.filter(b => b.isActive)
@@ -198,9 +203,9 @@ export default function SimulatorPanel({ brands }: Props) {
           </Button>
         )}
 
-        {/* Error */}
-        {error && (
-          <p className="text-xs text-red-400">{error}</p>
+        {/* Error — client-side validation takes priority over a stale API error */}
+        {(validationError ?? error) && (
+          <p className="text-xs text-red-400">{validationError ?? error}</p>
         )}
 
         {/* Helper note */}

@@ -1,6 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ReceiptText, Clock, Flame, PackageCheck, CheckCircle2, Search } from 'lucide-react'
 import { get } from '../lib/api'
+import {
+  getSocket,
+  initSocket,
+  joinLocation,
+  joinLocations,
+  onSocketEvent,
+  onSocketReconnect,
+} from '../lib/socket'
+import { useOutlet } from '../context/OutletContext'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -51,6 +60,7 @@ function fmtTime(iso: string) {
 }
 
 export default function Orders() {
+  const { outlets, selectedOutletId } = useOutlet()
   const [orders, setOrders] = useState<Order[]>([])
   const [brands, setBrands] = useState<Record<string, Brand>>({})
   const [loading, setLoading] = useState(true)
@@ -58,20 +68,100 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [search, setSearch] = useState('')
 
+  // ── Initial load ──────────────────────────────────────────────────────────
+  // Wrapped in useCallback so it can also re-run when the outlet switcher
+  // changes (selectedOutletId/outlets are in its deps — same M2 pattern as
+  // useKitchenOrders.ts): a specific outlet joins exactly that outlet's
+  // socket room; 'ALL' (HQ-scope viewers) joins every outlet's room. This
+  // ALSO toggles `loading`, showing the "Loading orders…" placeholder — that
+  // is correct for a genuinely fresh fetch (mount, or an outlet switch) but
+  // NOT for a live realtime refresh, which must update the table in place
+  // without flashing a reload — see `refetchSilently` below for that case.
+  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [ordersRes, brandsRes] = await Promise.all([
+        get<Order[]>('/orders'),
+        get<Brand[]>('/brands'),
+      ])
+      if (cancelledRef?.current) return
+      setOrders(ordersRes.data)
+      setBrands(Object.fromEntries(brandsRes.data.map((x) => [x.id, x])))
+
+      // Ensure the socket is connected + joined to the room(s) for the
+      // selected outlet (mirrors useKitchenOrders.ts's M2 fix) so
+      // order.created/order.updated events for the right outlet(s) actually
+      // reach this page.
+      if (!getSocket()) initSocket()
+      if (selectedOutletId === 'ALL') {
+        if (outlets.length > 0) joinLocations(outlets.map((o) => o.id))
+      } else {
+        joinLocation(selectedOutletId)
+      }
+    } catch (e) {
+      if (!cancelledRef?.current) {
+        setError(e instanceof Error ? e.message : 'Failed to load orders')
+      }
+    } finally {
+      if (!cancelledRef?.current) setLoading(false)
+    }
+  }, [selectedOutletId, outlets])
+
   useEffect(() => {
-    let alive = true
-    Promise.all([get<Order[]>('/orders'), get<Brand[]>('/brands')])
-      .then(([o, b]) => {
-        if (!alive) return
-        setOrders(o.data)
-        setBrands(Object.fromEntries(b.data.map((x) => [x.id, x])))
-      })
-      .catch((e) => alive && setError(e?.message ?? 'Failed to load orders'))
-      .finally(() => alive && setLoading(false))
+    const cancelledRef = { current: false }
+    void load(cancelledRef)
     return () => {
-      alive = false
+      cancelledRef.current = true
+    }
+  }, [load])
+
+  // ── Background refetch (realtime events + reconnect) ────────────────────
+  // Re-fetches the same list but WITHOUT touching `loading` — the table
+  // already has data on screen, so a live update must patch it in place
+  // (Business Rule #9: "real-time or it doesn't count" implies no visible
+  // reload). Socket room membership is already established by `load` above
+  // (and re-applied automatically on reconnect by lib/socket.ts), so this
+  // doesn't need to repeat the join step. Soft-fails on error (keeps
+  // whatever was last shown rather than blanking the page over a transient
+  // background refresh failure) — the next event or reconnect gets another
+  // chance.
+  const refetchSilently = useCallback(async () => {
+    try {
+      const [ordersRes, brandsRes] = await Promise.all([
+        get<Order[]>('/orders'),
+        get<Brand[]>('/brands'),
+      ])
+      setOrders(ordersRes.data)
+      setBrands(Object.fromEntries(brandsRes.data.map((x) => [x.id, x])))
+    } catch {
+      // Soft-fail — see comment above.
     }
   }, [])
+
+  // A dropped-then-restored socket may have missed order.created/updated
+  // events entirely — refetch to catch up (Business Rule #9).
+  useEffect(() => {
+    return onSocketReconnect(() => { void refetchSilently() })
+  }, [refetchSilently])
+
+  // order.created / order.updated → refetch the list. Debounced so a burst
+  // of events (e.g. the simulator running at a high rate) coalesces into one
+  // refetch instead of one per order.
+  useEffect(() => {
+    const debounceHandle = { current: null as ReturnType<typeof setTimeout> | null }
+    function scheduleRefetch() {
+      if (debounceHandle.current) clearTimeout(debounceHandle.current)
+      debounceHandle.current = setTimeout(() => { void refetchSilently() }, 300)
+    }
+    const unsubCreated = onSocketEvent('order.created', scheduleRefetch)
+    const unsubUpdated = onSocketEvent('order.updated', scheduleRefetch)
+    return () => {
+      if (debounceHandle.current) clearTimeout(debounceHandle.current)
+      unsubCreated()
+      unsubUpdated()
+    }
+  }, [refetchSilently])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}

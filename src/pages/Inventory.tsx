@@ -32,7 +32,14 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { get, post } from '../lib/api'
-import { onSocketEvent, onSocketReconnect } from '../lib/socket'
+import {
+  getSocket,
+  initSocket,
+  joinLocation,
+  joinLocations,
+  onSocketEvent,
+  onSocketReconnect,
+} from '../lib/socket'
 import type { LowStockAlert, StockPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
 import type { UserRole } from '../auth/AuthContext'
@@ -761,7 +768,7 @@ function ItoList({
 export default function Inventory() {
   const { user } = useAuth()
   const role = user?.role
-  const { selectedOutletId } = useOutlet()
+  const { selectedOutletId, outlets } = useOutlet()
   const queryClient = useQueryClient()
 
   // ── Cache-first reads (perf) ─────────────────────────────────────────────
@@ -850,6 +857,22 @@ export default function Inventory() {
     () => queryClient.invalidateQueries({ queryKey: ['itos', selectedOutletId] }),
     [queryClient, selectedOutletId],
   )
+
+  // ── Socket connect + room join ───────────────────────────────────────────────
+  // WAREHOUSE_MAIN/WAREHOUSE_OUTLET land directly on THIS page (RoleLanding.tsx
+  // ROLE_LANDING), so — unlike Printers.tsx, which only ever gets reached via
+  // '/' or '/kitchen' (both of which already join the room) — this page can't
+  // assume the socket is already connected/joined. Mirrors the M2 pattern in
+  // useKitchenOrders.ts / Orders.tsx: a specific outlet joins exactly that
+  // outlet's room; 'ALL' (HQ-scope viewers) joins every outlet's room.
+  useEffect(() => {
+    if (!getSocket()) initSocket()
+    if (selectedOutletId === 'ALL') {
+      if (outlets.length > 0) joinLocations(outlets.map(o => o.id))
+    } else {
+      joinLocation(selectedOutletId)
+    }
+  }, [selectedOutletId, outlets])
 
   // ── Socket subscriptions ─────────────────────────────────────────────────────
 
