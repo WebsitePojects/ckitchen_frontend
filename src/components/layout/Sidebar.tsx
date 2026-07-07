@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { Avatar, AvatarFallback } from '../ui/avatar'
 import { cn } from '../../lib/utils'
 import { NAV_GROUPS } from './nav-items'
-import { canAccess } from '../../auth/access'
+import { usePermissions } from '../../context/PermissionsContext'
 import { useSignOut } from './useSignOut'
 import { PLATFORM_NAME } from '../../lib/branding'
 
@@ -26,6 +26,7 @@ interface SidebarProps {
  */
 export default function Sidebar({ onNavigate }: SidebarProps) {
   const { user } = useAuth()
+  const { canAccessPage } = usePermissions()
   const signOut = useSignOut()
 
   function handleLogout() {
@@ -44,7 +45,11 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {NAV_GROUPS.map((group) => {
-          const items = group.items.filter((item) => user != null && canAccess(user.role, item.to))
+          // canAccessPage layers the persisted RBAC matrix on top of canAccess — it
+          // itself falls back to canAccess (code defaults) when the matrix hasn't
+          // loaded / failed to load / came back empty (fail-open — see
+          // context/PermissionsContext.tsx).
+          const items = group.items.filter((item) => user != null && canAccessPage(item.to))
           if (items.length === 0) return null
           return (
             <div key={group.label} className="mt-4 first:mt-0">
