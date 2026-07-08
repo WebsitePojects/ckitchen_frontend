@@ -138,6 +138,15 @@ interface StockLine {
    */
   reserved?: number | string
   available?: number | string
+  /**
+   * Depletion projection (optional — absent on old deploys; treat absent as
+   * null). `daily_consumption_7d` = average PREPARING deduction per day over
+   * the last 7 days; `days_remaining` = projected days until zero at that
+   * rate, null when there was no recent consumption. Coerced defensively —
+   * the rest of this payload arrives as strings.
+   */
+  daily_consumption_7d?: number | string
+  days_remaining?: number | string | null
 }
 
 type ItoStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED'
@@ -204,10 +213,27 @@ function formatQty(qty: number | string, unit: string): string {
   return `${n % 1 === 0 ? n : n.toFixed(2)} ${unit}`
 }
 
-function toNum(v: number | string | undefined): number | undefined {
+function toNum(v: number | string | null | undefined): number | undefined {
   if (v === undefined || v === null) return undefined
   const n = typeof v === 'string' ? Number(v) : v
   return Number.isFinite(n) ? n : undefined
+}
+
+/** Compact number for the depletion column: integers plain, else 1 decimal. */
+function fmtDays(n: number): string {
+  return n % 1 === 0 ? String(n) : n.toFixed(1)
+}
+
+/**
+ * Depletion view for a stock row (days-left projection contract). `daysLeft`
+ * null = no consumption in the last 7 days OR an old deploy that doesn't send
+ * the fields — both render as "—".
+ */
+function depletionView(row: StockLine): { daysLeft: number | null; dailyConsumption: number } {
+  return {
+    daysLeft: toNum(row.days_remaining) ?? null,
+    dailyConsumption: toNum(row.daily_consumption_7d) ?? 0,
+  }
 }
 
 /**
@@ -338,6 +364,9 @@ function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, 
                 <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   Threshold
                 </TableHead>
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Days&nbsp;Left
+                </TableHead>
                 <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   Status
                 </TableHead>
@@ -352,6 +381,7 @@ function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, 
               {rows.map(row => {
                 const isAlert = row.below_threshold || alertedIds.has(row.ingredientId)
                 const { reserved, available, atRisk } = reservationView(row)
+                const { daysLeft, dailyConsumption } = depletionView(row)
                 // Amber "at-risk" styling only when the row isn't already the
                 // stronger red "below threshold" alert.
                 const showRisk = atRisk && !isAlert
@@ -397,6 +427,34 @@ function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, 
                       <span className="font-mono tabular-nums text-xs text-zinc-500">
                         {row.ingredient.lowStockThreshold} {row.ingredient.unit}
                       </span>
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-right">
+                      {daysLeft === null ? (
+                        <span
+                          className="font-mono text-sm text-zinc-600"
+                          title="No consumption in the last 7 days"
+                        >
+                          —
+                        </span>
+                      ) : (
+                        <span
+                          className={[
+                            'font-mono tabular-nums text-sm font-semibold',
+                            daysLeft <= 1
+                              ? 'text-red-400'
+                              : daysLeft <= 3
+                                ? 'text-amber-400'
+                                : 'text-zinc-300',
+                          ].join(' ')}
+                        >
+                          {fmtDays(daysLeft)}d
+                        </span>
+                      )}
+                      {dailyConsumption > 0 && (
+                        <span className="mt-0.5 block font-mono tabular-nums text-[10px] text-zinc-500">
+                          ≈{fmtDays(dailyConsumption)} {row.ingredient.unit}/day
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-center">
                       {isAlert ? (

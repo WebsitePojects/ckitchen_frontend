@@ -23,12 +23,13 @@ import {
   Percent,
   Plus,
   Tag,
+  Trash2,
   UtensilsCrossed,
   XCircle,
 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { get, patch, post } from '../lib/api'
+import { CKApiError, del, get, patch, post } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import { useOutlet } from '../context/OutletContext'
 import { hasRole } from '../auth/access'
@@ -563,6 +564,37 @@ export default function Menu() {
     [canWrite, selectedBrandId],
   )
 
+  // ── Delete item ────────────────────────────────────────────────────────────
+
+  // Confirm-dialog target; null = closed. DELETE /menu/:id hard-deletes only
+  // items with no order history — the backend 409s (HAS_ORDERS) otherwise,
+  // because past orders must keep referencing what was actually sold.
+  const [deleteTarget, setDeleteTarget] = useState<MenuItem | null>(null)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return
+    setDeleteSubmitting(true)
+    try {
+      await del(`/menu/${deleteTarget.id}`)
+      setMenuItems((prev) => prev.filter((i) => i.id !== deleteTarget.id))
+      toast.success(`"${deleteTarget.name}" deleted`)
+      setDeleteTarget(null)
+    } catch (e) {
+      if (e instanceof CKApiError && e.code === 'HAS_ORDERS') {
+        toast.error('Cannot delete — item has order history', {
+          description: 'Past orders reference this product. Set its availability to Paused to retire it instead.',
+        })
+        setDeleteTarget(null)
+      } else {
+        const msg = e instanceof Error ? e.message : 'Failed to delete item.'
+        toast.error('Delete failed', { description: msg })
+      }
+    } finally {
+      setDeleteSubmitting(false)
+    }
+  }, [deleteTarget, setMenuItems])
+
   // ── Table columns ─────────────────────────────────────────────────────────
   const columns = useMemo<ColumnDef<MenuItem, unknown>[]>(
     () => [
@@ -749,6 +781,14 @@ export default function Menu() {
               >
                 <Percent className="h-3 w-3" />
                 Discounts / Promo
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2 text-xs text-red-400 focus:text-red-300"
+                disabled={!canWrite}
+                onSelect={() => setDeleteTarget(row.original)}
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1136,6 +1176,45 @@ export default function Menu() {
     </Dialog>
   )
 
+  // ── Delete confirm dialog ──────────────────────────────────────────────────
+  const deleteDialog = (
+    <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleteSubmitting) setDeleteTarget(null) }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-400">
+            <Trash2 className="h-4 w-4" />
+            Delete menu item
+          </DialogTitle>
+          <DialogDescription>
+            Permanently delete <span className="font-medium text-zinc-200">&ldquo;{deleteTarget?.name}&rdquo;</span> and
+            its recipe from this brand? Items that already appear in orders cannot be
+            deleted — pause them instead. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={deleteSubmitting}
+            onClick={() => setDeleteTarget(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={deleteSubmitting}
+            className="bg-red-600 text-white hover:bg-red-500"
+            onClick={() => void handleDeleteConfirm()}
+          >
+            {deleteSubmitting ? 'Deleting…' : 'Delete item'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
   // ── Render: brand load error ───────────────────────────────────────────────
   if (errorBrands) {
     return (
@@ -1279,6 +1358,7 @@ export default function Menu() {
 
       {/* Edit dialog — no DialogTrigger; opened via openEditDialog() from row actions */}
       {editItemDialog}
+      {deleteDialog}
 
       {/* Discounts / Promo dialog — no DialogTrigger; opened via openDiscountsDialog() from row actions */}
       <MenuItemDiscountsDialog

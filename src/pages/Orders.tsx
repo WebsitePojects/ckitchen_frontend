@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ReceiptText, Clock, Flame, PackageCheck, CheckCircle2, Search, Plus, Percent, ShieldCheck } from 'lucide-react'
+import { ReceiptText, Clock, Copy, Flame, PackageCheck, CheckCircle2, Search, Plus, Percent, ShieldCheck } from 'lucide-react'
+import { toast } from 'sonner'
 import { get } from '../lib/api'
 import {
   getSocket,
@@ -54,10 +55,22 @@ interface Order {
   brandId: string
   aggregator: string
   externalRef: string
+  /**
+   * Short human-friendly order code (e.g. "TOK-FP-7K3QD"). camelCase on REST
+   * responses; socket payloads may send snake_case `order_code` — both are
+   * optional/defensive: old rows (pre-backfill) and old deploys send neither.
+   */
+  orderCode?: string | null
+  order_code?: string | null
   customerName: string | null
   status: string
   total: string
   placedAt: string
+}
+
+/** Display code for a row: short order code when present, external ref as fallback. */
+function orderDisplayCode(o: Order): string {
+  return o.orderCode ?? o.order_code ?? o.externalRef
 }
 
 const STATUSES = ['NEW', 'PREPARING', 'READY', 'COMPLETED', 'CANCELLED']
@@ -220,6 +233,16 @@ export default function Orders() {
     return c
   }, [orders])
 
+  // Copy the row's order code (or external-ref fallback) to the clipboard.
+  const copyOrderCode = useCallback(async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      toast.success('Order code copied')
+    } catch {
+      toast.error('Could not copy to clipboard')
+    }
+  }, [])
+
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
     return orders
@@ -229,6 +252,7 @@ export default function Orders() {
         const brand = brands[o.brandId]?.name ?? ''
         return (
           o.externalRef.toLowerCase().includes(q) ||
+          (o.orderCode ?? o.order_code ?? '').toLowerCase().includes(q) ||
           brand.toLowerCase().includes(q) ||
           (o.customerName ?? '').toLowerCase().includes(q)
         )
@@ -340,7 +364,21 @@ export default function Orders() {
                 // animates in on mount (stable keys mean existing rows never
                 // re-animate on a re-sort/refetch).
                 <TableRow key={o.id} className="border-border animate-in fade-in slide-in-from-top-1 duration-500">
-                  <TableCell className="font-mono text-xs text-zinc-300">{o.externalRef}</TableCell>
+                  <TableCell className="font-mono text-xs text-zinc-300">
+                    <span className="inline-flex items-center gap-1">
+                      {orderDisplayCode(o)}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void copyOrderCode(orderDisplayCode(o))}
+                        aria-label={`Copy order code ${orderDisplayCode(o)}`}
+                        title="Copy order code"
+                        className="h-5 w-5 shrink-0 text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </span>
+                  </TableCell>
                   <TableCell className="whitespace-nowrap text-sm text-zinc-400">{fmtTime(o.placedAt)}</TableCell>
                   <TableCell><AggregatorBadge aggregator={o.aggregator} /></TableCell>
                   <TableCell><BrandChip brand={brands[o.brandId]} /></TableCell>
@@ -350,15 +388,21 @@ export default function Orders() {
                   </TableCell>
                   <TableCell><StatusBadge status={o.status} /></TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={() => setDiscountOrder(o)}
-                    >
-                      <Percent className="h-3 w-3" />
-                      Discount
-                    </Button>
+                    {/* Manual discounts are walk-in (OTHER) only — the backend
+                        409s AGGREGATOR_ORDER for FOODPANDA/GRABFOOD, whose
+                        totals come from the platform. Omitted entirely (no
+                        disabled stub) for aggregator orders. */}
+                    {o.aggregator === 'OTHER' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1 px-2 text-xs"
+                        onClick={() => setDiscountOrder(o)}
+                      >
+                        <Percent className="h-3 w-3" />
+                        Discount
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

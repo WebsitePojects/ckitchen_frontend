@@ -38,6 +38,8 @@ export interface KdsOrder {
   brandId: string
   aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
   externalRef: string
+  /** Short human-friendly order code (e.g. "TOK-FP-7K3QD"); null on old rows/deploys. */
+  orderCode?: string | null
   customerName: string | null
   status: OrderStatus
   total: string
@@ -81,6 +83,9 @@ export interface RawOrderDetail {
   brandId: string
   aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
   externalRef: string
+  /** camelCase on REST; socket-shaped payloads may send snake_case — both optional (old deploys send neither). */
+  orderCode?: string | null
+  order_code?: string | null
   customerName: string | null
   status: OrderStatus
   total: string
@@ -151,6 +156,7 @@ export function toKdsOrder(raw: RawOrderDetail): KdsOrder {
     brandId: raw.brandId,
     aggregator: raw.aggregator,
     externalRef: raw.externalRef,
+    orderCode: raw.orderCode ?? raw.order_code ?? null,
     customerName: raw.customerName,
     status: raw.status,
     total: raw.total,

@@ -29,7 +29,11 @@ export default function SimulatorPanel({ brands }: Props) {
   const { running, brandIds: ctxBrandIds, rate: ctxRate, loading, error, start, stop } = useSimulator()
 
   const [selectedIds, setSelectedIds] = useState<string[]>(ctxBrandIds)
-  const [rate, setRate]               = useState<number>(ctxRate)
+  // Rate is held as a STRING so the input always renders exactly what the
+  // user typed. Storing it as a number (`Number(e.target.value)` on change)
+  // produced the stuck-"0" bug: clearing the field became 0, and typing "1"
+  // rendered "01". Parsed with Number() only at start/validation time.
+  const [rate, setRate]               = useState<string>(String(ctxRate))
   // Validation errors (empty selection / out-of-range rate) are checked
   // client-side before ever calling the context — kept local since they're
   // not API failures. Rendered alongside the context's `error` below.
@@ -45,7 +49,7 @@ export default function SimulatorPanel({ brands }: Props) {
   useEffect(() => {
     if (running) {
       setSelectedIds(ctxBrandIds)
-      setRate(ctxRate)
+      setRate(String(ctxRate))
     }
   }, [running, ctxBrandIds, ctxRate])
 
@@ -68,12 +72,13 @@ export default function SimulatorPanel({ brands }: Props) {
       setValidationError('Select at least one brand to simulate.')
       return
     }
-    if (Number.isNaN(rate) || rate < 0.1 || rate > 60) {
+    const parsedRate = Number(rate)
+    if (rate.trim() === '' || Number.isNaN(parsedRate) || parsedRate < 0.1 || parsedRate > 60) {
       setValidationError('Rate must be a number between 0.1 and 60 orders/min.')
       return
     }
     setValidationError(null)
-    await start(selectedIds, rate)
+    await start(selectedIds, parsedRate)
   }
 
   async function handleStop() {
@@ -168,7 +173,8 @@ export default function SimulatorPanel({ brands }: Props) {
             max={60}
             step={0.1}
             value={rate}
-            onChange={e => setRate(Number(e.target.value))}
+            placeholder="2"
+            onChange={e => setRate(e.target.value)}
             disabled={running}
             className={[
               'w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-zinc-200',

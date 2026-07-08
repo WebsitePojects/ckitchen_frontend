@@ -197,6 +197,12 @@ async function fetchOrderDetail(id: string): Promise<OrderDetail | null> {
 }
 
 // ─── Audio alert (Business Rule #9: distinct audible alert on order.created) ──
+//
+// Client review 2026-07-08: alerts must sound FORMAL, not game-like. Single
+// soft sine tone, very fast attack, ~0.18 s exponential decay, low gain — no
+// second tone, no sweeps. Audio fires ONLY for order.created (here and on the
+// KDS); warning/error paths (lowstock.alert, stock.risk, error toasts) are
+// silent by design.
 
 function playBeep(): void {
   try {
@@ -209,13 +215,13 @@ function playBeep(): void {
     osc.connect(gain)
     gain.connect(ctx.destination)
     osc.type = 'sine'
-    // Two-tone "ding-dong" kitchen alert
-    osc.frequency.setValueAtTime(880, ctx.currentTime)
-    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.18)
-    gain.gain.setValueAtTime(0.35, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45)
+    // Single soft professional notification tone
+    osc.frequency.setValueAtTime(620, ctx.currentTime)
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + 0.012) // fast attack
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.19) // ~0.18 s decay
     osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 0.45)
+    osc.stop(ctx.currentTime + 0.2)
     osc.onended = () => { void ctx.close() }
   } catch {
     // Web Audio unavailable or blocked — fail silently

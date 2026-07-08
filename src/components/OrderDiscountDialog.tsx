@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Percent, Tag } from 'lucide-react'
 import { toast } from 'sonner'
-import { get, post } from '../lib/api'
+import { CKApiError, get, post } from '../lib/api'
 import {
   Dialog,
   DialogContent,
@@ -267,7 +267,17 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
       await queryClient.invalidateQueries({ queryKey: ['order-discounts', order.id] })
       onChanged?.()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to apply discount.')
+      // 409 AGGREGATOR_ORDER: manual discounts are walk-in (OTHER) only —
+      // Orders.tsx already hides the trigger for FOODPANDA/GRABFOOD rows, but
+      // a stale list (order re-ingested/edited since load) can still get here.
+      if (err instanceof CKApiError && err.code === 'AGGREGATOR_ORDER') {
+        toast.error('Discounts are not allowed on aggregator orders', {
+          description:
+            'Manual discounts apply to walk-in orders only — Foodpanda/GrabFood totals are set by the platform.',
+        })
+      } else {
+        toast.error(err instanceof Error ? err.message : 'Failed to apply discount.')
+      }
     } finally {
       setSubmitting(false)
     }

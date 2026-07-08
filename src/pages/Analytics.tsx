@@ -105,9 +105,40 @@ interface ApiMargin {
 }
 
 // ─── Date helpers ──────────────────────────────────────────────────────────────
+//
+// Timezone-correct date handling (client bug: empty Product Performance/Sales
+// despite completed orders). The UI keeps yyyy-mm-dd strings for the
+// <input type="date"> controls, but every query string sent to /analytics/*
+// and /reports/sales* converts them to FULL ISO datetimes: from = LOCAL start
+// of day → .toISOString(), to = LOCAL end of day (23:59:59.999) → .toISOString().
+// Previously date-only strings were sent and the backend parsed `to` as
+// midnight UTC — excluding all of "today" (and, for UTC+8 Manila, most of the
+// last day of any range).
 
+/** Local calendar date of `d` as yyyy-mm-dd (NOT UTC — .toISOString() would
+ *  shift the date for UTC+ offsets before 8am Manila). */
 function isoDate(d: Date): string {
-  return d.toISOString().split('T')[0]
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** yyyy-mm-dd → ISO datetime at the LOCAL start of that day (00:00:00.000). */
+function localDayStartISO(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0).toISOString()
+}
+
+/** yyyy-mm-dd → ISO datetime at the LOCAL end of that day (23:59:59.999). */
+function localDayEndISO(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1, 23, 59, 59, 999).toISOString()
+}
+
+/** `from=…&to=…` query fragment: local-day bounds as URL-encoded ISO datetimes. */
+function rangeParams(from: string, to: string): string {
+  return `from=${encodeURIComponent(localDayStartISO(from))}&to=${encodeURIComponent(localDayEndISO(to))}`
 }
 
 function defaultRange() {
@@ -237,7 +268,7 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    get<ApiBrandPerf[]>(`/analytics/brands?from=${from}&to=${to}`)
+    get<ApiBrandPerf[]>(`/analytics/brands?${rangeParams(from, to)}`)
       .then(res => { if (!cancelled) setData(res.data ?? []) })
       .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load brand analytics.') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -504,7 +535,7 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    get<ApiAggregatorSplit[]>(`/analytics/aggregators?from=${from}&to=${to}`)
+    get<ApiAggregatorSplit[]>(`/analytics/aggregators?${rangeParams(from, to)}`)
       .then(res => { if (!cancelled) setData(res.data ?? []) })
       .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load aggregator data.') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -655,7 +686,7 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    get<ApiMargin[]>(`/analytics/margins?from=${from}&to=${to}`)
+    get<ApiMargin[]>(`/analytics/margins?${rangeParams(from, to)}`)
       .then(res => { if (!cancelled) setData(res.data ?? []) })
       .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load margin data.') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -878,7 +909,7 @@ function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
     let cancelled = false
     setLoading(true)
     setError(null)
-    get<ApiProductPerf[]>(`/analytics/products?from=${from}&to=${to}`)
+    get<ApiProductPerf[]>(`/analytics/products?${rangeParams(from, to)}`)
       .then(res => { if (!cancelled) setData(res.data ?? []) })
       .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load product performance.') })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -1121,7 +1152,7 @@ function SalesReportSection() {
     setLoading(true)
     setError(null)
     get<ApiSalesReport>(
-      `/reports/sales?from=${appliedFrom}&to=${appliedTo}&group_by=${appliedGroupBy}`,
+      `/reports/sales?${rangeParams(appliedFrom, appliedTo)}&group_by=${appliedGroupBy}`,
     )
       .then(res => { if (!cancelled) setReport(res.data) })
       .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load sales report.') })
@@ -1153,7 +1184,12 @@ function SalesReportSection() {
     setExporting(format)
     try {
       const res = await apiClient.get('/reports/sales/export', {
-        params: { from: appliedFrom, to: appliedTo, group_by: appliedGroupBy, format },
+        params: {
+          from: localDayStartISO(appliedFrom),
+          to: localDayEndISO(appliedTo),
+          group_by: appliedGroupBy,
+          format,
+        },
         responseType: 'blob',
       })
       const fallback = `orion-sales.${format}`
@@ -1370,7 +1406,7 @@ export default function Analytics() {
   useEffect(() => {
     let cancelled = false
     setKpiLoading(true)
-    get<ApiBrandPerf[]>(`/analytics/brands?from=${appliedFrom}&to=${appliedTo}`)
+    get<ApiBrandPerf[]>(`/analytics/brands?${rangeParams(appliedFrom, appliedTo)}`)
       .then(res => { if (!cancelled) setBrandsKpi(res.data ?? []) })
       .catch(() => { if (!cancelled) setBrandsKpi([]) })
       .finally(() => { if (!cancelled) setKpiLoading(false) })

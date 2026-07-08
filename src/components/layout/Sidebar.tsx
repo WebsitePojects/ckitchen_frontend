@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from '../ui/avatar'
 import { cn } from '../../lib/utils'
 import { NAV_GROUPS } from './nav-items'
 import { usePermissions } from '../../context/PermissionsContext'
+import { useNotifications } from '../../context/NotificationContext'
 import { useSignOut } from './useSignOut'
 import { PLATFORM_NAME } from '../../lib/branding'
 
@@ -27,6 +28,10 @@ interface SidebarProps {
 export default function Sidebar({ onNavigate }: SidebarProps) {
   const { user } = useAuth()
   const { canAccessPage } = usePermissions()
+  // Unseen live-update counts per route (NotificationContext, mounted in
+  // AppShell) — a page you're NOT viewing that received realtime events shows
+  // a pulsing red dot on its nav item; visiting it clears the dot.
+  const { unseen } = useNotifications()
   const signOut = useSignOut()
 
   function handleLogout() {
@@ -74,6 +79,13 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                   >
                     <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden />
                     <span className="truncate">{label}</span>
+                    {(unseen[to] ?? 0) > 0 && (
+                      <span
+                        className="ml-auto h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500"
+                        role="status"
+                        aria-label={`${label} has new updates`}
+                      />
+                    )}
                   </NavLink>
                 ))}
               </div>

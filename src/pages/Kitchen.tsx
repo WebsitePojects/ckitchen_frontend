@@ -196,6 +196,10 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
   const stale   = isOrderStale(order)
   const isOverdue = isOrderOverdue(order) && order.status !== 'COMPLETED'
   const elapsed = elapsedMMSS(start)
+  // Short order code (e.g. "TOK-FP-7K3QD") when the backend sends one; the
+  // aggregator external ref (e.g. "SIM-17835…") remains the fallback for old
+  // rows/deploys. No copy button here — KDS is touch-first (big targets only).
+  const displayRef = order.orderCode ?? order.externalRef
 
   // Items relevant to THIS station only; fall back to all items
   const stationItems  = order.items.filter(i => i.stationId === stationId)
@@ -219,7 +223,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         <BrandChip brand={brand} />
         <AggregatorBadge aggregator={order.aggregator} />
         <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
-          {order.externalRef}
+          {displayRef}
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {stale && (
@@ -280,7 +284,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
           <button
             onClick={() => onAdvance(order.id)}
             disabled={advancing}
-            aria-label={`Advance order ${order.externalRef} to ${next}`}
+            aria-label={`Advance order ${displayRef} to ${next}`}
             className={[
               'w-full flex items-center justify-center gap-2',
               'rounded-lg px-4 py-3.5 text-sm font-bold tracking-wide',
@@ -340,7 +344,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
       <Dialog open={cancelOpen} onOpenChange={(o) => { if (!cancelling) setCancelOpen(o) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel order {order.externalRef}</DialogTitle>
+            <DialogTitle>Cancel order {displayRef}</DialogTitle>
             <DialogDescription>
               A reason is required and is saved to the audit log.
             </DialogDescription>
@@ -417,7 +421,7 @@ export default function Kitchen() {
     // but skips toasts/sounds. Fires only for genuinely new orders (not the
     // initial load); chimedRef dedups against duplicate order.created events.
     onOrderCreated: (detail) => {
-      toast.info(`New order: ${detail.externalRef}`, {
+      toast.info(`New order: ${detail.orderCode ?? detail.externalRef}`, {
         description: detail.customerName ? `Customer: ${detail.customerName}` : undefined,
       })
       if (!chimedRef.current.has(detail.id)) {
