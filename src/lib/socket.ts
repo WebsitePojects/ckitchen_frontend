@@ -88,6 +88,25 @@ let _socket: Socket | null = null
 let _joinedLocationIds = new Set<string>()
 let _hasConnectedBefore = false
 
+// Registry of every handler subscribed via onSocketEvent, kept in module state
+// so it can be (re)attached to the CURRENT socket. Two problems this solves:
+//   1. Subscribe-before-init race: a page's subscription effect can run before
+//      the effect that calls initSocket() (observed on a cold deployed load —
+//      the handler was previously dropped with a warning, so live order.created
+//      events never reached the page → "live orders don't update" on deploy).
+//   2. Socket recreation: initSocket() replaces the singleton on (re)login; the
+//      new socket must inherit the still-wanted handlers.
+// Entry identity (the object) is the unsubscribe key.
+interface EventHandlerEntry { event: string; handler: (...args: unknown[]) => void }
+const _eventHandlers = new Set<EventHandlerEntry>()
+
+function _attachHandlers(socket: Socket): void {
+  for (const { event, handler } of _eventHandlers) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    socket.on(event, handler as any)
+  }
+}
+
 // Handlers notified when the socket reconnects (i.e. `connect` fires again
 // after the first connection) — used by pages to refetch and catch up on
 // any events missed while offline (Business Rule #9).
@@ -169,6 +188,10 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
     console.warn('[socket] connect_error', err.message)
     _emitStatus('disconnected')
   })
+
+  // Attach handlers already registered via onSocketEvent — including any that
+  // were subscribed BEFORE this initSocket() call (the cold-load race above).
+  _attachHandlers(_socket)
 
   return _socket
 }
@@ -265,15 +288,24 @@ export function onSocketEvent<K extends keyof ServerEvents>(
   event: K,
   handler: ServerEvents[K],
 ): () => void {
-  const socket = _socket
-  if (!socket) {
-    console.warn('[socket] onSocketEvent called before initSocket — handler not attached')
-    return () => undefined
+  // Register in module state so the handler survives (and is attached to) a
+  // socket created LATER — fixes the deployed cold-load race where a page's
+  // subscription effect ran before initSocket() and the handler was dropped,
+  // leaving live order.created/updated events with no listener.
+  const entry: EventHandlerEntry = {
+    event: event as string,
+    handler: handler as (...args: unknown[]) => void,
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  socket.on(event as string, handler as any)
-  return () => {
+  _eventHandlers.add(entry)
+  // If a socket already exists, attach now; otherwise _attachHandlers() will
+  // attach it the moment initSocket() creates one.
+  if (_socket) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    socket.off(event as string, handler as any)
+    _socket.on(event as string, handler as any)
+  }
+  return () => {
+    _eventHandlers.delete(entry)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _socket?.off(event as string, handler as any)
   }
 }
