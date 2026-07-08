@@ -15,8 +15,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -43,7 +41,7 @@ import {
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { get } from '../lib/api'
-import { getSocket, initSocket, joinLocation, onSocketEvent, onSocketReconnect } from '../lib/socket'
+import { getSocket, initSocket, joinLocation, joinLocations, onSocketEvent, onSocketReconnect } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
 import { Button } from '../components/ui/button'
 import {
@@ -64,6 +62,7 @@ import AggregatorBadge from '../components/common/AggregatorBadge'
 import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
 import SimulatorPanel from '../components/SimulatorPanel'
+import OrdersByHourByBrandChart from '../components/charts/OrdersByHourByBrandChart'
 import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_SINGLE, type Aggregator } from '../lib/theme'
 
 // ─── Public types (consumed by SimulatorPanel) ────────────────────────────────
@@ -243,12 +242,7 @@ function formatElapsed(isoStart: string): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
-function hourLabel(h: number): string {
-  if (h === 0)  return '12am'
-  if (h < 12)   return `${h}am`
-  if (h === 12) return '12pm'
-  return `${h - 12}pm`
-}
+// (hourLabel moved into OrdersByHourByBrandChart with the "Orders Today" swap.)
 
 // ─── Chart shared styles (LOCKED W4a palette — see lib/theme.ts) ──────────────
 // Same grid/tooltip/skeleton treatment as Analytics.tsx for cross-page consistency.
@@ -274,7 +268,7 @@ interface Filters {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { selectedOutletId } = useOutlet()
+  const { selectedOutletId, outlets } = useOutlet()
   const [orders, setOrders]     = useState<OrderDetail[]>([])
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
@@ -342,7 +336,11 @@ export default function Dashboard() {
     } finally {
       if (!cancelledRef?.current) setLoading(false)
     }
-  }, [])
+    // selectedOutletId is a deliberate re-run trigger (not used in the body): the
+    // X-Outlet-Id header is set from localStorage by the api interceptor, so
+    // switching the outlet must re-invoke load() to refetch the correctly-scoped
+    // order feed (P6 — outlets interchangeable from the header).
+  }, [selectedOutletId])
 
   useEffect(() => {
     const cancelledRef = { current: false }
@@ -355,10 +353,17 @@ export default function Dashboard() {
   // covers the initial load regardless of whether brands or orders resolves
   // first, now that they're no longer a single Promise.all.
   useEffect(() => {
-    if (brands.length === 0) return
     if (!getSocket()) initSocket()
-    joinLocation(brands[0].locationId)
-  }, [brands])
+    // Join the room(s) for the SELECTED outlet — NOT brands[0].locationId, which
+    // was whichever brand happened to sort first (wrong for any specific outlet
+    // pick). 'ALL' (HQ scope) joins every outlet's room. Mirrors useKitchenOrders'
+    // M2 fix so the Dashboard feed re-scopes when the header outlet switches (P6).
+    if (selectedOutletId === 'ALL') {
+      if (outlets.length > 0) joinLocations(outlets.map((o) => o.id))
+    } else {
+      joinLocation(selectedOutletId)
+    }
+  }, [selectedOutletId, outlets])
 
   // ── Reconnect recovery ─────────────────────────────────────────────────────
   // A dropped-then-restored socket may have missed order.created/updated
@@ -366,13 +371,15 @@ export default function Dashboard() {
   // socket has left every room server-side) to catch up (Business Rule #9).
   useEffect(() => {
     return onSocketReconnect(() => {
-      if (brands.length > 0) {
-        if (!getSocket()) initSocket()
-        joinLocation(brands[0].locationId)
+      if (!getSocket()) initSocket()
+      if (selectedOutletId === 'ALL') {
+        if (outlets.length > 0) joinLocations(outlets.map((o) => o.id))
+      } else {
+        joinLocation(selectedOutletId)
       }
       void load()
     })
-  }, [load, brands])
+  }, [load, selectedOutletId, outlets])
 
   // ── Socket subscriptions (FR-OD-03, FR-OD-04) ────────────────────────────
   useEffect(() => {
@@ -460,19 +467,12 @@ export default function Dashboard() {
 
   // ── Chart data (derived client-side from the already-loaded `orders` +
   //    `brands` state — no extra endpoints/GETs) ─────────────────────────────
-
-  /** Today's orders bucketed by hour-of-day (local time), 24-hour scaffold. */
-  const hourlyData = useMemo(() => {
-    const todayKey = new Date().toDateString()
-    const buckets = Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 }))
-    for (const o of orders) {
-      const placed = new Date(o.placedAt)
-      if (placed.toDateString() !== todayKey) continue
-      buckets[placed.getHours()].count += 1
-    }
-    return buckets
-  }, [orders])
-  const hasOrdersToday = hourlyData.some(d => d.count > 0)
+  //
+  // NOTE: "Orders Today" is now a stacked-by-brand chart (MoM #9 — "which brand
+  // is it?") backed by GET /analytics/orders-by-hour-by-brand and rendered by
+  // <OrdersByHourByBrandChart/>, which owns its own fetch + loading/empty/error
+  // states. The old client-side hourly bucketing lived here; it was removed with
+  // the swap. The two charts below still derive from the loaded order set.
 
   /** Aggregator split across the loaded order set (fixed brand colors, D-locked). */
   const aggregatorData = useMemo(() => {
@@ -494,6 +494,33 @@ export default function Dashboard() {
       .map(([brandId, count]) => ({ brandId, name: brandMap.get(brandId)?.name ?? 'Unknown', count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 6)
+  }, [orders, brandMap])
+
+  /** Today's orders bucketed by hour × brand — client-side from the loaded,
+   *  outlet-scoped order set (so it's correctly per-outlet AND works for every
+   *  Dashboard role; the /analytics endpoints aren't outlet-scoped and 403 for
+   *  OUTLET_MANAGER). Live: recomputes as the socket feed updates `orders`. */
+  const hourBrandData = useMemo(() => {
+    const now = new Date()
+    const y = now.getFullYear(), m = now.getMonth(), d = now.getDate()
+    const byHour = new Map<number, Map<string, { name: string; count: number }>>()
+    for (const o of orders) {
+      const dt = new Date(o.placedAt)
+      if (dt.getFullYear() !== y || dt.getMonth() !== m || dt.getDate() !== d) continue
+      const hour = dt.getHours()
+      let bm = byHour.get(hour)
+      if (!bm) { bm = new Map(); byHour.set(hour, bm) }
+      const name = brandMap.get(o.brandId)?.name ?? 'Unknown'
+      const prev = bm.get(o.brandId)
+      if (prev) prev.count += 1
+      else bm.set(o.brandId, { name, count: 1 })
+    }
+    return Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      brands: [...(byHour.get(hour)?.entries() ?? [])].map(([brandId, v]) => ({
+        brandId, brandName: v.name, count: v.count,
+      })),
+    }))
   }, [orders, brandMap])
 
   const hasActiveFilters = !!(filters.brand_id || filters.aggregator || filters.status || filters.station_id)
@@ -670,56 +697,17 @@ export default function Dashboard() {
           orders/brands state already fetched above, no new endpoints) ────── */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
 
-        {/* Orders today, by hour — single-measure area, brand emerald */}
+        {/* Orders today, by hour, STACKED BY BRAND (MoM 2026-07-01 #9 — "which
+            brand is it?"). Backed by /analytics/orders-by-hour-by-brand via the
+            self-contained chart component (owns its own fetch + states); the
+            socket feed / simulator / order table below are untouched. */}
         <Card className="border-border bg-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold text-zinc-100">Orders Today</CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">Hourly order volume, today</p>
+            <p className="mt-0.5 text-xs text-zinc-500">Hourly order volume by brand, today</p>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <Skeleton className="h-[240px] w-full rounded-xl" />
-            ) : !hasOrdersToday ? (
-              <EmptyState
-                icon={BarChart3}
-                title="No orders today yet"
-                description="Today's orders will appear here by hour."
-                className="border-none bg-transparent py-10"
-              />
-            ) : (
-              <ResponsiveContainer width="100%" height={240}>
-                <AreaChart data={hourlyData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                  <defs>
-                    <linearGradient id="ordersTodayFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_SINGLE} stopOpacity={0.35} />
-                      <stop offset="95%" stopColor={CHART_SINGLE} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} vertical={false} />
-                  <XAxis
-                    dataKey="hour"
-                    tickFormatter={hourLabel}
-                    tick={{ fontSize: 10, fill: CHART_TICK }}
-                    tickLine={false}
-                    axisLine={{ stroke: CHART_GRID }}
-                    interval={2}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    tick={{ fontSize: 11, fill: CHART_TICK }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={28}
-                  />
-                  <Tooltip
-                    labelFormatter={label => hourLabel(Number(label))}
-                    formatter={(v) => [`${v} orders`, '']}
-                    contentStyle={CHART_TOOLTIP_STYLE}
-                  />
-                  <Area type="monotone" dataKey="count" stroke={CHART_SINGLE} strokeWidth={2} fill="url(#ordersTodayFill)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
+            <OrdersByHourByBrandChart brands={brands} buckets={hourBrandData} />
           </CardContent>
         </Card>
 

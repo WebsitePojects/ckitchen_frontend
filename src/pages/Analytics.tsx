@@ -47,6 +47,7 @@ import {
   DollarSign,
   FileSpreadsheet,
   FileText,
+  Package,
   ReceiptText,
   Star,
   TrendingUp,
@@ -800,6 +801,200 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
   )
 }
 
+// ─── Section: Product Performance (MoM 2026-07-01 #8 — "Brand and Product
+//     Performance"; brand perf already exists, product perf did not) ───────────
+//
+// Backed by GET /analytics/products?from&to → top menu items by revenue.
+// NOTE: this endpoint returns **camelCase** fields (menuItemId/qtySold/…), unlike
+// the older snake_case analytics endpoints above — typed accordingly.
+// Chart: single measure (revenue) → ONE hue (CHART_SINGLE), horizontal bars so
+// long product names stay readable (dataviz: never rainbow one measure). Full
+// per-item detail (product · brand · qty · revenue · orders) lives in the table.
+
+interface ApiProductPerf {
+  menuItemId: string
+  name: string
+  brandId: string
+  brandName: string
+  qtySold: number | null | undefined
+  revenue: number | null | undefined
+  orders: number | null | undefined
+}
+
+const PRODUCT_TOP_N = 10
+
+/** Compact ₱ axis tick — full precision stays in the tooltip + table. */
+function fmtPHPAxis(v: number): string {
+  if (Math.abs(v) >= 1000) return `₱${(v / 1000).toFixed(0)}k`
+  return `₱${v.toFixed(0)}`
+}
+
+/** Truncate a long product name for the y-axis tick (full name in tooltip/table). */
+function truncateLabel(s: string, max = 18): string {
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s
+}
+
+function ProductTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload?: ApiProductPerf }>
+}) {
+  if (!active || !payload || payload.length === 0) return null
+  const p = payload[0]?.payload
+  if (!p) return null
+  return (
+    <div
+      className="rounded-lg border px-3 py-2 text-xs"
+      style={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#F4F4F5' }}
+    >
+      <p className="font-semibold text-zinc-100">{p.name}</p>
+      <p className="mb-1.5 text-zinc-500">{p.brandName}</p>
+      <dl className="space-y-0.5">
+        <div className="flex items-center justify-between gap-4">
+          <dt className="text-zinc-400">Revenue</dt>
+          <dd className="tabular-nums text-emerald-400">{fmtPHP(p.revenue)}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <dt className="text-zinc-400">Qty sold</dt>
+          <dd className="tabular-nums text-zinc-200">{fmtNum(p.qtySold)}</dd>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <dt className="text-zinc-400">Orders</dt>
+          <dd className="tabular-nums text-zinc-200">{fmtNum(p.orders)}</dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
+function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
+  const [data, setData]       = useState<ApiProductPerf[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    get<ApiProductPerf[]>(`/analytics/products?from=${from}&to=${to}`)
+      .then(res => { if (!cancelled) setData(res.data ?? []) })
+      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load product performance.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [from, to])
+
+  // API is already revenue-desc; defensively re-sort, then take the top N.
+  const topProducts = useMemo(
+    () =>
+      [...data]
+        .sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0))
+        .slice(0, PRODUCT_TOP_N)
+        .map(p => ({ ...p, revenue: p.revenue ?? 0 })),
+    [data],
+  )
+  // ~34px per row keeps horizontal bars legible regardless of count.
+  const chartHeight = Math.max(topProducts.length * 34 + 24, 140)
+
+  return (
+    <Card className="border-border bg-card">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold text-zinc-100">
+          Product Performance
+        </CardTitle>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          Top menu items by revenue{data.length > PRODUCT_TOP_N ? ` (top ${PRODUCT_TOP_N} of ${data.length})` : ''} — across all brands
+        </p>
+      </CardHeader>
+
+      <CardContent>
+        {loading ? (
+          <ChartSkeleton />
+        ) : error ? (
+          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+        ) : topProducts.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title="No product sales yet"
+            description="No data yet — run the simulator to generate orders"
+          />
+        ) : (
+          <>
+            {/* Horizontal revenue bar chart (single measure → one hue) */}
+            <div className="mb-6 w-full overflow-x-auto">
+              <ResponsiveContainer width="100%" height={chartHeight}>
+                <BarChart
+                  data={topProducts}
+                  layout="vertical"
+                  margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickFormatter={v => fmtPHPAxis(v as number)}
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={{ stroke: CHART_GRID }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tickFormatter={v => truncateLabel(String(v))}
+                    tick={{ fontSize: 11, fill: CHART_TICK }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={132}
+                    interval={0}
+                  />
+                  <Tooltip content={<ProductTooltip />} cursor={{ fill: CURSOR_FILL }} />
+                  <Bar dataKey="revenue" fill={CHART_SINGLE} radius={[0, 4, 4, 0]} maxBarSize={22} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Compact detail table */}
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                    <th className="px-4 py-2.5 text-left">#</th>
+                    <th className="px-4 py-2.5 text-left">Product</th>
+                    <th className="px-4 py-2.5 text-left">Brand</th>
+                    <th className="px-4 py-2.5 text-right">Qty Sold</th>
+                    <th className="px-4 py-2.5 text-right">Revenue</th>
+                    <th className="px-4 py-2.5 text-right">Orders</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topProducts.map((p, idx) => (
+                    <tr key={p.menuItemId} className="border-b border-border/50 last:border-0">
+                      <td className="px-4 py-2.5 font-bold tabular-nums text-zinc-600">
+                        {idx + 1}
+                      </td>
+                      <td className="px-4 py-2.5 font-medium text-zinc-200">{p.name}</td>
+                      <td className="px-4 py-2.5 text-zinc-400">{p.brandName}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                        {fmtNum(p.qtySold)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-400">
+                        {fmtPHP(p.revenue)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                        {fmtNum(p.orders)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Section: Sales Report (client req #10, D33 / backend W3a) ────────────────
 //
 // Gated separately from the rest of /reports: PAGE_ROLES allows OUTLET_MANAGER /
@@ -1243,6 +1438,9 @@ export default function Analytics() {
         <AggregatorSplitSection from={appliedFrom} to={appliedTo} />
         <BrandMarginsSection    from={appliedFrom} to={appliedTo} />
       </div>
+
+      {/* ── Product performance (MoM #8) ── */}
+      <ProductPerformanceSection from={appliedFrom} to={appliedTo} />
 
       {/* ── Sales Report (client req #10) — OWNER/ACCOUNTING only; the backend
           403s BRAND_MANAGER/OUTLET_MANAGER/PURCHASING on /reports/sales*. Rather

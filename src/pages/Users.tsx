@@ -21,6 +21,7 @@ import {
   Pencil,
   MapPin,
   History,
+  BarChart3,
   Plus,
 } from 'lucide-react'
 import { get, post, patch, put } from '../lib/api'
@@ -29,6 +30,7 @@ import { hasRole } from '../auth/access'
 import { useOutlet } from '../context/OutletContext'
 import type { OutletSummary } from '../context/OutletContext'
 import { NAV_GROUPS } from '../components/layout/nav-items'
+import UserPerformanceDialog from '../components/UserPerformanceDialog'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
@@ -862,6 +864,7 @@ export default function Users() {
   const [resetTarget, setResetTarget] = useState<AdminUser | null>(null)
   const [outletTarget, setOutletTarget] = useState<AdminUser | null>(null)
   const [activityTarget, setActivityTarget] = useState<AdminUser | null>(null)
+  const [perfTarget, setPerfTarget] = useState<AdminUser | null>(null)
 
   const [security, setSecurity] = useState(() =>
     Object.fromEntries(SECURITY_CONTROLS.map((c) => [c.id, c.on])) as Record<string, boolean>,
@@ -1010,6 +1013,9 @@ export default function Users() {
                                 <DropdownMenuItem onClick={() => setActivityTarget(u)}>
                                   <History className="h-3.5 w-3.5" /> Activity
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setPerfTarget(u)}>
+                                  <BarChart3 className="h-3.5 w-3.5" /> Performance
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => handleToggleBlock(u)}
@@ -1090,6 +1096,11 @@ export default function Users() {
         onSaved={invalidateUsers}
       />
       <ActivityDialog target={activityTarget} onOpenChange={(o) => !o && setActivityTarget(null)} />
+      <UserPerformanceDialog
+        target={perfTarget}
+        outlets={outlets}
+        onOpenChange={(o) => !o && setPerfTarget(null)}
+      />
     </PageContainer>
   )
 }

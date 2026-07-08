@@ -336,7 +336,10 @@ export default function Orders() {
             </TableHeader>
             <TableBody>
               {rows.map((o) => (
-                <TableRow key={o.id} className="border-border">
+                // P1: a new order arriving live is a freshly-keyed row, so it
+                // animates in on mount (stable keys mean existing rows never
+                // re-animate on a re-sort/refetch).
+                <TableRow key={o.id} className="border-border animate-in fade-in slide-in-from-top-1 duration-500">
                   <TableCell className="font-mono text-xs text-zinc-300">{o.externalRef}</TableCell>
                   <TableCell className="whitespace-nowrap text-sm text-zinc-400">{fmtTime(o.placedAt)}</TableCell>
                   <TableCell><AggregatorBadge aggregator={o.aggregator} /></TableCell>
