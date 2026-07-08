@@ -1023,7 +1023,7 @@ export default function Menu() {
               value={addItemNo}
               maxLength={32}
               onChange={(e) => setAddItemNo(e.target.value)}
-              placeholder="e.g. SKU-001 (unique per brand)"
+              placeholder="e.g. TH-001 (unique per brand)"
             />
           </div>
 
@@ -1217,7 +1217,7 @@ export default function Menu() {
               value={editItemNo}
               maxLength={32}
               onChange={(e) => setEditItemNo(e.target.value)}
-              placeholder="e.g. SKU-001 (unique per brand)"
+              placeholder="e.g. TH-001 (unique per brand)"
             />
           </div>
 

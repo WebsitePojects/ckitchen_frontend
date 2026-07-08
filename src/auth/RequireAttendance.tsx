@@ -1,6 +1,8 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { get } from '../lib/api'
+import { showAppDialog } from '../lib/appDialog'
 import { useAuth } from './AuthContext'
 import { normalizeRole } from './access'
 
@@ -60,8 +62,10 @@ function isExemptPath(pathname: string): boolean {
 export function RequireAttendance() {
   const { user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
 
   const isOwner = user ? normalizeRole(user.role) === 'OWNER' : false
+  const exempt = isExemptPath(location.pathname)
 
   // Hooks run unconditionally; the query itself only fires for non-OWNER
   // authed users (a disabled query stays isPending forever, so every branch
@@ -73,10 +77,39 @@ export function RequireAttendance() {
     enabled: !!user && !isOwner,
   })
 
+  // Blocked = an authed non-OWNER, with a linked employee, who is NOT clocked
+  // in and is trying to open a non-exempt route (i.e. anything but /attendance).
+  // This drives the explanatory gate modal below.
+  const isBlocked =
+    !!user &&
+    !isOwner &&
+    !exempt &&
+    query.isSuccess &&
+    !!query.data.employee &&
+    !query.data.clocked_in
+
+  // Fire the explanatory modal ONCE per navigation attempt (guard by
+  // location.key so React rerenders don't re-fire it). The dialog is buffered
+  // by lib/appDialog and shown on /attendance after the redirect below lands.
+  const firedKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (isBlocked && firedKeyRef.current !== location.key) {
+      firedKeyRef.current = location.key
+      showAppDialog({
+        variant: 'warning',
+        title: 'Clock in first',
+        message:
+          "You're timed out. Record your time-in on the Attendance page before opening other pages.",
+        actionLabel: 'Go to Attendance',
+        onAction: () => navigate('/attendance', { replace: true }),
+      })
+    }
+  }, [isBlocked, location.key, navigate])
+
   // RequireAuth handles the no-token case upstream; if user is still resolving, render nothing.
   if (!user) return null
 
-  if (isOwner || isExemptPath(location.pathname)) return <Outlet />
+  if (isOwner || exempt) return <Outlet />
 
   if (query.isPending) {
     // Same minimal-spinner pattern as RequireAuth — avoids a flash-redirect

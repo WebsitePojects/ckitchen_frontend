@@ -24,6 +24,7 @@ import Brands from './pages/Brands'
 import Outlets from './pages/Outlets'
 import ChannelListings from './pages/ChannelListings'
 import Employees from './pages/Employees'
+import EmployeeProfile from './pages/EmployeeProfile'
 import AuditTrail from './pages/AuditTrail'
 import StockLedger from './pages/StockLedger'
 import Attendance from './pages/Attendance'
@@ -61,6 +62,17 @@ export default function App() {
                 {/* '/merchants' left the nav post-D30 ("merchant" = Brand) — kept as an
                     unconditional redirect (outside RequireAccess) so old links don't 404. */}
                 <Route path="merchants" element={<Navigate to="/channel-listings" replace />} />
+                {/* Employee 360 detail — deliberately OUTSIDE <RequireAccess>:
+                    that guard matches the RAW pathname ('/employees/<uuid>')
+                    against page keys, and the persisted RBAC matrix
+                    (/me/permissions) only ever contains parent keys like
+                    '/employees', so the Set lookup would bounce every
+                    non-OWNER role even when Employees is allowed. The page
+                    self-gates instead: it inherits '/employees' permissions
+                    via usePermissions().canAccessPage('/employees') and
+                    redirects to the role landing exactly like RequireAccess
+                    would (see EmployeeProfile.tsx). */}
+                <Route path="employees/:id" element={<EmployeeProfile />} />
                 <Route element={<RequireAccess />}>
                 <Route index element={<RoleLanding />} />
                 <Route path="orders" element={<Orders />} />

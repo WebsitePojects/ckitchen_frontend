@@ -435,13 +435,15 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                       placeholder="Search ingredient…"
                     />
                   </div>
-                  <div className="w-24">
-                    <label className="mb-1 block text-[11px] text-zinc-500">SKU</label>
+                  <div className="w-32">
+                    <label className="mb-1 block text-[11px] text-zinc-500">
+                      Supplier item code
+                    </label>
                     <Input
                       value={addSku}
                       onChange={(e) => setAddSku(e.target.value)}
                       maxLength={64}
-                      placeholder="opt."
+                      placeholder="optional"
                       className={INPUT_CLS}
                     />
                   </div>
@@ -472,6 +474,10 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                     Link
                   </Button>
                 </div>
+                <p className="text-[11px] text-zinc-600">
+                  Supplier item code — the code this supplier uses for the item on their invoices
+                  (optional).
+                </p>
                 {ingredients.length > 0 && ingredients.length === linkedIds.size && (
                   <p className="text-[11px] text-zinc-600">
                     Every ingredient is already linked to this supplier.

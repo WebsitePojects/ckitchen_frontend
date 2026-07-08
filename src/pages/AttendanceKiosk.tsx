@@ -46,6 +46,11 @@ interface PublicEmployee {
   employeeNo: string
   fullName: string
   department: string
+  /** Today's clock state (backend 2026-07-08). Absent on old deploys → treat
+   *  as unknown (both punch buttons stay enabled; the server is the backstop). */
+  clocked_in?: boolean
+  clocked_out?: boolean
+  last_type?: 'TIME_IN' | 'TIME_OUT' | null
 }
 
 type PunchType = 'TIME_IN' | 'TIME_OUT'
@@ -92,12 +97,35 @@ interface KioskCaptureProps {
   onBack: () => void
   onSuccess: (type: PunchType, at: Date) => void
   onDisabled: () => void
+  /** Called after a clock-state 409 (double time-in / no time-in / already
+   *  timed out) so the parent can refetch the list and reset to it. */
+  onConflict: () => void
 }
 
-function KioskCapture({ employee, onBack, onSuccess, onDisabled }: KioskCaptureProps) {
+/** Clock-state 409 codes the backend uses to reject a double/invalid punch. */
+const CLOCK_CONFLICT_CODES = new Set(['ALREADY_TIMED_IN', 'NOT_TIMED_IN', 'ALREADY_TIMED_OUT'])
+
+function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: KioskCaptureProps) {
   const { videoRef, camError, startCamera, captureFrame } = useAttendanceCamera()
   const [captured, setCaptured] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<PunchType | null>(null)
+
+  // Today's clock state drives which punch is allowed — "no double time-in;
+  // if this user has timed in, next must be time out" (client 2026-07-08).
+  // Fields absent on old deploys (known === false) → leave both enabled and
+  // let the server 409 be the backstop.
+  const known = employee.clocked_in !== undefined
+  const clockedIn = !!employee.clocked_in
+  const clockedOut = !!employee.clocked_out
+  const timeInDisabled = submitting !== null || (known && (clockedIn || clockedOut))
+  const timeOutDisabled = submitting !== null || (known && (!clockedIn || clockedOut))
+  const stateHint = known
+    ? clockedOut
+      ? 'Done for today — already timed in and out.'
+      : clockedIn
+        ? 'Already timed in — time out next.'
+        : null
+    : null
 
   function capture() {
     const frame = captureFrame()
@@ -124,6 +152,13 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled }: KioskCaptureP
       if (e instanceof CKApiError && e.status === 404) {
         // Flag flipped off between page load and this punch.
         onDisabled()
+        return
+      }
+      if (e instanceof CKApiError && (e.status === 409 || CLOCK_CONFLICT_CODES.has(e.code))) {
+        // Server-side guard tripped (someone else clocked them, or a stale
+        // list): say it plainly and refresh so the buttons/chips are correct.
+        toast.error(e.message || 'That punch is not allowed right now.')
+        onConflict()
         return
       }
       toast.error(e instanceof Error ? e.message : 'Punch failed — please try again.')
@@ -168,22 +203,25 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled }: KioskCaptureP
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={() => void punch('TIME_IN')}
-                disabled={submitting !== null}
-                className="h-20 bg-emerald-600 text-xl font-semibold text-white hover:bg-emerald-500"
+                disabled={timeInDisabled}
+                title={known && (clockedIn || clockedOut) ? 'Already timed in — time out next' : undefined}
+                className="h-20 bg-emerald-600 text-xl font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
               >
                 <LogIn className="mr-3 h-6 w-6" />
                 {submitting === 'TIME_IN' ? 'Submitting…' : 'TIME IN'}
               </Button>
               <Button
                 onClick={() => void punch('TIME_OUT')}
-                disabled={submitting !== null}
+                disabled={timeOutDisabled}
                 variant="outline"
-                className="h-20 border-amber-500/40 text-xl font-semibold text-amber-300 hover:bg-amber-500/10"
+                title={known && (!clockedIn || clockedOut) ? 'Not timed in yet' : undefined}
+                className="h-20 border-amber-500/40 text-xl font-semibold text-amber-300 hover:bg-amber-500/10 disabled:opacity-40"
               >
                 <LogOut className="mr-3 h-6 w-6" />
                 {submitting === 'TIME_OUT' ? 'Submitting…' : 'TIME OUT'}
               </Button>
             </div>
+            {stateHint && <p className="text-center text-sm text-amber-300/80">{stateHint}</p>}
             <Button
               variant="outline"
               size="lg"
@@ -325,10 +363,17 @@ export default function AttendanceKiosk() {
           <KioskCapture
             employee={step.employee}
             onBack={resetToList}
-            onSuccess={(type, at) =>
+            onSuccess={(type, at) => {
+              // Refresh so the returning list shows the new clock state chip and
+              // the guardrail (no double time-in) reflects this punch.
+              void employeesQuery.refetch()
               setStep({ kind: 'success', name: step.employee.fullName, type, at })
-            }
+            }}
             onDisabled={() => setDisabledByFlag(true)}
+            onConflict={() => {
+              void employeesQuery.refetch()
+              resetToList()
+            }}
           />
         ) : (
           // ── Employee list ──
@@ -403,6 +448,19 @@ export default function AttendanceKiosk() {
                       <div className="truncate text-sm text-zinc-500">
                         {e.employeeNo} · {e.department}
                       </div>
+                      {/* Today's clock state chip — only when the backend
+                          supplies the fields (absent → nothing / unknown). */}
+                      {e.clocked_in && !e.clocked_out ? (
+                        <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Timed in
+                        </div>
+                      ) : e.clocked_out ? (
+                        <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-600" />
+                          Timed out
+                        </div>
+                      ) : null}
                     </div>
                   </button>
                 ))}

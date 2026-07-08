@@ -79,6 +79,7 @@ import {
 import AdjustmentDialog from '../components/AdjustmentDialog'
 import IngredientDialog from '../components/IngredientDialog'
 import type { EditableIngredient } from '../components/IngredientDialog'
+import ReceivingReportDialog from '../components/ReceivingReportDialog'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -531,168 +532,6 @@ function StockTable({
         )}
       </CardContent>
     </Card>
-  )
-}
-
-// ─── Receive into MAIN form ────────────────────────────────────────────────────
-
-interface ReceiveItem {
-  ingredientId: string
-  quantity: string
-}
-
-interface ReceiveFormProps {
-  ingredients: Ingredient[]
-  outletId?: string
-  onSuccess: () => void
-  onClose: () => void
-}
-
-function ReceiveForm({ ingredients, outletId, onSuccess, onClose }: ReceiveFormProps) {
-  const [items, setItems] = useState<ReceiveItem[]>([{ ingredientId: '', quantity: '' }])
-  const [submitting, setSubmitting] = useState(false)
-
-  function addRow() {
-    setItems(prev => [...prev, { ingredientId: '', quantity: '' }])
-  }
-
-  function removeRow(idx: number) {
-    setItems(prev => prev.filter((_, i) => i !== idx))
-  }
-
-  function setField(idx: number, field: keyof ReceiveItem, value: string) {
-    setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    // A row is "bad" if only one of ingredientId/quantity is filled in, or quantity
-    // is filled but not a finite number > 0. A fully blank row (extra "Add row" click)
-    // is fine to silently ignore.
-    const hasBadRow = items.some(it => {
-      const hasIngredient = !!it.ingredientId
-      const qtyNum = Number(it.quantity)
-      const hasValidQty = it.quantity !== '' && Number.isFinite(qtyNum) && qtyNum > 0
-      if (!hasIngredient && !it.quantity) return false
-      return hasIngredient !== hasValidQty
-    })
-    if (hasBadRow) {
-      toast.error(
-        'Fix or remove incomplete rows before submitting — each row needs both an ingredient and a quantity greater than 0.',
-      )
-      return
-    }
-    const valid = items.filter(it => it.ingredientId && Number(it.quantity) > 0)
-    if (valid.length === 0) {
-      toast.error('Add at least one ingredient with a quantity > 0.')
-      return
-    }
-    setSubmitting(true)
-    try {
-      await post('/inventory/receive', {
-        outlet_id: outletId,
-        // Backend Zod schema expects snake_case `ingredient_id` in the request body
-        // (verified against ckitchen_backend/src/modules/inventory/routes.ts).
-        items: valid.map(it => ({
-          ingredient_id: it.ingredientId,
-          quantity: Number(it.quantity),
-        })),
-      })
-      toast.success(`Received ${valid.length} ingredient(s) into MAIN warehouse.`)
-      setItems([{ ingredientId: '', quantity: '' }])
-      onSuccess()
-      onClose()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to receive stock.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <form onSubmit={e => void handleSubmit(e)} className="space-y-4">
-      <div className="space-y-3">
-        {items.map((item, idx) => (
-          <div key={idx} className="flex gap-2 items-end">
-            <div className="flex-1 min-w-0">
-              {idx === 0 && (
-                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
-                  Ingredient
-                </label>
-              )}
-              <Select
-                value={item.ingredientId || '_none'}
-                onValueChange={v => setField(idx, 'ingredientId', v === '_none' ? '' : v)}
-              >
-                <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
-                  <SelectValue placeholder="Select ingredient…" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#121A17] border-[#1F2A24]">
-                  <SelectItem value="_none" className="text-zinc-400">
-                    Select ingredient…
-                  </SelectItem>
-                  {ingredients.map(ing => (
-                    <SelectItem key={ing.id} value={ing.id} className="text-zinc-200">
-                      {ing.name} ({ing.unit})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-28">
-              {idx === 0 && (
-                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
-                  Quantity
-                </label>
-              )}
-              <Input
-                type="number"
-                min="0.01"
-                step="any"
-                value={item.quantity}
-                onChange={e => setField(idx, 'quantity', e.target.value)}
-                required
-                placeholder="0"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
-              />
-            </div>
-            {items.length > 1 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => removeRow(idx)}
-                aria-label="Remove row"
-                className="h-9 w-9 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="flex gap-2 pt-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addRow}
-          className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-        >
-          <Plus className="h-3.5 w-3.5 mr-1" />
-          Add row
-        </Button>
-        <Button
-          type="submit"
-          disabled={submitting}
-          size="sm"
-          className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
-        >
-          {submitting ? 'Receiving…' : 'Receive into MAIN'}
-        </Button>
-      </div>
-    </form>
   )
 }
 
@@ -1639,7 +1478,7 @@ export default function Inventory() {
         />
         <KpiCard
           icon={Boxes}
-          label="Total SKUs"
+          label="Stock Lines"
           value={totalSkus}
         />
         <KpiCard
@@ -1810,24 +1649,12 @@ export default function Inventory() {
         onSaved={refetchAfterIngredientEdit}
       />
 
-      {/* ── Receive into MAIN dialog ── */}
-      <Dialog open={showReceive} onOpenChange={setShowReceive}>
-        <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-zinc-50">
-              Receive into MAIN Warehouse
-            </DialogTitle>
-            <DialogDescription className="text-zinc-500">
-              Log a supplier delivery into the MAIN warehouse (FR-IV-08).
-            </DialogDescription>
-          </DialogHeader>
-          <ReceiveForm
-            ingredients={ingredients}
-            onSuccess={() => void refetchMainStock()}
-            onClose={() => setShowReceive(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* ── Receive into MAIN dialog (Receiving Report form) ── */}
+      <ReceivingReportDialog
+        open={showReceive}
+        onOpenChange={setShowReceive}
+        onReceived={() => void refetchMainStock()}
+      />
 
       {/* ── Request Transfer (ITO) dialog ── */}
       <Dialog open={showRequestIto} onOpenChange={setShowRequestIto}>

@@ -15,7 +15,7 @@
  *   PO_ROLES        = OWNER, PURCHASING
  *   RECEIVE_ROLES   = OWNER, WAREHOUSE_OUTLET
  */
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
@@ -120,6 +120,19 @@ export default function Purchasing() {
   const activeSuppliers = useMemo(() => allSuppliers.filter((s) => s.isActive), [allSuppliers])
   const supplierById = useMemo(() => new Map(allSuppliers.map((s) => [s.id, s])), [allSuppliers])
   const poById = useMemo(() => new Map(pos.map((p) => [p.id, p])), [pos])
+
+  // Resolve an RR's supplier name defensively — direct receipts carry supplier
+  // info on the row itself (no PO to join through); PO-based ones fall back to
+  // the linked PO's supplier.
+  const resolveRrSupplier = useCallback(
+    (r: ReceivingReport): string => {
+      if (r.supplier?.name) return r.supplier.name
+      if (r.supplierId) return supplierById.get(r.supplierId)?.name ?? '—'
+      const po = r.poId ? poById.get(r.poId) : null
+      return po ? supplierById.get(po.supplierId)?.name ?? '—' : '—'
+    },
+    [supplierById, poById],
+  )
 
   // ── Per-row details (lines) for items-count / totals ─────────────────────
   // The list endpoints return bare rows (no lines); details are fetched per row
@@ -531,19 +544,34 @@ export default function Purchasing() {
       {
         id: 'po',
         header: 'PO',
-        accessorFn: (r) => poById.get(r.poId)?.poNo ?? '—',
-        cell: ({ row }) => (
-          <span className="font-mono text-xs text-zinc-400">
-            {poById.get(row.original.poId)?.poNo ?? '—'}
-          </span>
-        ),
+        accessorFn: (r) => (r.poId ? poById.get(r.poId)?.poNo ?? '—' : 'Direct'),
+        cell: ({ row }) => {
+          const poId = row.original.poId
+          if (!poId) {
+            return (
+              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400 ring-1 ring-inset ring-zinc-500/30">
+                Direct
+              </span>
+            )
+          }
+          return (
+            <span className="font-mono text-xs text-zinc-400">
+              {poById.get(poId)?.poNo ?? '—'}
+            </span>
+          )
+        },
       },
       {
         id: 'supplier',
         header: 'Supplier',
-        accessorFn: (r) => {
-          const po = poById.get(r.poId)
-          return po ? supplierById.get(po.supplierId)?.name ?? '—' : '—'
+        accessorFn: (r) => resolveRrSupplier(r),
+        cell: ({ row }) => {
+          const name = resolveRrSupplier(row.original)
+          return name === '—' ? (
+            <span className="text-zinc-600">—</span>
+          ) : (
+            <span className="text-zinc-200">{name}</span>
+          )
         },
       },
       {
@@ -564,7 +592,7 @@ export default function Purchasing() {
         ),
       },
     ],
-    [poById, supplierById, rrLineCounts],
+    [poById, supplierById, rrLineCounts, resolveRrSupplier],
   )
 
   // ── Render ────────────────────────────────────────────────────────────────

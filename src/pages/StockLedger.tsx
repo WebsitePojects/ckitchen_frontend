@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ListOrdered, ArrowDownToLine, ArrowUpFromLine, Layers, Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { get } from '../lib/api'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
@@ -29,6 +30,12 @@ interface LedgerEntry {
   sourceModule: string
   sourceDocumentNo: string
   sourceLineNo: string | null
+  /**
+   * Short human-friendly reference for the movement — an order code like
+   * "TOK-FP-7K3QD" for order rows, an RR number for receives, null otherwise.
+   * Optional: absent on old deploys (read defensively, fall back to doc no).
+   */
+  source_ref?: string | null
   ingredientId: string
   warehouseId: string
   movementType: 'IN' | 'OUT'
@@ -63,21 +70,48 @@ export default function StockLedger() {
   const [error, setError] = useState<string | null>(null)
   const [module, setModule] = useState('ALL')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
+  // Debounce the server-side search term (~300ms). Client-side filtering (below)
+  // still uses the immediate `search`, so typing narrows the list instantly even
+  // before the request lands — and old deploys that ignore `q=` still filter.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // Static lookups (ingredient + warehouse names) — fetched once. On failure the
+  // table degrades to short ids rather than blocking the ledger.
+  useEffect(() => {
+    let alive = true
+    Promise.all([get<Ingredient[]>('/ingredients'), get<Warehouse[]>('/warehouses')])
+      .then(([ing, wh]) => {
+        if (!alive) return
+        setIngredients(Object.fromEntries(ing.data.map((x) => [x.id, x])))
+        setWarehouses(Object.fromEntries(wh.data.map((x) => [x.id, x])))
+      })
+      .catch(() => {
+        /* names degrade to ids — non-fatal */
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  // Ledger rows — refetch on module filter or debounced search. The backend
+  // accepts `q=` (case-insensitive over ingredient name / source_ref / doc no);
+  // older deploys ignore it, so we ALSO filter client-side in `rows` below.
   useEffect(() => {
     let alive = true
     setLoading(true)
-    const q = module === 'ALL' ? '' : `?source_module=${module}`
-    Promise.all([
-      get<LedgerEntry[]>(`/stock-ledger${q}`),
-      get<Ingredient[]>('/ingredients'),
-      get<Warehouse[]>('/warehouses'),
-    ])
-      .then(([l, ing, wh]) => {
+    const params = new URLSearchParams()
+    if (module !== 'ALL') params.set('source_module', module)
+    if (debouncedSearch.trim()) params.set('q', debouncedSearch.trim())
+    const qs = params.toString()
+    get<LedgerEntry[]>(`/stock-ledger${qs ? `?${qs}` : ''}`)
+      .then((l) => {
         if (!alive) return
         setEntries(l.data)
-        setIngredients(Object.fromEntries(ing.data.map((x) => [x.id, x])))
-        setWarehouses(Object.fromEntries(wh.data.map((x) => [x.id, x])))
         setError(null)
       })
       .catch((e) => alive && setError(e?.message ?? 'Failed to load stock ledger'))
@@ -85,7 +119,16 @@ export default function StockLedger() {
     return () => {
       alive = false
     }
-  }, [module])
+  }, [module, debouncedSearch])
+
+  async function copyRef(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Copied')
+    } catch {
+      toast.error('Could not copy to clipboard')
+    }
+  }
 
   const stats = useMemo(() => {
     const ins = entries.filter((e) => e.movementType === 'IN').length
@@ -99,6 +142,7 @@ export default function StockLedger() {
       const ing = ingredients[e.ingredientId]?.name ?? ''
       return (
         e.sourceDocumentNo.toLowerCase().includes(q) ||
+        (e.source_ref?.toLowerCase().includes(q) ?? false) ||
         ing.toLowerCase().includes(q) ||
         e.sourceModule.toLowerCase().includes(q)
       )
@@ -120,7 +164,7 @@ export default function StockLedger() {
         <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
           <Input
-            placeholder="Search doc #, ingredient, module…"
+            placeholder="Search ref, doc #, ingredient, module…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-72 pl-8"
@@ -152,6 +196,7 @@ export default function StockLedger() {
                 <TableHead>Time</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Document</TableHead>
+                <TableHead>Ref</TableHead>
                 <TableHead>Ingredient</TableHead>
                 <TableHead>Warehouse</TableHead>
                 <TableHead>Move</TableHead>
@@ -170,6 +215,25 @@ export default function StockLedger() {
                   </TableCell>
                   <TableCell className="font-mono text-xs text-zinc-400">
                     {e.sourceDocumentNo.slice(0, 12)}{e.sourceLineNo ? `·${e.sourceLineNo.slice(0, 6)}` : ''}
+                  </TableCell>
+                  <TableCell>
+                    {e.source_ref ? (
+                      <button
+                        type="button"
+                        onClick={() => void copyRef(e.source_ref!)}
+                        title="Click to copy"
+                        className="font-mono text-xs text-emerald-300/90 transition-colors hover:text-emerald-200 hover:underline"
+                      >
+                        {e.source_ref}
+                      </button>
+                    ) : (
+                      <span
+                        className="font-mono text-xs text-zinc-500"
+                        title={e.sourceDocumentNo}
+                      >
+                        {e.sourceDocumentNo.slice(0, 8)}…
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-zinc-200">{ingredients[e.ingredientId]?.name ?? e.ingredientId.slice(0, 8)}</TableCell>
                   <TableCell className="text-sm text-zinc-400">{warehouses[e.warehouseId]?.type ?? e.warehouseId.slice(0, 8)}</TableCell>

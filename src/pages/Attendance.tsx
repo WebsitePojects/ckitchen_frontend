@@ -59,6 +59,9 @@ interface Punch {
   photoUrl: string
   capturedAt: string
   note: string | null
+  /** DTR pairing state (backend 2026-07-08). Absent on old deploys → render as
+   *  today (no status badge). FORFEITED = timed in >24h ago, never timed out. */
+  status?: 'COMPLETE' | 'OPEN' | 'FORFEITED'
 }
 
 function fmtTime(iso: string) {
@@ -207,6 +210,17 @@ export default function Attendance() {
           description: 'This punch was not saved. Refreshing your clock state…',
         })
         void queryClient.invalidateQueries({ queryKey: SELF_TODAY_QUERY_KEY })
+      } else if (
+        e instanceof CKApiError &&
+        (e.code === 'ALREADY_TIMED_IN' ||
+          e.code === 'NOT_TIMED_IN' ||
+          e.code === 'ALREADY_TIMED_OUT')
+      ) {
+        // Server-enforced clock-state guard (no double time-in / time-out).
+        // Say it plainly, then refresh so the buttons reflect the true state.
+        toast.error(e.message || 'That punch is not allowed right now.')
+        void queryClient.invalidateQueries({ queryKey: SELF_TODAY_QUERY_KEY })
+        loadPunches(effectiveEmployeeId)
       } else {
         setMsg({ err: e instanceof Error ? e.message : 'Punch failed.' })
       }
@@ -424,13 +438,28 @@ export default function Attendance() {
                 <li key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/40 p-2">
                   <img src={p.photoUrl} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />
                   <div className="min-w-0 flex-1">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        p.type === 'TIME_IN' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'
-                      }`}
-                    >
-                      {p.type}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          p.type === 'TIME_IN' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'
+                        }`}
+                      >
+                        {p.type}
+                      </span>
+                      {p.status === 'FORFEITED' && (
+                        <span
+                          title="Timed in but never timed out within 24 hours; no time credited. HR can correct manually."
+                          className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300"
+                        >
+                          FORFEITED — no time-out
+                        </span>
+                      )}
+                      {p.status === 'OPEN' && (
+                        <span className="inline-flex items-center rounded-full bg-zinc-700/40 px-2 py-0.5 text-[10px] font-semibold text-zinc-400">
+                          OPEN
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-0.5 text-xs tabular-nums text-zinc-400">{fmtTime(p.capturedAt)}</div>
                   </div>
                 </li>

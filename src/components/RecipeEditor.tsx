@@ -365,7 +365,7 @@ function NewIngredientForm({ suppliers, onCancel, onCreated }: NewIngredientForm
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-zinc-500">Supplier SKU</label>
+          <label className="mb-1 block text-[11px] text-zinc-500">Supplier item code (optional)</label>
           <Input
             value={sku}
             onChange={e => setSku(e.target.value)}

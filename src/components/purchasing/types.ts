@@ -115,7 +115,11 @@ export interface PurchaseOrderDetail extends PurchaseOrder {
 export interface ReceivingReport {
   id: string
   rrNo: string
-  poId: string
+  /** null for a direct receipt (received into MAIN without a purchase order). */
+  poId: string | null
+  /** Present on direct receipts (and, when the backend joins it, PO-based ones). */
+  supplierId?: string | null
+  supplier?: { id: string; code: string; name: string } | null
   warehouseId: string
   receivedByUserId: string
   notes: string | null

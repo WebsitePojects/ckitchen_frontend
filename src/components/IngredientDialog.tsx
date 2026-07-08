@@ -355,7 +355,9 @@ export default function IngredientDialog({
                       {aff.supplier?.name ?? aff.supplierId}
                     </p>
                     <p className="mt-0.5 text-[11px] text-zinc-500">
-                      {aff.supplierSku ? `SKU ${aff.supplierSku}` : 'no SKU'}
+                      {aff.supplierSku
+                        ? `Supplier item code ${aff.supplierSku}`
+                        : 'No supplier item code'}
                       {' · last '}
                       {formatCost(aff.lastUnitCost)}
                     </p>
@@ -412,12 +414,14 @@ export default function IngredientDialog({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="w-24">
-                  <label className="mb-1 block text-[11px] text-zinc-500">SKU</label>
+                <div className="w-32">
+                  <label className="mb-1 block text-[11px] text-zinc-500">
+                    Supplier item code
+                  </label>
                   <Input
                     value={addSku}
                     onChange={e => setAddSku(e.target.value)}
-                    placeholder="opt."
+                    placeholder="optional"
                     className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
                   />
                 </div>
@@ -448,6 +452,10 @@ export default function IngredientDialog({
                   Link
                 </Button>
               </div>
+              <p className="text-[11px] text-zinc-600">
+                Supplier item code — the code this supplier uses for the item on their invoices
+                (optional).
+              </p>
               {availableSuppliers.length === 0 && (
                 <p className="text-[11px] text-zinc-600">
                   Every active supplier is already linked to this ingredient.
