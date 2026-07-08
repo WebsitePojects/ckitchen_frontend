@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ReceiptText, Clock, Flame, PackageCheck, CheckCircle2, Search } from 'lucide-react'
+import { ReceiptText, Clock, Flame, PackageCheck, CheckCircle2, Search, Plus } from 'lucide-react'
 import { get } from '../lib/api'
 import {
   getSocket,
@@ -10,6 +10,8 @@ import {
   onSocketReconnect,
 } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
+import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -18,6 +20,8 @@ import AggregatorBadge from '../components/common/AggregatorBadge'
 import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
 import PageContainer from '../components/layout/PageContainer'
+import WalkInOrderDialog from '../components/WalkInOrderDialog'
+import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import {
@@ -62,6 +66,12 @@ function fmtTime(iso: string) {
 
 export default function Orders() {
   const { outlets, selectedOutletId } = useOutlet()
+  const { user } = useAuth()
+  // Walk-in manual order entry (MOTM 2026-06-24). Reuses the same gate style
+  // as Menu.tsx's canWrite — OWNER passes automatically via hasRole's
+  // short-circuit.
+  const canCreateWalkIn = hasRole(user?.role, ['OUTLET_MANAGER', 'BRAND_MANAGER'])
+  const [walkInOpen, setWalkInOpen] = useState(false)
   const [orders, setOrders] = useState<Order[]>([])
   const [brands, setBrands] = useState<Record<string, Brand>>({})
   const [loading, setLoading] = useState(true)
@@ -188,7 +198,22 @@ export default function Orders() {
 
   return (
     <PageContainer>
-      <PageHeader title="Orders" subtitle="Every order across all brands and platforms" />
+      <PageHeader
+        title="Orders"
+        subtitle="Every order across all brands and platforms"
+        actions={
+          canCreateWalkIn ? (
+            <Button
+              size="sm"
+              onClick={() => setWalkInOpen(true)}
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Walk-in Order
+            </Button>
+          ) : undefined
+        }
+      />
 
       <KpiRibbon>
         <KpiCard icon={ReceiptText} label="Total Orders" value={orders.length} />
@@ -266,6 +291,9 @@ export default function Orders() {
           </Table>
         )}
       </Card>
+
+      {/* Controlled dialog — no trigger of its own; opened via the header button above. */}
+      <WalkInOrderDialog open={walkInOpen} onOpenChange={setWalkInOpen} />
     </PageContainer>
   )
 }
