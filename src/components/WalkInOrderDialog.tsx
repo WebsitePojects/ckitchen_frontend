@@ -19,9 +19,10 @@
  */
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, ShoppingCart, Trash2 } from 'lucide-react'
+import { AlertTriangle, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { get, post } from '../lib/api'
+import { CKApiError, get, post } from '../lib/api'
+import type { StockShortfall } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
 import {
   Dialog,
@@ -72,6 +73,17 @@ interface WalkInOrderDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+/** POST /ingest/order response fields this dialog cares about (stock-reservation
+ *  contract). `stock_risk` = order was created but at risk (e.g. OTHER +
+ *  allow_oversell); shown as a warning toast after creation. */
+interface IngestOrderResponse {
+  stock_risk?: StockShortfall[]
+}
+
+function formatShortfall(s: StockShortfall): string {
+  return `${s.ingredient_name}: need ${s.required}, ${s.available} available`
+}
+
 const AVAIL_SUFFIX: Partial<Record<Availability, string>> = {
   PAUSED: ' (Paused)',
   SOLD_OUT: ' (Sold Out)',
@@ -91,6 +103,10 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
   const [pickedItemId, setPickedItemId] = useState('')
   const [pickedQty, setPickedQty] = useState('1')
   const [submitting, setSubmitting] = useState(false)
+  // Populated when the backend blocks a walk-in for insufficient stock (409
+  // INSUFFICIENT_STOCK). Showing this list turns the primary action into
+  // "Proceed anyway (oversell)", which resubmits with allow_oversell: true.
+  const [shortfalls, setShortfalls] = useState<StockShortfall[] | null>(null)
 
   // Only fetch while the dialog is actually open — no point warming this
   // cache on every Orders.tsx mount.
@@ -133,6 +149,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
     setLines([])
     setPickedItemId('')
     setPickedQty('1')
+    setShortfalls(null)
   }
 
   function handleOpenChange(next: boolean) {
@@ -146,6 +163,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
     // clears the cart rather than leaving stale cross-brand lines.
     setLines([])
     setPickedItemId('')
+    setShortfalls(null)
   }
 
   function addLine() {
@@ -163,34 +181,60 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
     })
     setPickedItemId('')
     setPickedQty('1')
+    // Cart changed — any prior shortfall no longer describes this order.
+    setShortfalls(null)
   }
 
   function removeLine(menuItemId: string) {
     setLines((prev) => prev.filter((l) => l.menuItemId !== menuItemId))
+    setShortfalls(null)
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function submitOrder(allowOversell: boolean) {
     if (!brandId || lines.length === 0) return
     setSubmitting(true)
     try {
-      await post('/ingest/order', {
+      const { data } = await post<IngestOrderResponse>('/ingest/order', {
         brand_id: brandId,
         aggregator: 'OTHER',
         external_ref: generateExternalRef(),
         customer_name: customerName.trim() || 'Walk-in',
         items: lines.map((l) => ({ menu_item_id: l.menuItemId, qty: l.qty })),
+        // Only sent when the operator explicitly chose to proceed past a
+        // shortfall — bypasses the 409 INSUFFICIENT_STOCK block server-side.
+        ...(allowOversell ? { allow_oversell: true } : {}),
       })
       toast.success('Walk-in order placed', {
         description: 'Now live on the Orders board, Dashboard, and KDS.',
       })
+      // Order created but the backend flagged it as at-risk (D: OTHER +
+      // allow_oversell) — warn after success so the shortfall isn't silent.
+      const risk = data?.stock_risk
+      if (Array.isArray(risk) && risk.length > 0) {
+        toast.warning('Order placed with stock shortfall', {
+          description: risk.map(formatShortfall).join(' · '),
+          duration: 10_000,
+        })
+      }
       handleOpenChange(false)
     } catch (err) {
+      // 409 INSUFFICIENT_STOCK — surface the shortfall list in-dialog and offer
+      // an explicit oversell override rather than a dead-end error toast.
+      if (err instanceof CKApiError && err.code === 'INSUFFICIENT_STOCK') {
+        const details = Array.isArray(err.details) ? (err.details as StockShortfall[]) : []
+        setShortfalls(details)
+        return
+      }
       const msg = err instanceof Error ? err.message : 'Failed to place order.'
       toast.error(msg)
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    void submitOrder(false)
   }
 
   const dataError = brandsError ?? menuError
@@ -344,6 +388,33 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
             <span className="text-lg font-bold tabular-nums text-zinc-50">₱{total.toFixed(2)}</span>
           </div>
 
+          {/* Insufficient-stock block (409 INSUFFICIENT_STOCK) — non-blocking:
+              lists the shortfall and lets the operator override via oversell. */}
+          {shortfalls && shortfalls.length > 0 && (
+            <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Insufficient stock for this order
+              </p>
+              <ul className="space-y-1">
+                {shortfalls.map((s) => (
+                  <li
+                    key={s.ingredient_id}
+                    className="flex items-center justify-between gap-2 text-xs text-amber-200/90"
+                  >
+                    <span className="min-w-0 flex-1 truncate">{s.ingredient_name}</span>
+                    <span className="shrink-0 tabular-nums">
+                      need {s.required} · {s.available} available
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-amber-400/70">
+                Proceed anyway to place the order and oversell the stock, or edit the cart.
+              </p>
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               type="button"
@@ -354,14 +425,26 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !brandId || lines.length === 0}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
-            >
-              {submitting ? 'Placing…' : 'Place Order'}
-            </Button>
+            {shortfalls && shortfalls.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void submitOrder(true)}
+                disabled={submitting || !brandId || lines.length === 0}
+                className="bg-amber-600 text-white hover:bg-amber-500"
+              >
+                {submitting ? 'Placing…' : 'Proceed anyway (oversell)'}
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="sm"
+                disabled={submitting || !brandId || lines.length === 0}
+                className="bg-emerald-600 text-white hover:bg-emerald-500"
+              >
+                {submitting ? 'Placing…' : 'Place Order'}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

@@ -116,6 +116,14 @@ interface StockLine {
   ingredient: Ingredient
   /** NOTE: API returns this one field snake_case — kept as-is. */
   below_threshold: boolean
+  /**
+   * Stock-reservation fields (optional — absent on pre-reservation deploys).
+   * `reserved` = qty held by not-yet-preparing orders; `available` = quantity −
+   * reserved. Numeric per the contract, but coerced defensively (the rest of
+   * this payload arrives as strings). Fall back: reserved 0 / available = qty.
+   */
+  reserved?: number | string
+  available?: number | string
 }
 
 type ItoStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED'
@@ -152,6 +160,33 @@ interface Ito {
 function formatQty(qty: number | string, unit: string): string {
   const n = typeof qty === 'string' ? Number(qty) : qty
   return `${n % 1 === 0 ? n : n.toFixed(2)} ${unit}`
+}
+
+function toNum(v: number | string | undefined): number | undefined {
+  if (v === undefined || v === null) return undefined
+  const n = typeof v === 'string' ? Number(v) : v
+  return Number.isFinite(n) ? n : undefined
+}
+
+/**
+ * Derive the reservation view for a stock row from the optional `reserved` /
+ * `available` fields (stock-reservation contract). Graceful fallback for old
+ * deploys that don't send them: reserved 0, available = on-hand quantity.
+ * `atRisk` = available has dropped to/below the low-stock threshold even though
+ * the on-hand quantity is still above it (reservations, not consumption, are
+ * eating the buffer) — a warning the plain `below_threshold` flag can't show.
+ */
+function reservationView(row: StockLine): {
+  reserved: number
+  available: number
+  atRisk: boolean
+} {
+  const quantity = toNum(row.quantity) ?? 0
+  const reserved = toNum(row.reserved) ?? 0
+  const available = toNum(row.available) ?? quantity - reserved
+  const threshold = toNum(row.ingredient?.lowStockThreshold) ?? 0
+  const atRisk = !row.below_threshold && reserved > 0 && available <= threshold
+  return { reserved, available, atRisk }
 }
 
 function formatTime(iso: string): string {
@@ -249,7 +284,10 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                   Ingredient
                 </TableHead>
                 <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
-                  Qty
+                  On&nbsp;Hand
+                </TableHead>
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Available
                 </TableHead>
                 <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   Threshold
@@ -262,6 +300,10 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
             <TableBody>
               {rows.map(row => {
                 const isAlert = row.below_threshold || alertedIds.has(row.ingredientId)
+                const { reserved, available, atRisk } = reservationView(row)
+                // Amber "at-risk" styling only when the row isn't already the
+                // stronger red "below threshold" alert.
+                const showRisk = atRisk && !isAlert
                 return (
                   <TableRow
                     key={row.ingredientId}
@@ -269,12 +311,14 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                       'transition-colors duration-300 border-[#1F2A24]',
                       isAlert
                         ? 'bg-red-500/5 hover:bg-red-500/10'
-                        : 'hover:bg-zinc-800/30',
+                        : showRisk
+                          ? 'bg-amber-500/5 hover:bg-amber-500/10'
+                          : 'hover:bg-zinc-800/30',
                     ].join(' ')}
                   >
                     <TableCell className="px-4 py-2.5">
                       <span
-                        className={`font-medium text-sm ${isAlert ? 'text-red-300' : 'text-zinc-100'}`}
+                        className={`font-medium text-sm ${isAlert ? 'text-red-300' : showRisk ? 'text-amber-200' : 'text-zinc-100'}`}
                       >
                         {row.ingredient.name}
                       </span>
@@ -284,6 +328,18 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                         className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : 'text-zinc-200'}`}
                       >
                         {formatQty(row.quantity, row.ingredient.unit)}
+                      </span>
+                      {reserved > 0 && (
+                        <span className="mt-0.5 block font-mono tabular-nums text-[10px] text-amber-400/80">
+                          {formatQty(reserved, row.ingredient.unit)} reserved
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="px-4 py-2.5 text-right">
+                      <span
+                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : showRisk ? 'text-amber-400' : 'text-zinc-300'}`}
+                      >
+                        {formatQty(available, row.ingredient.unit)}
                       </span>
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
@@ -296,6 +352,11 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400 ring-1 ring-inset ring-red-500/30">
                           <AlertTriangle className="h-3 w-3" aria-hidden />
                           Low
+                        </span>
+                      ) : showRisk ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/30">
+                          <AlertTriangle className="h-3 w-3" aria-hidden />
+                          At risk
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/30">

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { WifiOff } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Toaster } from '../ui/sonner'
-import { getSocket, initSocket, onSocketStatusChange } from '../../lib/socket'
+import { getSocket, initSocket, onSocketEvent, onSocketStatusChange } from '../../lib/socket'
 import { PageHeaderProvider } from './PageHeaderContext'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -31,6 +32,32 @@ export default function AppShell() {
   useEffect(() => {
     const unsubscribe = onSocketStatusChange(setSocketStatus)
     return unsubscribe
+  }, [])
+
+  // Global `stock.risk` toast (stock-reservation contract): fired to the outlet
+  // room when an aggregator order was accepted despite insufficient available
+  // stock. Subscribed here (always-mounted shell) so it surfaces on every page,
+  // alongside the Toaster this shell owns. Deduped per order_id — the backend
+  // can emit for the same order more than once (retry/replay) and we don't want
+  // a toast storm.
+  const seenRiskOrdersRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    return onSocketEvent('stock.risk', payload => {
+      const orderId = payload.order_id
+      if (orderId) {
+        if (seenRiskOrdersRef.current.has(orderId)) return
+        seenRiskOrdersRef.current.add(orderId)
+      }
+      const names = (payload.shortfalls ?? []).map(s => s.ingredient_name).filter(Boolean)
+      const nameList =
+        names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3} more` : names.join(', ')
+      toast.error(`Stock risk: order ${payload.external_ref ?? orderId}`, {
+        description: nameList
+          ? `Accepted despite insufficient stock: ${nameList}`
+          : 'Accepted despite insufficient available stock.',
+        duration: 10_000,
+      })
+    })
   }, [])
 
   return (

@@ -46,6 +46,25 @@ export interface LowStockAlert {
   threshold: number
 }
 
+/** One insufficient-stock line, shared by the `stock.risk` socket event and the
+ *  `stock_risk` / INSUFFICIENT_STOCK REST payloads. snake_case — matches the
+ *  stock-reservation backend contract (NOT the camelCase REST GET responses). */
+export interface StockShortfall {
+  ingredient_id: string
+  ingredient_name: string
+  required: number
+  available: number
+}
+
+/** `stock.risk` — emitted to the outlet room when an aggregator order was
+ *  accepted despite insufficient available stock. snake_case fields. */
+export interface StockRiskPayload {
+  order_id: string
+  external_ref: string
+  brand_id: string
+  shortfalls: StockShortfall[]
+}
+
 /** `print.status` — snake_case fields; job id key is `print_job_id` (not `job_id`). */
 export interface PrintStatusPayload {
   print_job_id: string
@@ -69,6 +88,7 @@ export interface ServerEvents {
   'order.updated': (payload: OrderPayload) => void
   'stock.updated': (payload: StockPayload) => void
   'lowstock.alert': (payload: LowStockAlert) => void
+  'stock.risk': (payload: StockRiskPayload) => void
   'print.status': (payload: PrintStatusPayload) => void
   'printer.status': (payload: PrinterStatusPayload) => void
 }
