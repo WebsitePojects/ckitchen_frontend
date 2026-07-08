@@ -2,6 +2,18 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Content-Security-Policy (XSS hardening — mitigates localStorage-JWT theft).
+      script-src 'self' blocks injected inline/eval scripts (the main XSS token-exfil
+      vector); connect-src pins where the app may talk (its own API + Socket.IO WSS,
+      plus localhost for dev). style-src needs 'unsafe-inline' for Radix/Recharts
+      inline style attributes. frame-ancestors is header-only (ignored in <meta>) —
+      set it + HSTS via an HTTP header (vercel.json) when moving to header-based CSP.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: https://res.cloudinary.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https://ckitchenbackend.onrender.com wss://ckitchenbackend.onrender.com http://localhost:4000 ws://localhost:4000"
+    />
     <link rel="icon" type="image/svg+xml" href="/ck-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orion</title>
