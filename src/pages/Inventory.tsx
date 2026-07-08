@@ -29,6 +29,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { get, post } from '../lib/api'
@@ -947,6 +948,12 @@ export default function Inventory() {
   const totalBelowThreshold = lowMain + lowKitchen
   const pendingItos = itos.filter(i => i.status === 'REQUESTED').length
   const totalSkus = mainStock.length + kitchenStock.length
+  // On-hand stock value (MOTM 2026-07-01 #1: "in the main inventory there should
+  // be the value of the product"). Σ quantity × ingredient.unit_cost across both
+  // tiers. Defensive Number() coercion — quantities/costs arrive as strings.
+  const stockValue =
+    mainStock.reduce((s, r) => s + Number(r.quantity) * Number(r.ingredient?.unitCost ?? 0), 0) +
+    kitchenStock.reduce((s, r) => s + Number(r.quantity) * Number(r.ingredient?.unitCost ?? 0), 0)
 
   // KITCHEN items below threshold or recently alerted (for the alerts panel)
   const kitchenAlerts = kitchenStock.filter(
@@ -1027,6 +1034,11 @@ export default function Inventory() {
           icon={Boxes}
           label="Total SKUs"
           value={totalSkus}
+        />
+        <KpiCard
+          icon={Wallet}
+          label="Stock Value"
+          value={`₱${stockValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
         />
       </KpiRibbon>
 
