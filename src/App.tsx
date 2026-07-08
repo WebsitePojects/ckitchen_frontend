@@ -22,6 +22,7 @@ import UsersPage from './pages/Users'
 import Orders from './pages/Orders'
 import Brands from './pages/Brands'
 import Outlets from './pages/Outlets'
+import OutletProfile from './pages/OutletProfile'
 import ChannelListings from './pages/ChannelListings'
 import Employees from './pages/Employees'
 import EmployeeProfile from './pages/EmployeeProfile'
@@ -73,6 +74,12 @@ export default function App() {
                     redirects to the role landing exactly like RequireAccess
                     would (see EmployeeProfile.tsx). */}
                 <Route path="employees/:id" element={<EmployeeProfile />} />
+                {/* Outlet 360 detail — self-gates on '/outlets' (+ outlet-scope
+                    check) for the SAME reason employees/:id sits outside
+                    RequireAccess: the guard matches the raw '/outlets/<uuid>'
+                    pathname against page keys the RBAC matrix never stores.
+                    See OutletProfile.tsx for the scope-aware gate. */}
+                <Route path="outlets/:id" element={<OutletProfile />} />
                 <Route element={<RequireAccess />}>
                 <Route index element={<RoleLanding />} />
                 <Route path="orders" element={<Orders />} />

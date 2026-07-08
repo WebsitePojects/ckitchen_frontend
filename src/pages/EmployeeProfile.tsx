@@ -60,8 +60,16 @@ interface ProfileEmployee {
   status: string
   workDays?: string[] | null
   hiredAt?: string | null
+  // Outlet assignment (T1) — absent entirely on an old deploy, null = HQ/unassigned.
+  locationId?: string | null
   userId: string | null
   createdAt: string
+}
+
+/** Minimal shape consumed from GET /outlets (see pages/Outlets.tsx for the full row). */
+interface OutletOption {
+  id: string
+  name: string
 }
 
 type DayStatus = 'PRESENT' | 'ABSENT' | 'REST' | 'FUTURE' | 'FORFEITED' | 'OPEN'
@@ -385,6 +393,14 @@ export default function EmployeeProfile() {
     enabled: allowed && isOwner && !!linkedUserId,
   })
 
+  // Outlet name lookup for the header chip (T1). Same queryKey as
+  // Employees.tsx's outlets query so the two pages share one cached fetch.
+  const outletsQuery = useQuery({
+    queryKey: ['outlets', 'options'],
+    queryFn: async () => (await get<OutletOption[]>('/outlets')).data,
+    enabled: allowed,
+  })
+
   // ── Guards (after all hooks) ──────────────────────────────────────────────
   if (!user) return null
   if (!allowed) {
@@ -423,6 +439,11 @@ export default function EmployeeProfile() {
 
   const workDays = sanitizeWorkDays(employee.workDays)
   const isCurrentMonth = month >= currentMonthStr()
+  // Outlet chip (T1) — omitted silently when locationId is absent (old
+  // deploy) or null (unassigned/HQ), or while the outlets list is loading.
+  const outletName = employee.locationId
+    ? outletsQuery.data?.find((o) => o.id === employee.locationId)?.name
+    : undefined
 
   // Calendar layout: leading blanks so day 1 lands on its true weekday column.
   const firstDow = new Date(`${month}-01T00:00:00Z`).getUTCDay() // 0 = Sun
@@ -508,6 +529,11 @@ export default function EmployeeProfile() {
               {' · '}
               {employee.department.charAt(0) + employee.department.slice(1).toLowerCase()}
               {employee.position ? ` · ${employee.position}` : ''}
+              {outletName && (
+                <span className="ml-2 inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-300">
+                  {outletName}
+                </span>
+              )}
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">

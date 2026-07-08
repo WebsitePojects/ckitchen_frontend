@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { Building2, CheckCircle2, Home, Plus, Warehouse } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Building2, CheckCircle2, ChevronRight, Home, Plus, Warehouse } from 'lucide-react'
 import { get, post } from '../lib/api'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
@@ -81,6 +82,7 @@ function warehousePill(label: string, ready: boolean) {
 }
 
 export default function Outlets() {
+  const navigate = useNavigate()
   const [outlets, setOutlets] = useState<Outlet[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -272,11 +274,16 @@ export default function Outlets() {
                 <TableHead>In-house Inventory</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Manage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {outlets.map((outlet) => (
-                <TableRow key={outlet.id} className="border-border">
+                <TableRow
+                  key={outlet.id}
+                  className="cursor-pointer border-border transition-colors hover:bg-zinc-800/40"
+                  onClick={() => navigate(`/outlets/${outlet.id}`)}
+                >
                   <TableCell className="font-mono text-xs text-emerald-300">{outlet.code}</TableCell>
                   <TableCell>
                     <div>
@@ -307,6 +314,19 @@ export default function Outlets() {
                         {outlet.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                       </span>
                     </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        navigate(`/outlets/${outlet.id}`)
+                      }}
+                    >
+                      Manage outlet
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

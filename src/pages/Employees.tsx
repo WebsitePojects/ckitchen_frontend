@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   Users,
   UserCog,
@@ -73,8 +74,16 @@ interface Employee {
   status: string
   workDays?: string[] | null
   hiredAt?: string | null
+  // Outlet assignment (T1) — absent entirely on an old deploy, null = HQ/unassigned.
+  locationId?: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** Minimal shape consumed from GET /outlets (see pages/Outlets.tsx for the full row). */
+interface OutletOption {
+  id: string
+  name: string
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +116,11 @@ const DEPT_CLASS: Record<string, string> = {
 
 const STATUSES = ['ACTIVE', 'INACTIVE'] as const // backend employee_status enum
 
+// Radix Select disallows an empty-string item value, so the "no outlet"
+// option uses this sentinel; it's translated to `location_id: null` at
+// submit time.
+const UNASSIGNED_OUTLET = '__unassigned__'
+
 // ---------------------------------------------------------------------------
 // Form state (shared by Add + Edit dialogs)
 // ---------------------------------------------------------------------------
@@ -119,6 +133,12 @@ interface FormState {
   work_days: WorkDay[]
   hired_at: string // 'YYYY-MM-DD' or '' (unset)
   status: (typeof STATUSES)[number]
+  // location_id displays the current/default selection (UNASSIGNED_OUTLET or
+  // a real outlet id); location_touched tracks whether the user actually
+  // interacted with the Select this dialog session. Only touched selections
+  // are sent — see handleSubmit/handleEditSubmit ("deploy-order safe").
+  location_id: string
+  location_touched: boolean
 }
 
 const EMPTY_FORM: FormState = {
@@ -129,6 +149,8 @@ const EMPTY_FORM: FormState = {
   work_days: DEFAULT_WORK_DAYS,
   hired_at: '',
   status: 'ACTIVE',
+  location_id: UNASSIGNED_OUTLET,
+  location_touched: false,
 }
 
 // ---------------------------------------------------------------------------
@@ -195,11 +217,15 @@ function EmployeeFormFields({
   setForm,
   submitting,
   mode,
+  outlets,
+  outletsLoading,
 }: {
   form: FormState
   setForm: React.Dispatch<React.SetStateAction<FormState>>
   submitting: boolean
   mode: 'add' | 'edit'
+  outlets: OutletOption[]
+  outletsLoading: boolean
 }) {
   return (
     <>
@@ -255,6 +281,28 @@ function EmployeeFormFields({
           onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
           disabled={submitting}
         />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-zinc-400">Outlet</label>
+        <Select
+          value={form.location_id}
+          onValueChange={(v) =>
+            setForm((f) => ({ ...f, location_id: v, location_touched: true }))
+          }
+          disabled={submitting || outletsLoading}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select outlet" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNASSIGNED_OUTLET}>Unassigned / HQ</SelectItem>
+            {outlets.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                {o.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-zinc-400">Working days</label>
@@ -342,6 +390,21 @@ export default function Employees() {
 
   useEffect(fetchEmployees, [])
 
+  // ── Outlets (T1 — Outlet select options + list-column name lookup) ─────
+  // Cached TanStack Query so the Add/Edit dialogs and the table's Outlet
+  // column share one fetch; queryKey matches EmployeeProfile.tsx's so a
+  // visit to either page warms the other's cache too.
+  const outletsQuery = useQuery({
+    queryKey: ['outlets', 'options'],
+    queryFn: async () => (await get<OutletOption[]>('/outlets')).data,
+  })
+  const outlets = outletsQuery.data ?? []
+  const outletNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const o of outlets) map.set(o.id, o.name)
+    return map
+  }, [outlets])
+
   // ── Derived counts for KPI ribbon ─────────────────────────────────────
 
   const totalCount = employees.length
@@ -389,6 +452,9 @@ export default function Employees() {
         position: form.position.trim() || undefined,
         work_days: form.work_days,
         ...(form.hired_at ? { hired_at: form.hired_at } : {}),
+        ...(form.location_touched
+          ? { location_id: form.location_id === UNASSIGNED_OUTLET ? null : form.location_id }
+          : {}),
       })
       setDialogOpen(false)
       setForm(EMPTY_FORM)
@@ -416,6 +482,10 @@ export default function Employees() {
       work_days: days.length > 0 ? days : DEFAULT_WORK_DAYS,
       hired_at: emp.hiredAt ? emp.hiredAt.slice(0, 10) : '',
       status: emp.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE',
+      // Reflects the employee's current assignment, but starts untouched —
+      // submit omits location_id unless the admin actually changes this.
+      location_id: emp.locationId ?? UNASSIGNED_OUTLET,
+      location_touched: false,
     })
     setEditError(null)
     setEditTarget(emp)
@@ -442,6 +512,12 @@ export default function Employees() {
         status: editForm.status,
         work_days: editForm.work_days,
         ...(editForm.hired_at ? { hired_at: editForm.hired_at } : {}),
+        ...(editForm.location_touched
+          ? {
+              location_id:
+                editForm.location_id === UNASSIGNED_OUTLET ? null : editForm.location_id,
+            }
+          : {}),
       })
       setEditTarget(null)
       fetchEmployees()
@@ -477,7 +553,14 @@ export default function Employees() {
           <DialogTitle>Add Employee</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-          <EmployeeFormFields form={form} setForm={setForm} submitting={submitting} mode="add" />
+          <EmployeeFormFields
+            form={form}
+            setForm={setForm}
+            submitting={submitting}
+            mode="add"
+            outlets={outlets}
+            outletsLoading={outletsQuery.isLoading}
+          />
           {formError && (
             <p className="text-xs text-red-400">{formError}</p>
           )}
@@ -551,6 +634,7 @@ export default function Employees() {
                 <TableHead>Employee #</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
+                <TableHead>Outlet</TableHead>
                 <TableHead>Position</TableHead>
                 <TableHead>Schedule</TableHead>
                 <TableHead>Status</TableHead>
@@ -577,6 +661,9 @@ export default function Employees() {
                     >
                       {(emp.department ?? '—').charAt(0) + (emp.department ?? '').slice(1).toLowerCase()}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-zinc-400">
+                    {emp.locationId ? outletNameById.get(emp.locationId) ?? '—' : '—'}
                   </TableCell>
                   <TableCell className="text-sm text-zinc-400">
                     {emp.position ?? '—'}
@@ -651,6 +738,8 @@ export default function Employees() {
                 setForm={setEditForm}
                 submitting={editSubmitting}
                 mode="edit"
+                outlets={outlets}
+                outletsLoading={outletsQuery.isLoading}
               />
               {editError && <p className="text-xs text-red-400">{editError}</p>}
               <DialogFooter>
