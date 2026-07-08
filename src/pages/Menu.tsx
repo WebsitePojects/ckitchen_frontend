@@ -20,7 +20,9 @@ import {
   MoreVertical,
   Pencil,
   PauseCircle,
+  Percent,
   Plus,
+  Tag,
   UtensilsCrossed,
   XCircle,
 } from 'lucide-react'
@@ -32,6 +34,10 @@ import { useOutlet } from '../context/OutletContext'
 import { hasRole } from '../auth/access'
 import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
+import MenuItemDiscountsDialog, {
+  type DiscountMenuItemRef,
+  type ItemDiscount,
+} from '../components/MenuItemDiscountsDialog'
 import {
   Dialog,
   DialogContent,
@@ -182,6 +188,29 @@ export default function Menu() {
   })
   const lowStockItems = useMemo(() => kitchenStock.filter(i => i.below_threshold), [kitchenStock])
 
+  // ── Per-item promo badge (MOTM 2026-07-01 #2b/#7) ─────────────────────────
+  // One brand-wide fetch mapped by menuItemId, rather than N per-row queries —
+  // cheap enough to keep the table lightweight. Refetched whenever
+  // MenuItemDiscountsDialog reports a change (create/toggle/delete).
+  const discountsQueryKey = useMemo(
+    () => ['discounts', 'brand', selectedBrandId] as const,
+    [selectedBrandId],
+  )
+  const { data: brandDiscounts = [] } = useQuery({
+    queryKey: discountsQueryKey,
+    queryFn: async () => (await get<ItemDiscount[]>(`/discounts?brand_id=${selectedBrandId}`)).data,
+    enabled: !!selectedBrandId,
+  })
+  const activeDiscountCountByItem = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const d of brandDiscounts) {
+      if (d.scope === 'ITEM' && d.active && d.menuItemId) {
+        map.set(d.menuItemId, (map.get(d.menuItemId) ?? 0) + 1)
+      }
+    }
+    return map
+  }, [brandDiscounts])
+
   // Default to the first brand once the brand list loads.
   useEffect(() => {
     if (!selectedBrandId && brands.length > 0) {
@@ -250,6 +279,16 @@ export default function Menu() {
   const [editRemarks, setEditRemarks] = useState('')
   const [editImageUrl, setEditImageUrl] = useState('')
   const [editUploading, setEditUploading] = useState(false)
+
+  // Discounts / Promo dialog state — controlled, opened from the row actions
+  // dropdown, same imperative-open pattern as openEditDialog() below.
+  const [discountsOpen, setDiscountsOpen] = useState(false)
+  const [discountsItem, setDiscountsItem] = useState<DiscountMenuItemRef | null>(null)
+
+  const openDiscountsDialog = useCallback((item: MenuItem) => {
+    setDiscountsItem({ id: item.id, brandId: item.brandId, name: item.name })
+    setDiscountsOpen(true)
+  }, [])
 
   // Station lookup map
   const stationMap = useMemo(
@@ -548,16 +587,30 @@ export default function Menu() {
       {
         accessorKey: 'name',
         header: 'Name',
-        cell: ({ row }) => (
-          <div className="min-w-0">
-            <span className="font-medium text-zinc-100">{row.original.name}</span>
-            {row.original.remarks && (
-              <span className="block truncate text-[11px] text-zinc-500" title={row.original.remarks}>
-                {row.original.remarks}
-              </span>
-            )}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const promoCount = activeDiscountCountByItem.get(row.original.id) ?? 0
+          return (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-zinc-100">{row.original.name}</span>
+                {promoCount > 0 && (
+                  <span
+                    title={`${promoCount} active discount${promoCount === 1 ? '' : 's'}`}
+                    className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-400 ring-1 ring-inset ring-emerald-500/30"
+                  >
+                    <Tag className="h-2.5 w-2.5" aria-hidden />
+                    {promoCount}
+                  </span>
+                )}
+              </div>
+              {row.original.remarks && (
+                <span className="block truncate text-[11px] text-zinc-500" title={row.original.remarks}>
+                  {row.original.remarks}
+                </span>
+              )}
+            </div>
+          )
+        },
       },
       {
         id: 'itemNo',
@@ -673,7 +726,7 @@ export default function Menu() {
                 <MoreVertical className="h-3.5 w-3.5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
+            <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem
                 className="gap-2 text-xs"
                 disabled={!canWrite}
@@ -690,12 +743,28 @@ export default function Menu() {
                 <Plus className="h-3 w-3" />
                 Duplicate
               </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2 text-xs"
+                onSelect={() => openDiscountsDialog(row.original)}
+              >
+                <Percent className="h-3 w-3" />
+                Discounts / Promo
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ),
       },
     ],
-    [stationMap, cycleAvailability, toggleChannel, canWrite, openEditDialog, handleDuplicate],
+    [
+      stationMap,
+      cycleAvailability,
+      toggleChannel,
+      canWrite,
+      openEditDialog,
+      handleDuplicate,
+      openDiscountsDialog,
+      activeDiscountCountByItem,
+    ],
   )
 
   // ── Add Item Dialog ───────────────────────────────────────────────────────
@@ -1210,6 +1279,15 @@ export default function Menu() {
 
       {/* Edit dialog — no DialogTrigger; opened via openEditDialog() from row actions */}
       {editItemDialog}
+
+      {/* Discounts / Promo dialog — no DialogTrigger; opened via openDiscountsDialog() from row actions */}
+      <MenuItemDiscountsDialog
+        item={discountsItem}
+        open={discountsOpen}
+        onOpenChange={setDiscountsOpen}
+        canWrite={canWrite}
+        onChanged={() => queryClient.invalidateQueries({ queryKey: discountsQueryKey })}
+      />
     </div>
   )
 }
