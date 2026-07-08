@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ReceiptText, Clock, Flame, PackageCheck, CheckCircle2, Search, Plus } from 'lucide-react'
+import { ReceiptText, Clock, Flame, PackageCheck, CheckCircle2, Search, Plus, Percent, ShieldCheck } from 'lucide-react'
 import { get } from '../lib/api'
 import {
   getSocket,
@@ -21,7 +21,10 @@ import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
 import PageContainer from '../components/layout/PageContainer'
 import WalkInOrderDialog from '../components/WalkInOrderDialog'
+import OrderDiscountDialog from '../components/OrderDiscountDialog'
+import DiscountApprovalsDialog from '../components/DiscountApprovalsDialog'
 import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import {
@@ -72,6 +75,43 @@ export default function Orders() {
   // short-circuit.
   const canCreateWalkIn = hasRole(user?.role, ['OUTLET_MANAGER', 'BRAND_MANAGER'])
   const [walkInOpen, setWalkInOpen] = useState(false)
+
+  // Discount + 3-layer approval UI (live backend, 2026-07-08). Additive to
+  // this page — does not touch the socket/refetch effects above. Approvals
+  // queue is gated to OUTLET_MANAGER+ (OWNER passes automatically via
+  // hasRole's short-circuit), matching the backend's own SUPERVISOR-level
+  // approval gate.
+  const canApproveDiscounts = hasRole(user?.role, ['OUTLET_MANAGER'])
+  const [discountOrder, setDiscountOrder] = useState<Order | null>(null)
+  const [approvalsOpen, setApprovalsOpen] = useState(false)
+  const [pendingDiscountCount, setPendingDiscountCount] = useState(0)
+
+  const refreshPendingDiscountCount = useCallback(async () => {
+    if (!canApproveDiscounts) return
+    try {
+      const res = await get<{ id: string }[]>('/discounts/approvals', { params: { status: 'PENDING' } })
+      setPendingDiscountCount(res.data.length)
+    } catch {
+      // Soft-fail — the badge just won't update this cycle; not worth surfacing a toast for.
+    }
+  }, [canApproveDiscounts])
+
+  useEffect(() => {
+    void refreshPendingDiscountCount()
+  }, [refreshPendingDiscountCount])
+
+  function handleDiscountDialogChange(next: boolean) {
+    if (!next) {
+      setDiscountOrder(null)
+      void refreshPendingDiscountCount()
+    }
+  }
+
+  function handleApprovalsDialogChange(next: boolean) {
+    setApprovalsOpen(next)
+    if (!next) void refreshPendingDiscountCount()
+  }
+
   const [orders, setOrders] = useState<Order[]>([])
   const [brands, setBrands] = useState<Record<string, Brand>>({})
   const [loading, setLoading] = useState(true)
@@ -202,15 +242,35 @@ export default function Orders() {
         title="Orders"
         subtitle="Every order across all brands and platforms"
         actions={
-          canCreateWalkIn ? (
-            <Button
-              size="sm"
-              onClick={() => setWalkInOpen(true)}
-              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Walk-in Order
-            </Button>
+          canApproveDiscounts || canCreateWalkIn ? (
+            <>
+              {canApproveDiscounts && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setApprovalsOpen(true)}
+                  className="gap-1.5"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Approvals
+                  {pendingDiscountCount > 0 && (
+                    <Badge className="h-5 min-w-5 justify-center rounded-full border-transparent bg-amber-500/20 px-1.5 text-[10px] text-amber-300">
+                      {pendingDiscountCount}
+                    </Badge>
+                  )}
+                </Button>
+              )}
+              {canCreateWalkIn && (
+                <Button
+                  size="sm"
+                  onClick={() => setWalkInOpen(true)}
+                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New Walk-in Order
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       />
@@ -271,6 +331,7 @@ export default function Orders() {
                 <TableHead>Customer</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Discount</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -285,6 +346,17 @@ export default function Orders() {
                     ₱{Number(o.total ?? 0).toLocaleString()}
                   </TableCell>
                   <TableCell><StatusBadge status={o.status} /></TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 gap-1 px-2 text-xs"
+                      onClick={() => setDiscountOrder(o)}
+                    >
+                      <Percent className="h-3 w-3" />
+                      Discount
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -294,6 +366,21 @@ export default function Orders() {
 
       {/* Controlled dialog — no trigger of its own; opened via the header button above. */}
       <WalkInOrderDialog open={walkInOpen} onOpenChange={setWalkInOpen} />
+
+      {/* Per-order discount apply/view — opened via each row's "Discount" button. */}
+      <OrderDiscountDialog
+        order={discountOrder}
+        open={!!discountOrder}
+        onOpenChange={handleDiscountDialogChange}
+        onChanged={refreshPendingDiscountCount}
+      />
+
+      {/* Supervisor/Admin approval queue — opened via the toolbar "Approvals" button. */}
+      <DiscountApprovalsDialog
+        open={approvalsOpen}
+        onOpenChange={handleApprovalsDialogChange}
+        onChanged={refreshPendingDiscountCount}
+      />
     </PageContainer>
   )
 }
