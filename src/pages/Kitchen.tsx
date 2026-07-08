@@ -20,7 +20,7 @@
  * page owns only Kitchen-specific concerns: station grouping, advance/cancel
  * actions, stage tabs, and the stock/lowstock toasts.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
@@ -31,6 +31,8 @@ import {
   LayoutGrid,
   PackageCheck,
   Tv,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -63,6 +65,7 @@ import {
   type OrderStatus,
 } from '../lib/kds'
 import { useKitchenOrders } from '../hooks/useKitchenOrders'
+import { playNewOrderChime, playFirePrepCue } from '../lib/kdsSound'
 import type { Brand } from './Dashboard'
 import PageHeader from '../components/common/PageHeader'
 import BrandChip from '../components/common/BrandChip'
@@ -91,6 +94,17 @@ const NEXT_STAGE: Record<string, string> = {
  * always passes via `hasRole`.
  */
 const ORDER_STAGE_ROLES: UserRole[] = ['KITCHEN_CREW']
+
+/** localStorage key for the KDS sound-cue mute toggle (MoM June-24). */
+const SOUND_STORAGE_KEY = 'ck_kds_sound'
+
+function readSoundEnabled(): boolean {
+  try {
+    return localStorage.getItem(SOUND_STORAGE_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
 
 // ─── Dark-mode stage color tokens ─────────────────────────────────────────────
 
@@ -371,15 +385,77 @@ export default function Kitchen() {
   const [advancing, setAdvancing] = useState<Set<string>>(new Set())
   const [activeStage, setActiveStage] = useState<StageFilter>('ALL')
 
+  // ── Prep sound cues (MoM June-24) ──────────────────────────────────────────
+  // Mute toggle persisted in localStorage. `soundOnRef` mirrors the state so the
+  // hook's onOrderCreated closure always sees the current value without needing
+  // to re-subscribe. Dedup sets ensure one sound per order EVENT (not per
+  // re-render): `chimedRef` for order.created, `firedPrepRef` for the PREPARING
+  // ("fire") cue. `prepSeededRef` seeds firedPrepRef with orders already past
+  // NEW on first paint so we never retro-fire the cue for the initial board.
+  const [soundOn, setSoundOn] = useState<boolean>(readSoundEnabled)
+  const soundOnRef = useRef(soundOn)
+  soundOnRef.current = soundOn
+  const chimedRef = useRef<Set<string>>(new Set())
+  const firedPrepRef = useRef<Set<string>>(new Set())
+  const prepSeededRef = useRef(false)
+
+  const toggleSound = useCallback(() => {
+    setSoundOn(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem(SOUND_STORAGE_KEY, next ? '1' : '0')
+      } catch {
+        /* storage blocked — keep the in-memory toggle working anyway */
+      }
+      return next
+    })
+  }, [])
+
   const { orders, setOrders, stations, brandMap, loading, error, now } = useKitchenOrders({
-    // Page-specific side effect (toast) on top of the hook's own state update —
-    // the TV board (src/pages/Tv.tsx) shares the same hook but skips toasts.
+    // Page-specific side effect (toast + NEW-order chime) on top of the hook's
+    // own state update — the TV board (src/pages/Tv.tsx) shares the same hook
+    // but skips toasts/sounds. Fires only for genuinely new orders (not the
+    // initial load); chimedRef dedups against duplicate order.created events.
     onOrderCreated: (detail) => {
       toast.info(`New order: ${detail.externalRef}`, {
         description: detail.customerName ? `Customer: ${detail.customerName}` : undefined,
       })
+      if (!chimedRef.current.has(detail.id)) {
+        chimedRef.current.add(detail.id)
+        if (soundOnRef.current) playNewOrderChime()
+      }
     },
   })
+
+  // ── PREPARING ("fire") cue ─────────────────────────────────────────────────
+  // Watch the live order set: when an order first reaches PREPARING (whether via
+  // this crew's own Advance click or a remote order.updated), play the fire cue
+  // once. firedPrepRef dedups so a re-render of an order already PREPARING is
+  // silent. On the very first settled render we SEED the set with every order
+  // that's already past NEW, so opening the board mid-shift doesn't blast a cue
+  // for orders that were fired long ago.
+  useEffect(() => {
+    if (loading) return
+    const fired = firedPrepRef.current
+    if (!prepSeededRef.current) {
+      for (const o of orders) {
+        if (o.status !== 'NEW') fired.add(o.id)
+      }
+      prepSeededRef.current = true
+      return
+    }
+    for (const o of orders) {
+      if (fired.has(o.id)) continue
+      if (o.status === 'PREPARING') {
+        fired.add(o.id)
+        if (soundOnRef.current) playFirePrepCue()
+      } else if (o.status === 'READY' || o.status === 'COMPLETED') {
+        // Skipped straight past PREPARING in our view (fast advance / late join)
+        // — mark as fired so we never retro-play the cue for it.
+        fired.add(o.id)
+      }
+    }
+  }, [orders, loading])
 
   // ── Kitchen-only socket subscriptions (stock/low-stock toasts) ────────────
   useEffect(() => {
@@ -526,6 +602,23 @@ export default function Kitchen() {
                   {overdueCount} overdue (&gt;{OVERDUE_MINS}m)
                 </span>
               )}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleSound}
+                aria-pressed={soundOn}
+                title={soundOn ? 'Mute prep sound cues' : 'Unmute prep sound cues'}
+                className="h-8 w-8"
+              >
+                {soundOn ? (
+                  <Volume2 className="h-3.5 w-3.5" />
+                ) : (
+                  <VolumeX className="h-3.5 w-3.5 text-zinc-500" />
+                )}
+                <span className="sr-only">
+                  {soundOn ? 'Mute prep sound cues' : 'Unmute prep sound cues'}
+                </span>
+              </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/tv" target="_blank" rel="noopener noreferrer" aria-label="Open TV Mode board in a new tab">
                   <Tv className="h-3.5 w-3.5" />

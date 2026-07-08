@@ -24,15 +24,19 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   Boxes,
+  Check,
   CheckCircle2,
+  ClipboardList,
   Package,
   Plus,
   RefreshCw,
+  SlidersHorizontal,
   Trash2,
   Wallet,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { get, post } from '../lib/api'
+import { get, post, CKApiError } from '../lib/api'
 import {
   getSocket,
   initSocket,
@@ -71,6 +75,7 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table'
+import AdjustmentDialog from '../components/AdjustmentDialog'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -96,6 +101,15 @@ const CAN_REQUEST_ITO: UserRole[] = ['KITCHEN_CREW']
  * when D31 matrix lands server-side.
  */
 const CAN_CONFIRM_ITO: UserRole[] = ['WAREHOUSE_OUTLET']
+
+/**
+ * Roles that may create/decide stock adjustments (MoM: expiry + negligence
+ * write-offs). Matches the fixed backend contract's allow-list (OWNER,
+ * OUTLET_MANAGER, WAREHOUSE_MAIN, WAREHOUSE_OUTLET) minus OWNER, which passes
+ * via `hasRole`'s short-circuit. The server enforces this AND the self-approval
+ * rule; the UI mirrors it and handles the 403/409 responses gracefully.
+ */
+const CAN_ADJUST: UserRole[] = ['OUTLET_MANAGER', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET']
 
 // ─── API types ────────────────────────────────────────────────────────────────
 
@@ -153,6 +167,34 @@ interface Ito {
   confirmedAt: string | null
   /** Only present on the POST /itos response; absent from GET /itos list rows. */
   items?: ItoItem[]
+}
+
+type AdjustmentStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+/**
+ * GET /adjustments row (fixed backend contract — MoM expiry/negligence
+ * write-offs). camelCase like the other GET endpoints, with two snake_case
+ * denormalized name fields. Every optional field is read defensively — an early
+ * backend deploy may omit some.
+ */
+interface Adjustment {
+  id: string
+  warehouseId: string
+  ingredientId: string
+  direction: 'IN' | 'OUT'
+  quantity: number | string
+  reason: string
+  note?: string | null
+  status: AdjustmentStatus
+  requestedBy?: string | null
+  decidedBy?: string | null
+  decisionNote?: string | null
+  decidedAt?: string | null
+  createdAt: string
+  ingredient?: { id: string; name: string; unit: string }
+  warehouse?: { id: string; type: string; locationId: string }
+  requested_by_name?: string | null
+  decided_by_name?: string | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,9 +268,13 @@ interface StockTableProps {
   error: string | null
   /** IDs of ingredients that just got a lowstock.alert via socket (for extra highlight) */
   alertedIds: Set<string>
+  /** When true, render the per-row "Adjust" action (gated to CAN_ADJUST roles). */
+  canAdjust: boolean
+  /** Opens the AdjustmentDialog for a specific stock row. */
+  onAdjust: (row: StockLine) => void
 }
 
-function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTableProps) {
+function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, onAdjust }: StockTableProps) {
   const lowCount = rows.filter(r => r.below_threshold || alertedIds.has(r.ingredientId)).length
 
   return (
@@ -295,6 +341,11 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                 <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   Status
                 </TableHead>
+                {canAdjust && (
+                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -365,6 +416,20 @@ function StockTable({ title, tier, rows, loading, error, alertedIds }: StockTabl
                         </span>
                       )}
                     </TableCell>
+                    {canAdjust && (
+                      <TableCell className="px-4 py-2.5 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onAdjust(row)}
+                          aria-label={`Adjust stock for ${row.ingredient.name}`}
+                          title="Adjust stock (write-off / add)"
+                          className="h-7 w-7 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                        >
+                          <SlidersHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 )
               })}
@@ -825,6 +890,264 @@ function ItoList({
   )
 }
 
+// ─── Adjustments panel ──────────────────────────────────────────────────────
+
+const ADJ_STATUS_CLASSES: Record<AdjustmentStatus, string> = {
+  PENDING: 'bg-amber-500/15 text-amber-400 ring-1 ring-inset ring-amber-500/30',
+  APPROVED: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30',
+  REJECTED: 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/30',
+}
+
+function AdjStatusBadge({ status }: { status: AdjustmentStatus }) {
+  const cls = ADJ_STATUS_CLASSES[status] ?? ADJ_STATUS_CLASSES.PENDING
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${cls}`}
+    >
+      {status}
+    </span>
+  )
+}
+
+/** Title-case a reason enum (EXPIRY → Expiry) for display. */
+function formatReason(reason: string): string {
+  if (!reason) return '—'
+  return reason.charAt(0) + reason.slice(1).toLowerCase()
+}
+
+interface AdjustmentsPanelProps {
+  adjustments: Adjustment[]
+  loading: boolean
+  error: string | null
+  canDecide: boolean
+  deciding: Set<string>
+  onDecide: (id: string, action: 'approve' | 'reject', note?: string) => void
+  /** Fallback name/unit lookup when a row omits the joined ingredient object. */
+  ingredientsById: Map<string, Ingredient>
+}
+
+function AdjustmentsPanel({
+  adjustments,
+  loading,
+  error,
+  canDecide,
+  deciding,
+  onDecide,
+  ingredientsById,
+}: AdjustmentsPanelProps) {
+  // Decision dialog: capture an optional note before approving/rejecting.
+  const [decision, setDecision] = useState<{ id: string; action: 'approve' | 'reject' } | null>(
+    null,
+  )
+  const [decisionNote, setDecisionNote] = useState('')
+
+  function openDecision(id: string, action: 'approve' | 'reject') {
+    setDecision({ id, action })
+    setDecisionNote('')
+  }
+
+  function confirmDecision() {
+    if (!decision) return
+    onDecide(decision.id, decision.action, decisionNote.trim() || undefined)
+    setDecision(null)
+    setDecisionNote('')
+  }
+
+  const pendingCount = adjustments.filter(a => a.status === 'PENDING').length
+
+  return (
+    <Card className="border-[#1F2A24] bg-[#121A17] overflow-hidden">
+      <CardHeader className="px-4 py-3 border-b border-[#1F2A24] flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-emerald-500" aria-hidden />
+          Stock Adjustments
+        </CardTitle>
+        {pendingCount > 0 && (
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400 ring-1 ring-inset ring-amber-500/30 tabular-nums">
+            {pendingCount} pending
+          </span>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-10">
+            <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
+            <p className="text-xs text-zinc-500">Loading adjustments…</p>
+          </div>
+        ) : error ? (
+          <div className="p-6 text-center">
+            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-red-400" aria-hidden />
+            <p className="text-sm font-medium text-red-400">{error}</p>
+          </div>
+        ) : adjustments.length === 0 ? (
+          <EmptyState
+            icon={ClipboardList}
+            title="No adjustments"
+            description="Write-offs (expiry, spoilage, negligence) and corrections appear here."
+            className="border-0 rounded-none bg-transparent"
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-[#1F2A24] hover:bg-transparent">
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Item
+                  </TableHead>
+                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Change
+                  </TableHead>
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Reason
+                  </TableHead>
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Requested by
+                  </TableHead>
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Date
+                  </TableHead>
+                  <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Status
+                  </TableHead>
+                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    <span className="sr-only">Decision</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {adjustments.map(adj => {
+                  const ing = adj.ingredient ?? ingredientsById.get(adj.ingredientId)
+                  const unit = adj.ingredient?.unit ?? ing?.unit ?? ''
+                  const name = adj.ingredient?.name ?? ing?.name ?? adj.ingredientId
+                  const qtyNum = Number(adj.quantity)
+                  const qtyLabel = Number.isFinite(qtyNum)
+                    ? `${qtyNum % 1 === 0 ? qtyNum : qtyNum.toFixed(2)}`
+                    : String(adj.quantity)
+                  const isOut = adj.direction === 'OUT'
+                  const requester = adj.requested_by_name ?? adj.requestedBy ?? '—'
+                  const isDeciding = deciding.has(adj.id)
+                  return (
+                    <TableRow key={adj.id} className="border-[#1F2A24] hover:bg-zinc-800/30">
+                      <TableCell className="px-4 py-2.5">
+                        <span className="font-medium text-sm text-zinc-100">{name}</span>
+                        {adj.note && (
+                          <span className="mt-0.5 block text-[11px] italic text-zinc-500 truncate max-w-[16rem]">
+                            {adj.note}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-right">
+                        <span
+                          className={`font-mono tabular-nums text-sm font-semibold ${isOut ? 'text-red-400' : 'text-emerald-400'}`}
+                        >
+                          {isOut ? '−' : '+'}
+                          {qtyLabel} {unit}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] uppercase tracking-wide text-zinc-600">
+                          {isOut ? 'Write-off' : 'Add'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-sm text-zinc-300">
+                        {formatReason(adj.reason)}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-sm text-zinc-400 truncate max-w-[10rem]">
+                        {requester}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-xs text-zinc-500 whitespace-nowrap">
+                        {formatTime(adj.createdAt)}
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-center">
+                        <AdjStatusBadge status={adj.status} />
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-right">
+                        {adj.status === 'PENDING' && canDecide ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              onClick={() => openDecision(adj.id, 'approve')}
+                              disabled={isDeciding}
+                              className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2.5 disabled:opacity-60"
+                            >
+                              <Check className="h-3.5 w-3.5 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openDecision(adj.id, 'reject')}
+                              disabled={isDeciding}
+                              className="h-7 border-red-500/40 text-red-300 hover:text-red-200 hover:bg-red-500/10 px-2.5 disabled:opacity-60"
+                            >
+                              <X className="h-3.5 w-3.5 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        ) : adj.status !== 'PENDING' && (adj.decided_by_name || adj.decidedBy) ? (
+                          <span className="text-[11px] text-zinc-500">
+                            by {adj.decided_by_name ?? adj.decidedBy}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Decision dialog — optional note before approve/reject */}
+      <Dialog open={decision !== null} onOpenChange={o => { if (!o) setDecision(null) }}>
+        <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-zinc-50">
+              {decision?.action === 'approve' ? 'Approve adjustment' : 'Reject adjustment'}
+            </DialogTitle>
+            <DialogDescription className="text-zinc-500">
+              {decision?.action === 'approve'
+                ? 'Approving posts the stock movement. Add an optional note for the audit log.'
+                : 'Rejecting discards the request. Add an optional reason for the audit log.'}
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            value={decisionNote}
+            onChange={e => setDecisionNote(e.target.value)}
+            maxLength={500}
+            rows={2}
+            placeholder="Optional note…"
+            className="w-full rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+          />
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDecision(null)}
+              className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={confirmDecision}
+              className={
+                decision?.action === 'approve'
+                  ? 'ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold'
+                  : 'ml-auto bg-red-600 hover:bg-red-500 text-white font-semibold'
+              }
+            >
+              {decision?.action === 'approve' ? 'Approve' : 'Reject'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
 export default function Inventory() {
@@ -882,6 +1205,26 @@ export default function Inventory() {
     ? itosQueryError instanceof Error ? itosQueryError.message : 'Failed to load ITOs.'
     : null
 
+  const {
+    data: adjustments = [],
+    isLoading: adjustmentsLoading,
+    error: adjustmentsQueryError,
+  } = useQuery({
+    queryKey: ['adjustments', selectedOutletId],
+    queryFn: async () => {
+      const { data } = await get<Adjustment[]>('/adjustments')
+      const rows = Array.isArray(data) ? data : []
+      // Newest-first (backend already sorts, but stay defensive).
+      rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      return rows
+    },
+  })
+  const adjustmentsError = adjustmentsQueryError
+    ? adjustmentsQueryError instanceof Error
+      ? adjustmentsQueryError.message
+      : 'Failed to load adjustments.'
+    : null
+
   // Ingredients are global master data (no outlet scoping server-side) —
   // shared across every page that reads them (Menu.tsx's add-item form etc).
   const { data: ingredients = [] } = useQuery({
@@ -903,6 +1246,26 @@ export default function Inventory() {
   const [showReceive, setShowReceive] = useState(false)
   const [showRequestIto, setShowRequestIto] = useState(false)
 
+  // — Stock adjustment (MoM expiry/negligence write-offs)
+  const [adjustTarget, setAdjustTarget] = useState<{
+    warehouseId: string
+    warehouseLabel: string
+    ingredient: { id: string; name: string; unit: string }
+  } | null>(null)
+  const [deciding, setDeciding] = useState<Set<string>>(new Set())
+
+  const openAdjust = useCallback((row: StockLine, tier: 'MAIN' | 'KITCHEN') => {
+    setAdjustTarget({
+      warehouseId: row.warehouseId,
+      warehouseLabel: tier,
+      ingredient: {
+        id: row.ingredient.id,
+        name: row.ingredient.name,
+        unit: row.ingredient.unit,
+      },
+    })
+  }, [])
+
   // ── Refetch helpers ──────────────────────────────────────────────────────
   // Invalidate + refetch (rather than local setState) so the shared cache
   // entries stay correct for every page/component reading the same key.
@@ -917,6 +1280,10 @@ export default function Inventory() {
   )
   const refetchItos = useCallback(
     () => queryClient.invalidateQueries({ queryKey: ['itos', selectedOutletId] }),
+    [queryClient, selectedOutletId],
+  )
+  const refetchAdjustments = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['adjustments', selectedOutletId] }),
     [queryClient, selectedOutletId],
   )
 
@@ -969,12 +1336,17 @@ export default function Inventory() {
   // are non-critical — no refetch needed here).
   useEffect(() => {
     const unsubReconnect = onSocketReconnect(() => {
-      void Promise.all([refetchMainStock(), refetchKitchenStock(), refetchItos()])
+      void Promise.all([
+        refetchMainStock(),
+        refetchKitchenStock(),
+        refetchItos(),
+        refetchAdjustments(),
+      ])
     })
     return () => {
       unsubReconnect()
     }
-  }, [refetchMainStock, refetchKitchenStock, refetchItos])
+  }, [refetchMainStock, refetchKitchenStock, refetchItos, refetchAdjustments])
 
   // ── ITO confirm handler ──────────────────────────────────────────────────────
 
@@ -996,11 +1368,56 @@ export default function Inventory() {
     }
   }
 
+  // ── Adjustment decision handler ──────────────────────────────────────────────
+  // Approval emits stock.updated (the socket subscription above refetches the
+  // affected tier); we only refetch the adjustments list here. Handles the
+  // fixed contract's 409 (already decided) + 403 SELF_APPROVAL responses.
+
+  async function handleDecideAdjustment(
+    id: string,
+    action: 'approve' | 'reject',
+    note?: string,
+  ) {
+    setDeciding(prev => new Set(prev).add(id))
+    try {
+      await post(`/adjustments/${id}/${action}`, note ? { note } : undefined)
+      toast.success(
+        action === 'approve'
+          ? 'Adjustment approved — stock updated.'
+          : 'Adjustment rejected.',
+      )
+      await refetchAdjustments()
+    } catch (e) {
+      if (e instanceof CKApiError) {
+        if (e.status === 409) {
+          toast.error('This adjustment was already decided.')
+          void refetchAdjustments()
+          return
+        }
+        if (
+          e.status === 403 &&
+          (e.code === 'SELF_APPROVAL' || e.message?.toLowerCase().includes('self'))
+        ) {
+          toast.error('You cannot approve your own adjustment request.')
+          return
+        }
+      }
+      toast.error(e instanceof Error ? e.message : 'Failed to decide adjustment.')
+    } finally {
+      setDeciding(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }
+
   // ── Role flags ───────────────────────────────────────────────────────────────
 
   const canReceive = hasRole(role, CAN_RECEIVE)
   const canRequestIto = hasRole(role, CAN_REQUEST_ITO)
   const canConfirmIto = hasRole(role, CAN_CONFIRM_ITO)
+  const canAdjust = hasRole(role, CAN_ADJUST)
 
   // ── Summary counts ───────────────────────────────────────────────────────────
 
@@ -1024,7 +1441,12 @@ export default function Inventory() {
   // ── Refresh handler ───────────────────────────────────────────────────────────
 
   function refreshAll() {
-    void Promise.all([refetchMainStock(), refetchKitchenStock(), refetchItos()])
+    void Promise.all([
+      refetchMainStock(),
+      refetchKitchenStock(),
+      refetchItos(),
+      refetchAdjustments(),
+    ])
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -1118,6 +1540,8 @@ export default function Inventory() {
               loading={mainLoading}
               error={mainError}
               alertedIds={alertedIds}
+              canAdjust={canAdjust}
+              onAdjust={row => openAdjust(row, 'MAIN')}
             />
             <StockTable
               title="KITCHEN Warehouse"
@@ -1126,6 +1550,8 @@ export default function Inventory() {
               loading={kitchenLoading}
               error={kitchenError}
               alertedIds={alertedIds}
+              canAdjust={canAdjust}
+              onAdjust={row => openAdjust(row, 'KITCHEN')}
             />
           </div>
 
@@ -1226,6 +1652,27 @@ export default function Inventory() {
           </Card>
         </aside>
       </div>
+
+      {/* ── Stock Adjustments (MoM: expiry + negligence write-offs) ── */}
+      <AdjustmentsPanel
+        adjustments={adjustments}
+        loading={adjustmentsLoading}
+        error={adjustmentsError}
+        canDecide={canAdjust}
+        deciding={deciding}
+        onDecide={(id, action, note) => void handleDecideAdjustment(id, action, note)}
+        ingredientsById={ingredientsById}
+      />
+
+      {/* ── Adjust stock dialog (per stock row) ── */}
+      <AdjustmentDialog
+        open={adjustTarget !== null}
+        onOpenChange={open => { if (!open) setAdjustTarget(null) }}
+        warehouseId={adjustTarget?.warehouseId ?? ''}
+        warehouseLabel={adjustTarget?.warehouseLabel}
+        ingredient={adjustTarget?.ingredient ?? null}
+        onSuccess={() => void refetchAdjustments()}
+      />
 
       {/* ── Receive into MAIN dialog ── */}
       <Dialog open={showReceive} onOpenChange={setShowReceive}>
