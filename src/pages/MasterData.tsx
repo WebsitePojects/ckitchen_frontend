@@ -9,6 +9,7 @@ import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
+import DepartmentBudgets from '../components/DepartmentBudgets'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
@@ -225,6 +226,8 @@ export default function MasterData() {
           </Table>
         )}
       </Card>
+
+      <DepartmentBudgets />
     </PageContainer>
   )
 }
