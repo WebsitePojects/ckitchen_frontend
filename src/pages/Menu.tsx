@@ -29,7 +29,7 @@ import {
 } from 'lucide-react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
-import { CKApiError, del, get, patch, post } from '../lib/api'
+import { CKApiError, del, get, patch, post, put } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import { useOutlet } from '../context/OutletContext'
 import { hasRole } from '../auth/access'
@@ -39,6 +39,7 @@ import MenuItemDiscountsDialog, {
   type DiscountMenuItemRef,
   type ItemDiscount,
 } from '../components/MenuItemDiscountsDialog'
+import RecipeEditor, { type RecipeLine } from '../components/RecipeEditor'
 import {
   Dialog,
   DialogContent,
@@ -121,6 +122,39 @@ interface StockLine {
   quantity: string
   ingredient: { id: string; name: string; unit: string; unitCost: string; lowStockThreshold: string }
   below_threshold: boolean
+}
+
+/**
+ * GET /menu/:id/recipe line — read defensively across camel/snake shapes and a
+ * possibly-joined `ingredient` object (the parallel backend may emit either).
+ */
+interface RecipeGetLine {
+  id?: string
+  ingredientId?: string
+  ingredient_id?: string
+  portionQty?: string | number
+  portion_qty?: string | number
+  ingredient?: { id?: string }
+}
+
+/** Normalize a GET /menu/:id/recipe payload into the editor's RecipeLine shape. */
+function toRecipeLines(rows: RecipeGetLine[]): RecipeLine[] {
+  if (!Array.isArray(rows)) return []
+  return rows
+    .map(r => ({
+      ingredientId: r.ingredientId ?? r.ingredient_id ?? r.ingredient?.id ?? '',
+      portionQty: String(r.portionQty ?? r.portion_qty ?? ''),
+    }))
+    .filter(l => l.ingredientId)
+}
+
+/** Build the PUT /menu/:id/recipe body from editor lines (drops incomplete rows). */
+function recipePutBody(lines: RecipeLine[]): { lines: { ingredient_id: string; portion_qty: number }[] } {
+  return {
+    lines: lines
+      .filter(l => l.ingredientId && Number(l.portionQty) > 0)
+      .map(l => ({ ingredient_id: l.ingredientId, portion_qty: Number(l.portionQty) })),
+  }
 }
 
 // ─── Availability cycle helpers ───────────────────────────────────────────────
@@ -264,6 +298,10 @@ export default function Menu() {
   const [addRemarks, setAddRemarks] = useState('')
   const [addImageUrl, setAddImageUrl] = useState('')
   const [addUploading, setAddUploading] = useState(false)
+  // Recipe lines for the new item. `addRecipeTouched` gates whether we PUT the
+  // recipe at all — an untouched editor must never send an (empty) recipe.
+  const [addRecipeLines, setAddRecipeLines] = useState<RecipeLine[]>([])
+  const [addRecipeTouched, setAddRecipeTouched] = useState(false)
 
   // Edit item dialog state — parallel to the Add form above, pre-filled from
   // the row being edited. `editOriginal` is kept alongside the editable
@@ -280,6 +318,12 @@ export default function Menu() {
   const [editRemarks, setEditRemarks] = useState('')
   const [editImageUrl, setEditImageUrl] = useState('')
   const [editUploading, setEditUploading] = useState(false)
+  // Existing recipe lines pre-loaded from GET /menu/:id/recipe on open.
+  // `editRecipeTouched` stays false through the pre-load so an unedited recipe
+  // is left untouched on save (no PUT → existing lines preserved).
+  const [editRecipeLines, setEditRecipeLines] = useState<RecipeLine[]>([])
+  const [editRecipeTouched, setEditRecipeTouched] = useState(false)
+  const [editRecipeLoading, setEditRecipeLoading] = useState(false)
 
   // Discounts / Promo dialog state — controlled, opened from the row actions
   // dropdown, same imperative-open pattern as openEditDialog() below.
@@ -370,7 +414,24 @@ export default function Menu() {
       })
       const newItem: MenuItem = { ...res.data, _channels: { ...DEFAULT_CHANNELS } }
       setMenuItems((prev) => [newItem, ...prev])
-      toast.success(`"${newItem.name}" added to the menu`)
+
+      // Save the recipe only if the user touched the editor. A failure here
+      // must NOT lose the just-created item — surface it so they can retry
+      // from Edit, but keep the item and close the dialog.
+      if (addRecipeTouched) {
+        try {
+          await put(`/menu/${newItem.id}/recipe`, recipePutBody(addRecipeLines))
+          toast.success(`"${newItem.name}" added to the menu`)
+        } catch (recipeErr) {
+          const rmsg = recipeErr instanceof Error ? recipeErr.message : 'Unknown error.'
+          toast.error(`"${newItem.name}" saved, but recipe failed: ${rmsg}`, {
+            description: 'Retry the recipe from the item’s Edit dialog.',
+          })
+        }
+      } else {
+        toast.success(`"${newItem.name}" added to the menu`)
+      }
+
       setAddOpen(false)
       resetAddForm()
     } catch (e) {
@@ -415,11 +476,13 @@ export default function Menu() {
     setAddItemNo('')
     setAddRemarks('')
     setAddImageUrl('')
+    setAddRecipeLines([])
+    setAddRecipeTouched(false)
   }
 
   // ── Edit item ──────────────────────────────────────────────────────────────
 
-  /** Opens the Edit dialog pre-filled with the row's current values. */
+  /** Opens the Edit dialog pre-filled with the row's current values + recipe. */
   const openEditDialog = useCallback((item: MenuItem) => {
     setEditOriginal(item)
     setEditName(item.name)
@@ -430,7 +493,19 @@ export default function Menu() {
     setEditItemNo(item.itemNo ?? '')
     setEditRemarks(item.remarks ?? '')
     setEditImageUrl(item.imageUrl ?? '')
+    // Pre-load the existing recipe. Kept as "untouched" so a save that doesn't
+    // edit the recipe skips the PUT and preserves the existing lines.
+    setEditRecipeLines([])
+    setEditRecipeTouched(false)
+    setEditRecipeLoading(true)
     setEditOpen(true)
+    void get<RecipeGetLine[]>(`/menu/${item.id}/recipe`)
+      .then(res => setEditRecipeLines(toRecipeLines(res.data)))
+      .catch(() => {
+        // Non-fatal — start with an empty recipe the user can build.
+        setEditRecipeLines([])
+      })
+      .finally(() => setEditRecipeLoading(false))
   }, [])
 
   function resetEditForm() {
@@ -443,6 +518,9 @@ export default function Menu() {
     setEditItemNo('')
     setEditRemarks('')
     setEditImageUrl('')
+    setEditRecipeLines([])
+    setEditRecipeTouched(false)
+    setEditRecipeLoading(false)
   }
 
   /** Same Cloudinary upload flow as Add, targeting the Edit form's photo field. */
@@ -507,17 +585,42 @@ export default function Menu() {
 
     if (editImageUrl !== (editOriginal.imageUrl ?? '')) payload.image_url = editImageUrl || null
 
-    if (Object.keys(payload).length === 0) {
+    const patchNeeded = Object.keys(payload).length > 0
+
+    // Nothing changed (no field edits, recipe untouched) — just close.
+    if (!patchNeeded && !editRecipeTouched) {
       setEditSubmitting(false)
       setEditOpen(false)
       return
     }
 
     try {
-      const res = await patch<MenuItem>(`/menu/${editOriginal.id}`, payload)
-      const updated: MenuItem = { ...res.data, _channels: editOriginal._channels ?? { ...DEFAULT_CHANNELS } }
-      setMenuItems((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
-      toast.success(`"${updated.name}" updated`)
+      let updatedName = editOriginal.name
+      if (patchNeeded) {
+        const res = await patch<MenuItem>(`/menu/${editOriginal.id}`, payload)
+        const updated: MenuItem = { ...res.data, _channels: editOriginal._channels ?? { ...DEFAULT_CHANNELS } }
+        setMenuItems((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+        updatedName = updated.name
+      }
+
+      // Recipe is only written when the user touched it (PUT REPLACES all
+      // lines). A recipe failure after a successful field PATCH keeps the
+      // field changes and surfaces a distinct toast to retry.
+      if (editRecipeTouched) {
+        try {
+          await put(`/menu/${editOriginal.id}/recipe`, recipePutBody(editRecipeLines))
+        } catch (recipeErr) {
+          const rmsg = recipeErr instanceof Error ? recipeErr.message : 'Unknown error.'
+          toast.error(`Changes saved, but recipe failed: ${rmsg}`, {
+            description: 'Reopen Edit to retry the recipe.',
+          })
+          setEditOpen(false)
+          resetEditForm()
+          return
+        }
+      }
+
+      toast.success(`"${updatedName}" updated`)
       setEditOpen(false)
       resetEditForm()
     } catch (err) {
@@ -826,7 +929,9 @@ export default function Menu() {
           Add New Item
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      {/* max-h + overflow-y-auto keep the taller recipe-enabled form scrollable
+          on small screens (restates the base DialogContent behavior). */}
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Menu Item</DialogTitle>
           <DialogDescription>
@@ -972,6 +1077,18 @@ export default function Menu() {
             </div>
           </div>
 
+          {/* Recipe (ingredients consumed per serving) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Recipe (optional)</label>
+            <RecipeEditor
+              lines={addRecipeLines}
+              onChange={(next) => {
+                setAddRecipeLines(next)
+                setAddRecipeTouched(true)
+              }}
+            />
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
@@ -1009,7 +1126,9 @@ export default function Menu() {
         if (!open) resetEditForm()
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      {/* max-h + overflow-y-auto keep the taller recipe-enabled form scrollable
+          on small screens (restates the base DialogContent behavior). */}
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Menu Item</DialogTitle>
           <DialogDescription>
@@ -1150,6 +1269,25 @@ export default function Menu() {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Recipe (ingredients consumed per serving) — pre-loaded from
+              GET /menu/:id/recipe; PUT only when touched (see handleEditItem). */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Recipe</label>
+            {editRecipeLoading ? (
+              <p className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-zinc-500">
+                Loading recipe…
+              </p>
+            ) : (
+              <RecipeEditor
+                lines={editRecipeLines}
+                onChange={(next) => {
+                  setEditRecipeLines(next)
+                  setEditRecipeTouched(true)
+                }}
+              />
+            )}
           </div>
 
           <DialogFooter>

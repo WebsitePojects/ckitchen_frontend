@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Package,
+  Pencil,
   Plus,
   RefreshCw,
   SlidersHorizontal,
@@ -76,6 +77,8 @@ import {
   TableRow,
 } from '../components/ui/table'
 import AdjustmentDialog from '../components/AdjustmentDialog'
+import IngredientDialog from '../components/IngredientDialog'
+import type { EditableIngredient } from '../components/IngredientDialog'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
@@ -298,9 +301,25 @@ interface StockTableProps {
   canAdjust: boolean
   /** Opens the AdjustmentDialog for a specific stock row. */
   onAdjust: (row: StockLine) => void
+  /** When true, render the per-row "Edit ingredient" action (OWNER-level, mirrors POST /ingredients). */
+  canEditIngredient: boolean
+  /** Opens the IngredientDialog for a specific stock row's ingredient. */
+  onEditIngredient: (row: StockLine) => void
 }
 
-function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, onAdjust }: StockTableProps) {
+function StockTable({
+  title,
+  tier,
+  rows,
+  loading,
+  error,
+  alertedIds,
+  canAdjust,
+  onAdjust,
+  canEditIngredient,
+  onEditIngredient,
+}: StockTableProps) {
+  const showActions = canAdjust || canEditIngredient
   const lowCount = rows.filter(r => r.below_threshold || alertedIds.has(r.ingredientId)).length
 
   return (
@@ -370,7 +389,7 @@ function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, 
                 <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   Status
                 </TableHead>
-                {canAdjust && (
+                {showActions && (
                   <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                     <span className="sr-only">Actions</span>
                   </TableHead>
@@ -474,18 +493,34 @@ function StockTable({ title, tier, rows, loading, error, alertedIds, canAdjust, 
                         </span>
                       )}
                     </TableCell>
-                    {canAdjust && (
+                    {showActions && (
                       <TableCell className="px-4 py-2.5 text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => onAdjust(row)}
-                          aria-label={`Adjust stock for ${row.ingredient.name}`}
-                          title="Adjust stock (write-off / add)"
-                          className="h-7 w-7 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
-                        >
-                          <SlidersHorizontal className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {canEditIngredient && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onEditIngredient(row)}
+                              aria-label={`Edit ingredient ${row.ingredient.name}`}
+                              title="Edit ingredient (name, unit, cost, threshold, suppliers)"
+                              className="h-7 w-7 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {canAdjust && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onAdjust(row)}
+                              aria-label={`Adjust stock for ${row.ingredient.name}`}
+                              title="Adjust stock (write-off / add)"
+                              className="h-7 w-7 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                            >
+                              <SlidersHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -1312,6 +1347,19 @@ export default function Inventory() {
   } | null>(null)
   const [deciding, setDeciding] = useState<Set<string>>(new Set())
 
+  // — Edit ingredient (name/unit/cost/threshold + supplier affiliations)
+  const [editIngredientTarget, setEditIngredientTarget] = useState<EditableIngredient | null>(null)
+
+  const openEditIngredient = useCallback((row: StockLine) => {
+    setEditIngredientTarget({
+      id: row.ingredient.id,
+      name: row.ingredient.name,
+      unit: row.ingredient.unit,
+      unitCost: row.ingredient.unitCost,
+      lowStockThreshold: row.ingredient.lowStockThreshold,
+    })
+  }, [])
+
   const openAdjust = useCallback((row: StockLine, tier: 'MAIN' | 'KITCHEN') => {
     setAdjustTarget({
       warehouseId: row.warehouseId,
@@ -1344,6 +1392,19 @@ export default function Inventory() {
     () => queryClient.invalidateQueries({ queryKey: ['adjustments', selectedOutletId] }),
     [queryClient, selectedOutletId],
   )
+  // Ingredients master list is global (no outlet key) — refetched after an
+  // ingredient edit so name/unit/cost/threshold + embedded suppliers stay fresh.
+  const refetchIngredients = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['ingredients'] }),
+    [queryClient],
+  )
+  // After an ingredient edit, its cost/threshold affect both stock tiers +
+  // the ingredients list — refetch all three.
+  const refetchAfterIngredientEdit = useCallback(() => {
+    void refetchMainStock()
+    void refetchKitchenStock()
+    void refetchIngredients()
+  }, [refetchMainStock, refetchKitchenStock, refetchIngredients])
 
   // ── Socket connect + room join ───────────────────────────────────────────────
   // WAREHOUSE_MAIN/WAREHOUSE_OUTLET land directly on THIS page (RoleLanding.tsx
@@ -1476,6 +1537,11 @@ export default function Inventory() {
   const canRequestIto = hasRole(role, CAN_REQUEST_ITO)
   const canConfirmIto = hasRole(role, CAN_CONFIRM_ITO)
   const canAdjust = hasRole(role, CAN_ADJUST)
+  // Editing an ingredient's master fields + supplier links is OWNER-level,
+  // mirroring the backend's POST /ingredients allow-list. hasRole(role, [])
+  // passes only for OWNER (+ legacy SUPER_ADMIN via its alias). The server
+  // enforces this too; the UI just hides the action for everyone else.
+  const canEditIngredient = hasRole(role, [])
 
   // ── Summary counts ───────────────────────────────────────────────────────────
 
@@ -1600,6 +1666,8 @@ export default function Inventory() {
               alertedIds={alertedIds}
               canAdjust={canAdjust}
               onAdjust={row => openAdjust(row, 'MAIN')}
+              canEditIngredient={canEditIngredient}
+              onEditIngredient={openEditIngredient}
             />
             <StockTable
               title="KITCHEN Warehouse"
@@ -1610,6 +1678,8 @@ export default function Inventory() {
               alertedIds={alertedIds}
               canAdjust={canAdjust}
               onAdjust={row => openAdjust(row, 'KITCHEN')}
+              canEditIngredient={canEditIngredient}
+              onEditIngredient={openEditIngredient}
             />
           </div>
 
@@ -1730,6 +1800,14 @@ export default function Inventory() {
         warehouseLabel={adjustTarget?.warehouseLabel}
         ingredient={adjustTarget?.ingredient ?? null}
         onSuccess={() => void refetchAdjustments()}
+      />
+
+      {/* ── Edit ingredient dialog (per stock row) ── */}
+      <IngredientDialog
+        open={editIngredientTarget !== null}
+        onOpenChange={open => { if (!open) setEditIngredientTarget(null) }}
+        ingredient={editIngredientTarget}
+        onSaved={refetchAfterIngredientEdit}
       />
 
       {/* ── Receive into MAIN dialog ── */}
