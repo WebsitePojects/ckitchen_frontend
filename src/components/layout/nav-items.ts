@@ -16,6 +16,7 @@ import {
   Camera,
   Handshake,
   Boxes,
+  ShoppingCart,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -63,7 +64,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Purchasing',
-    items: [{ to: '/master-data', label: 'Master Data', icon: Handshake }],
+    items: [
+      { to: '/purchasing', label: 'Purchasing', icon: ShoppingCart },
+      { to: '/master-data', label: 'Master Data', icon: Handshake },
+    ],
   },
   {
     label: 'People',

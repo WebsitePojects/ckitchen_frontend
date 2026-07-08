@@ -4,6 +4,7 @@ import { queryClient } from './lib/queryClient'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireAccess } from './auth/RequireAccess'
+import { RequireAttendance } from './auth/RequireAttendance'
 import RoleLanding from './auth/RoleLanding'
 import { OutletProvider } from './context/OutletContext'
 import { SimulatorProvider } from './context/SimulatorContext'
@@ -26,7 +27,9 @@ import Employees from './pages/Employees'
 import AuditTrail from './pages/AuditTrail'
 import StockLedger from './pages/StockLedger'
 import Attendance from './pages/Attendance'
+import AttendanceKiosk from './pages/AttendanceKiosk'
 import MasterData from './pages/MasterData'
+import Purchasing from './pages/Purchasing'
 
 export default function App() {
   return (
@@ -39,9 +42,21 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route path="/login" element={<Login />} />
+            {/* Public attendance kiosk (CK1-EMS-005 §3) — wall-tablet time
+                clock, deliberately OUTSIDE RequireAuth (unauthenticated by
+                design; photo is the identity evidence) and absent from
+                PAGE_ROLES. Fullscreen, no AppShell chrome (Tv.tsx pattern). */}
+            <Route path="/kiosk/attendance" element={<AttendanceKiosk />} />
 
             {/* Protected shell */}
             <Route element={<RequireAuth />}>
+              {/* Attendance gate — the "second middleware after login" (client
+                  directive 2026-07-08): non-OWNER staff with a linked employee
+                  record are bounced to /attendance until today's TIME_IN.
+                  Wraps BOTH the AppShell routes and /tv; /attendance itself is
+                  exempted inside the guard so it can never trap its own
+                  redirect target. */}
+              <Route element={<RequireAttendance />}>
               <Route element={<AppShell />}>
                 {/* '/merchants' left the nav post-D30 ("merchant" = Brand) — kept as an
                     unconditional redirect (outside RequireAccess) so old links don't 404. */}
@@ -58,6 +73,7 @@ export default function App() {
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="stock-ledger" element={<StockLedger />} />
                 <Route path="master-data" element={<MasterData />} />
+                <Route path="purchasing" element={<Purchasing />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="employees" element={<Employees />} />
                 <Route path="attendance" element={<Attendance />} />
@@ -72,6 +88,7 @@ export default function App() {
                   RequireAccess (platform-ia-navigation.md §6). */}
               <Route element={<RequireAccess />}>
                 <Route path="tv" element={<Tv />} />
+              </Route>
               </Route>
             </Route>
 

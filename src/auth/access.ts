@@ -76,6 +76,11 @@ export const PAGE_ROLES: Record<string, string[]> = {
   '/stock-ledger': ['OUTLET_MANAGER', 'KITCHEN_CREW', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET', 'PURCHASING', 'ACCOUNTING'],
 
   // Purchasing
+  // '/purchasing' mirrors the backend purchasing module's union of role sets
+  // (requesters / PO / receive / budget viewers) minus KITCHEN_CREW (kitchen
+  // raises replenishment via ITO on '/inventory', not POs) — matches the
+  // backend rbac-defaults entry added in the same wave.
+  '/purchasing': ['OUTLET_MANAGER', 'PURCHASING', 'WAREHOUSE_MAIN', 'WAREHOUSE_OUTLET', 'ACCOUNTING'],
   '/master-data': ['WAREHOUSE_MAIN', 'PURCHASING'],
 
   // People

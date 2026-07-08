@@ -8,8 +8,23 @@ import {
   type ReactNode,
 } from 'react'
 import { apiClient } from '../lib/api'
+import { queryClient } from '../lib/queryClient'
 import { destroySocket } from '../lib/socket'
 import { decodeJwtPayload } from './jwt'
+
+/**
+ * Drops the attendance-gate query (RequireAttendance's SELF_TODAY_QUERY_KEY)
+ * from the cache on every login/logout. Without this, on a shared device a
+ * NEW login within staleTime could reuse the PREVIOUS user's cached
+ * clocked_in state — passing the gate they should hit, or rendering the
+ * previous user's identity card on the Attendance page. Key literal is
+ * deliberately duplicated here (same pattern as 'orion.outletId' below)
+ * because importing it from ./RequireAttendance would create a circular
+ * import (RequireAttendance -> AuthContext -> RequireAttendance).
+ */
+function dropSelfAttendanceCache(): void {
+  queryClient.removeQueries({ queryKey: ['attendance', 'self-today'] })
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       { email, password },
     )
     localStorage.setItem(TOKEN_KEY, data.token)
+    dropSelfAttendanceCache()
     setState({ token: data.token, user: withTenancyClaims(data.user, data.token), loading: false })
   }, [])
 
@@ -162,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // here rather than imported, matching the same key already duplicated in
     // lib/api.ts, to avoid a circular import between auth/ and context/.
     localStorage.removeItem('orion.outletId')
+    dropSelfAttendanceCache()
     setState({ token: null, user: null, loading: false })
   }, [state.token])
 
