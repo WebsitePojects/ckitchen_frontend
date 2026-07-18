@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './lib/queryClient'
+import ThemeProvider from './components/layout/ThemeProvider'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireAccess } from './auth/RequireAccess'
@@ -32,9 +33,11 @@ import Attendance from './pages/Attendance'
 import AttendanceKiosk from './pages/AttendanceKiosk'
 import MasterData from './pages/MasterData'
 import Purchasing from './pages/Purchasing'
+import MerchantConsole from './pages/MerchantConsole'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <OutletProvider>
@@ -85,6 +88,10 @@ export default function App() {
                 <Route path="orders" element={<Orders />} />
                 <Route path="outlets" element={<Outlets />} />
                 <Route path="channel-listings" element={<ChannelListings />} />
+                {/* Merchant Console — per-listing live order queue + store pause +
+                    item availability (the per-merchant Grab tablet / foodpanda
+                    phone replacement — Documents/AGGREGATOR_API_INTEGRATION_SPEC.md). */}
+                <Route path="merchant-console" element={<MerchantConsole />} />
                 <Route path="brands" element={<Brands />} />
                 <Route path="kitchen" element={<Kitchen />} />
                 <Route path="printers" element={<Printers />} />
@@ -120,5 +127,6 @@ export default function App() {
       </OutletProvider>
     </AuthProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   )
 }

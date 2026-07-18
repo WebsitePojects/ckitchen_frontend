@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Sheet, SheetContent, SheetTitle } from '../ui/sheet'
 import { usePageHeaderContext } from './PageHeaderContext'
 import Sidebar from './Sidebar'
+import ThemeToggle from './ThemeToggle'
 import { useSignOut } from './useSignOut'
 
 function initials(name: string | undefined): string {
@@ -67,10 +68,10 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
           onValueChange={(value) => setSelectedOutletId(value as SelectedOutlet)}
         >
           <SelectTrigger
-            className="h-8 w-auto min-w-[7.5rem] max-w-[11rem] shrink-0 gap-1.5 border-border bg-secondary/50 px-2.5 text-xs text-zinc-300"
+            className="h-8 w-auto min-w-[7.5rem] max-w-[11rem] shrink-0 gap-1.5 border-border bg-secondary/50 px-2.5 text-xs text-foreground"
             aria-label="Select outlet"
           >
-            <Building2 className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+            <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
             <SelectValue placeholder="Outlet" />
           </SelectTrigger>
           <SelectContent>
@@ -86,12 +87,14 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
 
       {/* Title / subtitle */}
       <div className="min-w-0 flex-1">
-        <h1 className="truncate text-base font-semibold text-zinc-50 sm:text-lg">{title}</h1>
-        {subtitle && <p className="truncate text-xs text-zinc-500">{subtitle}</p>}
+        <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">{title}</h1>
+        {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
       </div>
 
       {/* Right cluster */}
-      <div className="flex shrink-0 items-center">
+      <div className="flex shrink-0 items-center gap-1">
+        <ThemeToggle />
+
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

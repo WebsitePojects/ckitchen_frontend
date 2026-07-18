@@ -225,3 +225,33 @@ export function shortOrderNo(externalRef: string): string {
   const trimmed = externalRef.trim()
   return trimmed.length > 6 ? trimmed.slice(-6).toUpperCase() : trimmed.toUpperCase()
 }
+
+// ─── Station ordering (July 15 site visit finding) ─────────────────────────────
+
+/**
+ * Reorders KDS station columns so any "Packing" station (case-insensitive
+ * match on the substring 'pack') always renders LAST. Client site-visit
+ * note (2026-07-15): "Packing should be the last step on the Kitchen
+ * Display; has actually Cold, Fry, Cooking" — GET /stations' natural order
+ * (DB id/creation order) does not guarantee that today. Every other station
+ * keeps its existing relative order — stable sort, only packing stations are
+ * pulled to the end (handles more than one packing-named station too).
+ *
+ * Sequencing note (checked, NOT implemented — see report): the current data
+ * model has no per-item/per-station completion state. An order appears in
+ * EVERY station column it has items routed to (Kitchen.tsx's `stationOrders`
+ * groups by `order.stationIds`, built purely from KOT routing), gated only
+ * by the order's single whole-order status (NEW/PREPARING/READY/COMPLETED —
+ * see RawOrderItem in this file, which carries no per-item done flag). So
+ * "only show in Packing once Cold/Fry/Cooking are done for that order" isn't
+ * implementable client-side without a backend change adding item- or
+ * station-level completion tracking; faking it would risk silently hiding a
+ * legitimate order from the packing station (business rules #7/#8 — no KOT
+ * is silently lost). This helper fixes column ORDER only.
+ */
+export function sortStationsPackingLast<T extends { name: string }>(stations: T[]): T[] {
+  const isPacking = (s: T) => s.name.toLowerCase().includes('pack')
+  const rest = stations.filter(s => !isPacking(s))
+  const packing = stations.filter(isPacking)
+  return [...rest, ...packing]
+}

@@ -49,7 +49,7 @@ export default function Login() {
   }
 
   const inputClass =
-    'peer block h-11 w-full rounded-lg border border-border bg-background/60 pl-10 pr-3 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60'
+    'peer block h-11 w-full rounded-lg border border-border bg-background/60 pl-10 pr-3 text-sm text-foreground placeholder-zinc-500 outline-none transition-colors duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60'
 
   const iconClass =
     'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 transition-colors duration-200 peer-focus:text-emerald-400'
@@ -68,7 +68,7 @@ export default function Login() {
           <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/10 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/40">
             <Orbit className="h-7 w-7 text-emerald-400" aria-hidden />
           </span>
-          <span className="text-2xl font-bold tracking-tight text-zinc-50">{PLATFORM_NAME}</span>
+          <span className="text-2xl font-bold tracking-tight text-foreground">{PLATFORM_NAME}</span>
           <p className="mt-1 text-sm text-zinc-500">{PLATFORM_TAGLINE}</p>
         </div>
 
@@ -79,7 +79,7 @@ export default function Login() {
         >
           <div className="space-y-5">
             <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-zinc-300">
+              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-muted-foreground">
                 Email address
               </label>
               <div className="relative">
@@ -99,7 +99,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-zinc-300">
+              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-muted-foreground">
                 Password
               </label>
               <div className="relative">
@@ -151,9 +151,9 @@ export default function Login() {
           </div>
 
           {import.meta.env.DEV && (
-            <p className="mt-5 rounded-lg bg-zinc-900/60 px-3 py-2 text-center text-xs text-zinc-500">
-              Demo: <span className="text-zinc-300">admin@cloudkitchen.local</span> /{' '}
-              <span className="text-zinc-300">admin123</span>
+            <p className="mt-5 rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
+              Demo: <span className="text-foreground">admin@cloudkitchen.local</span> /{' '}
+              <span className="text-foreground">admin123</span>
             </p>
           )}
         </form>

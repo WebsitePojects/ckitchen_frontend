@@ -324,9 +324,9 @@ function StockTable({
   const lowCount = rows.filter(r => r.below_threshold || alertedIds.has(r.ingredientId)).length
 
   return (
-    <Card className="border-[#1F2A24] bg-[#121A17] overflow-hidden">
-      <CardHeader className="px-4 py-3 border-b border-[#1F2A24] flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+    <Card className="border-border bg-card overflow-hidden">
+      <CardHeader className="px-4 py-3 border-b border-border flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Boxes className="h-4 w-4 text-emerald-500" aria-hidden />
           {title}
         </CardTitle>
@@ -371,7 +371,7 @@ function StockTable({
         ) : (
           <Table>
             <TableHeader>
-              <TableRow className="border-[#1F2A24] hover:bg-transparent">
+              <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                   Ingredient
                 </TableHead>
@@ -409,7 +409,7 @@ function StockTable({
                   <TableRow
                     key={row.ingredientId}
                     className={[
-                      'transition-colors duration-300 border-[#1F2A24]',
+                      'transition-colors duration-300 border-border',
                       isAlert
                         ? 'bg-red-500/5 hover:bg-red-500/10'
                         : showRisk
@@ -419,7 +419,7 @@ function StockTable({
                   >
                     <TableCell className="px-4 py-2.5">
                       <span
-                        className={`font-medium text-sm ${isAlert ? 'text-red-300' : showRisk ? 'text-amber-200' : 'text-zinc-100'}`}
+                        className={`font-medium text-sm ${isAlert ? 'text-red-300' : showRisk ? 'text-amber-200' : 'text-foreground'}`}
                       >
                         {row.ingredient.name}
                       </span>
@@ -438,7 +438,7 @@ function StockTable({
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
                       <span
-                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : showRisk ? 'text-amber-400' : 'text-zinc-300'}`}
+                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : showRisk ? 'text-amber-400' : 'text-muted-foreground'}`}
                       >
                         {formatQty(available, row.ingredient.unit)}
                       </span>
@@ -464,7 +464,7 @@ function StockTable({
                               ? 'text-red-400'
                               : daysLeft <= 3
                                 ? 'text-amber-400'
-                                : 'text-zinc-300',
+                                : 'text-muted-foreground',
                           ].join(' ')}
                         >
                           {fmtDays(daysLeft)}d
@@ -629,10 +629,10 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                 value={item.ingredientId || '_none'}
                 onValueChange={v => setField(idx, 'ingredientId', v === '_none' ? '' : v)}
               >
-                <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+                <SelectTrigger className="bg-background border-border text-zinc-200 text-sm h-9">
                   <SelectValue placeholder="Select ingredient…" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#121A17] border-[#1F2A24]">
+                <SelectContent className="bg-card border-border">
                   <SelectItem value="_none" className="text-zinc-400">
                     Select ingredient…
                   </SelectItem>
@@ -658,7 +658,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                 onChange={e => setField(idx, 'quantity', e.target.value)}
                 required
                 placeholder="0"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-zinc-200 placeholder:text-zinc-600 h-9"
               />
             </div>
             {items.length > 1 && (
@@ -683,7 +683,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
           variant="outline"
           size="sm"
           onClick={addRow}
-          className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+          className="border-border text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
         >
           <Plus className="h-3.5 w-3.5 mr-1" />
           Add row
@@ -746,7 +746,7 @@ function ItoList({
         icon={ArrowLeftRight}
         title="No transfer orders"
         description="Request a transfer to move stock MAIN → KITCHEN."
-        className="border-dashed border-[#1F2A24] bg-transparent"
+        className="border-dashed border-border bg-transparent"
       />
     )
   }
@@ -764,7 +764,7 @@ function ItoList({
                 ? 'border-amber-500/30 bg-amber-500/5'
                 : ito.status === 'CONFIRMED'
                   ? 'border-emerald-500/30 bg-emerald-500/5'
-                  : 'border-[#1F2A24] bg-zinc-800/30',
+                  : 'border-border bg-zinc-800/30',
             ].join(' ')}
           >
             {/* ITO header */}
@@ -782,7 +782,7 @@ function ItoList({
                 {ito.items.map(it => {
                   const ing = ingredientsById.get(it.ingredientId)
                   return (
-                    <li key={it.id} className="flex items-center gap-2 text-sm text-zinc-300">
+                    <li key={it.id} className="flex items-center gap-2 text-sm text-foreground">
                       <span className="font-medium">{ing?.name ?? it.ingredientId}</span>
                       <span className="ml-auto font-mono tabular-nums text-xs text-zinc-500">
                         {formatQty(it.quantity, ing?.unit ?? '')}
@@ -888,9 +888,9 @@ function AdjustmentsPanel({
   const pendingCount = adjustments.filter(a => a.status === 'PENDING').length
 
   return (
-    <Card className="border-[#1F2A24] bg-[#121A17] overflow-hidden">
-      <CardHeader className="px-4 py-3 border-b border-[#1F2A24] flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+    <Card className="border-border bg-card overflow-hidden">
+      <CardHeader className="px-4 py-3 border-b border-border flex-row items-center justify-between space-y-0">
+        <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
           <ClipboardList className="h-4 w-4 text-emerald-500" aria-hidden />
           Stock Adjustments
         </CardTitle>
@@ -923,7 +923,7 @@ function AdjustmentsPanel({
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-[#1F2A24] hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                     Item
                   </TableHead>
@@ -960,9 +960,9 @@ function AdjustmentsPanel({
                   const requester = adj.requested_by_name ?? adj.requestedBy ?? '—'
                   const isDeciding = deciding.has(adj.id)
                   return (
-                    <TableRow key={adj.id} className="border-[#1F2A24] hover:bg-zinc-800/30">
+                    <TableRow key={adj.id} className="border-border hover:bg-zinc-800/30">
                       <TableCell className="px-4 py-2.5">
-                        <span className="font-medium text-sm text-zinc-100">{name}</span>
+                        <span className="font-medium text-sm text-foreground">{name}</span>
                         {adj.note && (
                           <span className="mt-0.5 block text-[11px] italic text-zinc-500 truncate max-w-[16rem]">
                             {adj.note}
@@ -980,7 +980,7 @@ function AdjustmentsPanel({
                           {isOut ? 'Write-off' : 'Add'}
                         </span>
                       </TableCell>
-                      <TableCell className="px-4 py-2.5 text-sm text-zinc-300">
+                      <TableCell className="px-4 py-2.5 text-sm text-muted-foreground">
                         {formatReason(adj.reason)}
                       </TableCell>
                       <TableCell className="px-4 py-2.5 text-sm text-zinc-400 truncate max-w-[10rem]">
@@ -1032,9 +1032,9 @@ function AdjustmentsPanel({
 
       {/* Decision dialog — optional note before approve/reject */}
       <Dialog open={decision !== null} onOpenChange={o => { if (!o) setDecision(null) }}>
-        <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-md">
+        <DialogContent className="bg-card border-border text-foreground max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-zinc-50">
+            <DialogTitle className="text-foreground">
               {decision?.action === 'approve' ? 'Approve adjustment' : 'Reject adjustment'}
             </DialogTitle>
             <DialogDescription className="text-zinc-500">
@@ -1049,7 +1049,7 @@ function AdjustmentsPanel({
             maxLength={500}
             rows={2}
             placeholder="Optional note…"
-            className="w-full rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
           />
           <div className="flex gap-2 pt-1">
             <Button
@@ -1057,7 +1057,7 @@ function AdjustmentsPanel({
               variant="outline"
               size="sm"
               onClick={() => setDecision(null)}
-              className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              className="border-border text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
             >
               Cancel
             </Button>
@@ -1576,9 +1576,9 @@ export default function Inventory() {
           )}
 
           {/* ITO panel */}
-          <Card className="border-[#1F2A24] bg-[#121A17]">
-            <CardHeader className="px-4 py-3 border-b border-[#1F2A24] flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
+          <Card className="border-border bg-card">
+            <CardHeader className="px-4 py-3 border-b border-border flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <ArrowLeftRight className="h-4 w-4 text-emerald-500" aria-hidden />
                 Transfer Orders (ITO)
               </CardTitle>
@@ -1658,9 +1658,9 @@ export default function Inventory() {
 
       {/* ── Request Transfer (ITO) dialog ── */}
       <Dialog open={showRequestIto} onOpenChange={setShowRequestIto}>
-        <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
+        <DialogContent className="bg-card border-border text-foreground max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-zinc-50">
+            <DialogTitle className="text-foreground">
               Request Transfer — MAIN to KITCHEN
             </DialogTitle>
             <DialogDescription className="text-zinc-500">

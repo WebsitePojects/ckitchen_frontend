@@ -32,14 +32,14 @@ export default function KpiCard({ icon: Icon, label, value, deltaPct, children, 
     <Card hoverable className={cn('border-border bg-card', className)}>
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</span>
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/20">
-            <Icon className="h-4 w-4 text-emerald-400" aria-hidden />
+            <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
           </span>
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-bold tabular-nums text-zinc-50 sm:text-3xl">{value}</span>
+          <span className="text-2xl font-bold tabular-nums text-foreground sm:text-3xl">{value}</span>
           {deltaPct !== undefined && (
             <span
               className={cn(

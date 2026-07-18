@@ -69,6 +69,12 @@ export const PAGE_ROLES: Record<string, string[]> = {
   // edits) behind `hasRole(role, ['BRAND_MANAGER'])`, so kitchen crew view but can't mutate.
   '/menu': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'],
   '/channel-listings': ['BRAND_MANAGER'],
+  // Merchant Console (Documents/AGGREGATOR_API_INTEGRATION_SPEC.md §4 "Security" —
+  // "server-side RBAC (OWNER/OUTLET_MANAGER for store pause; KITCHEN_CREW for
+  // order actions)") — page access is the union of everyone who acts on it;
+  // per-action gating (pause/resume, accept/reject/ready, item availability)
+  // is enforced inside MerchantConsole.tsx via hasRole.
+  '/merchant-console': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'],
 
   // Inventory — KITCHEN_CREW is read-only except requesting an ITO (a legitimate kitchen
   // replenishment action); Inventory.tsx gates receive/confirm-ITO/adjust to warehouse roles.

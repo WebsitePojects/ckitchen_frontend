@@ -93,7 +93,11 @@ export default function AppShell() {
               </main>
             </div>
           </div>
-          <Toaster richColors theme="dark" position="top-right" />
+          {/* No `theme` prop — Toaster (ui/sonner.tsx) reads the live theme via
+              next-themes' useTheme() now that <ThemeProvider> wraps the app
+              (App.tsx), so toasts follow the user's dark/light/system choice
+              instead of being locked to dark. */}
+          <Toaster richColors position="top-right" />
         </NotificationProvider>
       </ErrorDialogProvider>
     </PageHeaderProvider>

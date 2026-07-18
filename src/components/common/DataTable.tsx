@@ -71,7 +71,7 @@ export default function DataTable<T>({
     <div className="space-y-3">
       {searchPlaceholder && (
         <div className="relative max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" aria-hidden />
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
@@ -92,13 +92,13 @@ export default function DataTable<T>({
                   return (
                     <TableHead
                       key={header.id}
-                      className="text-xs font-semibold uppercase tracking-wide text-zinc-500"
+                      className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                     >
                       {header.isPlaceholder ? null : sortable ? (
                         <button
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
-                          className="flex items-center gap-1 rounded transition-colors duration-200 hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                          className="flex items-center gap-1 rounded transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
                           {sortState === 'asc' ? (
@@ -143,7 +143,7 @@ export default function DataTable<T>({
               rows.map((row) => (
                 <TableRow key={row.id} className="border-border">
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-sm text-zinc-300">
+                    <TableCell key={cell.id} className="text-sm text-foreground">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -155,7 +155,7 @@ export default function DataTable<T>({
       </div>
 
       {!loading && rows.length > 0 && table.getPageCount() > 1 && (
-        <div className="flex items-center justify-between text-xs text-zinc-500">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
             Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
           </span>

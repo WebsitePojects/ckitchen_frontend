@@ -60,6 +60,7 @@ import {
   formatTime,
   isOverdue as isOrderOverdue,
   isStale as isOrderStale,
+  sortStationsPackingLast,
   timerStart,
   type KdsOrder,
   type OrderStatus,
@@ -568,6 +569,12 @@ export default function Kitchen() {
     return map
   }, [visibleOrders, stations])
 
+  // Column display order — Packing always last (July 15 site-visit finding;
+  // see sortStationsPackingLast in lib/kds.ts for what this does and does not
+  // fix). Lookups above stay keyed off the unsorted `stations` (order-agnostic
+  // Map); only the rendered column order below uses this.
+  const orderedStations = useMemo(() => sortStationsPackingLast(stations), [stations])
+
   // ── Stage summary counts ──────────────────────────────────────────────────
 
   const stageCounts = useMemo<StageCounts>(
@@ -705,7 +712,7 @@ export default function Kitchen() {
             className="flex h-full gap-3 p-4 sm:gap-4"
             style={{ minWidth: `${Math.max(stations.length * 296, 100)}px` }}
           >
-            {stations.map(station => {
+            {orderedStations.map(station => {
               const col = stationOrders.get(station.id) ?? []
               const colOverdue = col.filter(
                 o => isOrderOverdue(o) && o.status !== 'COMPLETED',
@@ -714,6 +721,8 @@ export default function Kitchen() {
               return (
                 <section
                   key={station.id}
+                  data-testid="kds-station-column"
+                  data-station-name={station.name}
                   className="flex w-72 shrink-0 flex-col rounded-2xl border border-[#1F2A24] bg-[#0C1310] overflow-hidden shadow-xl"
                   aria-label={`${station.name} station`}
                 >

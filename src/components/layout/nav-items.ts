@@ -17,6 +17,7 @@ import {
   Handshake,
   Boxes,
   ShoppingCart,
+  Tablet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,6 +45,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/orders', label: 'Live Orders', icon: ReceiptText },
       { to: '/kitchen', label: 'Kitchen (KDS)', icon: ChefHat },
+      { to: '/merchant-console', label: 'Merchant Console', icon: Tablet },
       { to: '/printers', label: 'Printers & Print Monitor', icon: Printer },
     ],
   },
