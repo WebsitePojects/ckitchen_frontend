@@ -45,6 +45,16 @@ export interface KdsOrder {
   total: string
   placedAt: string
   prepAt: string | null
+  /**
+   * ISO deadline by which a NEW order must be accepted before the aggregator
+   * auto-expires it (SITE_VISIT_VIDEO_ANALYSIS.md §1b — the Grab Merchant
+   * app's "05:00" accept countdown + "orders that are ignored will expire
+   * and your store will be paused" warning). Null on orders placed before
+   * the MC-1 backend wave that adds `accept_deadline_at`, or on listings the
+   * aggregator doesn't set a deadline for — MerchantConsole.tsx's OrderCard
+   * falls back to the existing elapsed-time display in that case.
+   */
+  acceptDeadlineAt: string | null
   items: KdsOrderItem[]
   stationIds: string[]
 }
@@ -91,6 +101,9 @@ export interface RawOrderDetail {
   total: string
   placedAt: string
   prepAt?: string | null
+  /** camelCase on REST; not sent by pre-MC-1 backend deploys — optional. */
+  acceptDeadlineAt?: string | null
+  accept_deadline_at?: string | null
   items: RawOrderItem[]
   print_jobs: RawPrintJob[]
 }
@@ -162,6 +175,7 @@ export function toKdsOrder(raw: RawOrderDetail): KdsOrder {
     total: raw.total,
     placedAt: raw.placedAt,
     prepAt: raw.prepAt ?? null,
+    acceptDeadlineAt: raw.acceptDeadlineAt ?? raw.accept_deadline_at ?? null,
     items,
     stationIds,
   }
