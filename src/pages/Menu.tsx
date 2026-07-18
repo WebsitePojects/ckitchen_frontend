@@ -11,7 +11,7 @@
  * RBAC: Writes (availability PATCH, add item) = OWNER (+ legacy SUPER_ADMIN) | BRAND_MANAGER.
  * Channel visibility (foodpanda / GrabFood / Direct) is presentational — local state only.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -285,6 +285,11 @@ export default function Menu() {
     [queryClient, menuQueryKey],
   )
 
+  // In-flight guard for the availability-cycle badge (double-submit race —
+  // the badge previously had no pending state at all, so a fast double-click
+  // could fire two overlapping PATCHes and race the optimistic update).
+  const [togglingAvailabilityIds, setTogglingAvailabilityIds] = useState<Set<string>>(new Set())
+
   // Add item dialog state
   const [addOpen, setAddOpen] = useState(false)
   const [addName, setAddName] = useState('')
@@ -359,6 +364,20 @@ export default function Menu() {
         toast.error('Permission denied', { description: 'You need BRAND_MANAGER or SUPER_ADMIN role.' })
         return
       }
+      // Atomic check-and-set via the functional updater — a second click on
+      // this badge before re-render sees the item already toggling and
+      // no-ops, instead of firing a second overlapping PATCH (which would
+      // also race the optimistic-update rollback below).
+      let alreadyToggling = false
+      setTogglingAvailabilityIds(prev => {
+        if (prev.has(item.id)) {
+          alreadyToggling = true
+          return prev
+        }
+        return new Set(prev).add(item.id)
+      })
+      if (alreadyToggling) return
+
       const next = AVAIL_CYCLE[item.availability]
 
       // Optimistic update
@@ -376,6 +395,12 @@ export default function Menu() {
         )
         const msg = e instanceof Error ? e.message : 'Failed to update availability.'
         toast.error('Update failed', { description: msg })
+      } finally {
+        setTogglingAvailabilityIds(prev => {
+          const nextSet = new Set(prev)
+          nextSet.delete(item.id)
+          return nextSet
+        })
       }
     },
     [canWrite],
@@ -398,6 +423,7 @@ export default function Menu() {
   // ── Add item submit ────────────────────────────────────────────────────────
   async function handleAddItem(e: FormEvent) {
     e.preventDefault()
+    if (addSubmitting) return
     if (!selectedBrandId) return
     setAddSubmitting(true)
 
@@ -556,6 +582,7 @@ export default function Menu() {
    */
   async function handleEditItem(e: FormEvent) {
     e.preventDefault()
+    if (editSubmitting) return
     if (!editOriginal) return
     setEditSubmitting(true)
 
@@ -639,6 +666,8 @@ export default function Menu() {
    * NOT copied — it's unique per brand, so the duplicate starts without a
    * product number until the user assigns one via Edit.
    */
+  const duplicatingIdsRef = useRef<Set<string>>(new Set())
+
   const handleDuplicate = useCallback(
     async (item: MenuItem) => {
       if (!canWrite) {
@@ -646,6 +675,11 @@ export default function Menu() {
         return
       }
       if (!selectedBrandId) return
+      // A dropdown menu closes on select, but guard anyway in case a second
+      // "Duplicate" click lands before it unmounts — a ref check is atomic
+      // and needs no re-render to take effect.
+      if (duplicatingIdsRef.current.has(item.id)) return
+      duplicatingIdsRef.current.add(item.id)
       try {
         const res = await post<MenuItem>(`/brands/${selectedBrandId}/menu`, {
           name: `${item.name} (copy)`,
@@ -662,6 +696,8 @@ export default function Menu() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to duplicate item.'
         toast.error('Duplicate failed', { description: msg })
+      } finally {
+        duplicatingIdsRef.current.delete(item.id)
       }
     },
     [canWrite, selectedBrandId],
@@ -676,6 +712,7 @@ export default function Menu() {
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
   const handleDeleteConfirm = useCallback(async () => {
+    if (deleteSubmitting) return
     if (!deleteTarget) return
     setDeleteSubmitting(true)
     try {
@@ -696,7 +733,7 @@ export default function Menu() {
     } finally {
       setDeleteSubmitting(false)
     }
-  }, [deleteTarget, setMenuItems])
+  }, [deleteTarget, deleteSubmitting, setMenuItems])
 
   // ── Table columns ─────────────────────────────────────────────────────────
   const columns = useMemo<ColumnDef<MenuItem, unknown>[]>(
@@ -789,16 +826,18 @@ export default function Menu() {
         enableSorting: false,
         cell: ({ row }) => {
           const av = row.original.availability as Availability
+          const isToggling = togglingAvailabilityIds.has(row.original.id)
           return (
             <button
               type="button"
               onClick={() => void cycleAvailability(row.original)}
+              disabled={!canWrite || isToggling}
               title={canWrite ? `Click to cycle: currently ${AVAIL_LABEL[av]}` : AVAIL_LABEL[av]}
               className={cn(
                 'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide transition-colors duration-200',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                 availBadgeClass(av),
-                !canWrite && 'cursor-default',
+                (!canWrite || isToggling) && 'cursor-default opacity-70',
               )}
             >
               {AVAIL_LABEL[av]}
@@ -901,6 +940,7 @@ export default function Menu() {
     [
       stationMap,
       cycleAvailability,
+      togglingAvailabilityIds,
       toggleChannel,
       canWrite,
       openEditDialog,

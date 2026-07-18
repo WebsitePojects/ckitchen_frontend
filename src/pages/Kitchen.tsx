@@ -182,6 +182,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
   const [cancelling, setCancelling] = useState(false)
 
   const submitCancel = async () => {
+    if (cancelling) return
     const reason = cancelReason.trim()
     if (reason.length === 0) return
     setCancelling(true)
@@ -492,7 +493,18 @@ export default function Kitchen() {
   // ── Advance handler ────────────────────────────────────────────────────────
 
   const handleAdvance = useCallback(async (orderId: string) => {
-    setAdvancing(prev => new Set(prev).add(orderId))
+    // Atomic check-and-set via the functional updater — a second Advance
+    // dispatched for the same order before re-render (fast double-tap on the
+    // KDS touch target) sees it already in-flight and no-ops.
+    let alreadyAdvancing = false
+    setAdvancing(prev => {
+      if (prev.has(orderId)) {
+        alreadyAdvancing = true
+        return prev
+      }
+      return new Set(prev).add(orderId)
+    })
+    if (alreadyAdvancing) return
     try {
       const { data } = await post<{ id: string; status: OrderStatus; prepAt?: string }>(
         `/orders/${orderId}/advance`,

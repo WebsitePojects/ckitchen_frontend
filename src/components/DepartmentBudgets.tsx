@@ -104,6 +104,7 @@ export default function DepartmentBudgets() {
   }
 
   async function saveEdit(dept: string) {
+    if (saving) return
     const amount = Number(amountDraft)
     if (!amountDraft.trim() || Number.isNaN(amount) || amount < 0) {
       toast.error('Enter a valid non-negative budget amount.')

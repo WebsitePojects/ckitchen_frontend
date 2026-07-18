@@ -25,6 +25,7 @@ import Brands from './pages/Brands'
 import Outlets from './pages/Outlets'
 import OutletProfile from './pages/OutletProfile'
 import ChannelListings from './pages/ChannelListings'
+import MerchantManagement from './pages/MerchantManagement'
 import Employees from './pages/Employees'
 import EmployeeProfile from './pages/EmployeeProfile'
 import AuditTrail from './pages/AuditTrail'
@@ -88,6 +89,7 @@ export default function App() {
                 <Route path="orders" element={<Orders />} />
                 <Route path="outlets" element={<Outlets />} />
                 <Route path="channel-listings" element={<ChannelListings />} />
+                <Route path="merchant-management" element={<MerchantManagement />} />
                 {/* Merchant Console — per-listing live order queue + store pause +
                     item availability (the per-merchant Grab tablet / foodpanda
                     phone replacement — Documents/AGGREGATOR_API_INTEGRATION_SPEC.md). */}

@@ -87,6 +87,7 @@ export default function ReceiveDialog({ open, onOpenChange, po, ingredients }: R
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (!po || !detail) return
     const payloadLines: { po_line_id: string; qty_received: number }[] = []
     for (const l of detail.lines) {

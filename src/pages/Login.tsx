@@ -30,6 +30,10 @@ export default function Login() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    // Early-return guard: Enter-key repeat re-fires the form's submit event
+    // regardless of the button's disabled attribute (that only blocks clicks
+    // on the button itself), so the disabled prop alone isn't enough here.
+    if (submitting) return
     setError(null)
     setSlowHint(false)
     setSubmitting(true)

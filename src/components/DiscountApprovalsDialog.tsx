@@ -88,6 +88,7 @@ export default function DiscountApprovalsDialog({ open, onOpenChange, onChanged 
   }
 
   async function handleApprove(id: string) {
+    if (actioningId !== null) return
     setActioningId(id)
     try {
       await post(`/order-discounts/${id}/approve`)
@@ -101,6 +102,7 @@ export default function DiscountApprovalsDialog({ open, onOpenChange, onChanged 
   }
 
   async function handleReject(id: string) {
+    if (actioningId !== null) return
     setActioningId(id)
     try {
       await post(`/order-discounts/${id}/reject`)

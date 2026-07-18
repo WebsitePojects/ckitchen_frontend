@@ -100,6 +100,7 @@ export default function AdjustmentDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!ingredient) return
     const qtyNum = Number(quantity)
     if (!(quantity !== '' && Number.isFinite(qtyNum) && qtyNum > 0)) {

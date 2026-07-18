@@ -219,6 +219,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!order || !selectedValue) return
     const trimmedReason = reason.trim()
     if (!trimmedReason) {

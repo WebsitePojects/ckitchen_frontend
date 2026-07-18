@@ -163,6 +163,7 @@ export default function MenuItemDiscountsDialog({
   // ── Add promo ──────────────────────────────────────────────────────────
   async function handleAddPromo(e: FormEvent) {
     e.preventDefault()
+    if (addSubmitting) return
     if (!item) return
 
     const trimmedName = addName.trim()
@@ -204,6 +205,7 @@ export default function MenuItemDiscountsDialog({
 
   // ── Active toggle (optimistic PATCH) ──────────────────────────────────
   async function toggleActive(d: ItemDiscount) {
+    if (pendingId !== null) return
     const next = !d.active
     setPendingId(d.id)
     queryClient.setQueryData<ItemDiscount[]>(queryKey, (prev) =>
@@ -226,6 +228,7 @@ export default function MenuItemDiscountsDialog({
   // ── Delete (soft) ──────────────────────────────────────────────────────
   async function handleDelete(d: ItemDiscount) {
     if (!window.confirm(`Remove "${d.name}" from ${item?.name ?? 'this item'}?`)) return
+    if (pendingId !== null) return
     setPendingId(d.id)
     try {
       await del(`/discounts/${d.id}`)

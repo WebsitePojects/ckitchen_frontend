@@ -169,6 +169,7 @@ export default function PurchaseOrderDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (!supplierId) {
       toast.error('Select a supplier first.')
       return

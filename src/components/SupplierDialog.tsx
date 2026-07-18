@@ -119,6 +119,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
   // ── Save supplier (POST create / PATCH edit) ─────────────────────────────
   async function handleSave(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (!code.trim() || !name.trim()) {
       toast.error('Code and name are required.')
       return
@@ -200,6 +201,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
   }
 
   async function handleLinkItem() {
+    if (linking) return
     if (!editingId || !addIngredientId) {
       toast.error('Select an item to link.')
       return
@@ -229,6 +231,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
   }
 
   async function handleUnlinkItem(ingredientId: string, ingredientName: string) {
+    if (removingId !== null) return
     if (!editingId) return
     setRemovingId(ingredientId)
     try {

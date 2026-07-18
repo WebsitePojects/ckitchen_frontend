@@ -78,6 +78,7 @@ export default function CustomerDialog({ open, onOpenChange, customer }: Custome
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (!code.trim() || !name.trim()) {
       toast.error('Code and name are required.')
       return

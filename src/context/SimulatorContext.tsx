@@ -89,6 +89,7 @@ export function SimulatorProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const start = useCallback(async (ids: string[], rt: number) => {
+    if (loading) return
     setLoading(true)
     setError(null)
     try {
@@ -102,9 +103,10 @@ export function SimulatorProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loading])
 
   const stop = useCallback(async () => {
+    if (loading) return
     setLoading(true)
     setError(null)
     try {
@@ -116,7 +118,7 @@ export function SimulatorProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loading])
 
   const value = useMemo<SimulatorContextValue>(
     () => ({ running, brandIds, rate, loading, error, start, stop }),

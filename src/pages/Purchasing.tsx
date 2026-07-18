@@ -15,7 +15,7 @@
  *   PO_ROLES        = OWNER, PURCHASING
  *   RECEIVE_ROLES   = OWNER, WAREHOUSE_OUTLET
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
@@ -185,6 +185,25 @@ export default function Purchasing() {
   const [receivePo, setReceivePo] = useState<PurchaseOrder | null>(null)
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
+  // `busy` state alone can't gate re-entrance: a second click fired before
+  // React re-renders the disabled button would read the same stale `busy`
+  // value as the first. `busyRef` makes the check-and-set atomic — the ref
+  // update is immediate, so a second dispatch (double-click, key repeat)
+  // always sees the first one's claim and no-ops instead of firing a second
+  // request for the same PR/PO action.
+  const busyRef = useRef<string | null>(null)
+
+  function startBusy(key: string): boolean {
+    if (busyRef.current !== null) return false
+    busyRef.current = key
+    setBusy(key)
+    return true
+  }
+
+  function endBusy() {
+    busyRef.current = null
+    setBusy(null)
+  }
 
   function invalidatePrs() {
     void queryClient.invalidateQueries({ queryKey: ['purchase-requests'] })
@@ -196,7 +215,7 @@ export default function Purchasing() {
 
   // ── PR actions (mirror backend transitions) ───────────────────────────────
   async function submitPr(pr: PurchaseRequest) {
-    setBusy(`submit:${pr.id}`)
+    if (!startBusy(`submit:${pr.id}`)) return
     try {
       const res = await post<PurchaseRequest & { budget_warning?: BudgetWarning }>(
         `/purchase-requests/${pr.id}/submit`,
@@ -215,12 +234,12 @@ export default function Purchasing() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to submit request.')
     } finally {
-      setBusy(null)
+      endBusy()
     }
   }
 
   async function decidePr(pr: PurchaseRequest, action: 'approve' | 'reject') {
-    setBusy(`${action}:${pr.id}`)
+    if (!startBusy(`${action}:${pr.id}`)) return
     try {
       await post(`/purchase-requests/${pr.id}/${action}`)
       toast.success(`${pr.prNo} ${action === 'approve' ? 'approved' : 'rejected'}.`)
@@ -228,12 +247,12 @@ export default function Purchasing() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : `Failed to ${action} request.`)
     } finally {
-      setBusy(null)
+      endBusy()
     }
   }
 
   async function createPoFromPr(pr: PurchaseRequest) {
-    setBusy(`po-from:${pr.id}`)
+    if (!startBusy(`po-from:${pr.id}`)) return
     try {
       const detail = await queryClient.fetchQuery({
         queryKey: ['pr-detail', pr.id],
@@ -254,13 +273,13 @@ export default function Purchasing() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not load the request lines.')
     } finally {
-      setBusy(null)
+      endBusy()
     }
   }
 
   // ── PO actions ────────────────────────────────────────────────────────────
   async function sendPo(po: PurchaseOrder) {
-    setBusy(`send:${po.id}`)
+    if (!startBusy(`send:${po.id}`)) return
     try {
       await post(`/purchase-orders/${po.id}/send`)
       toast.success(`${po.poNo} sent to ${supplierById.get(po.supplierId)?.name ?? 'supplier'}.`)
@@ -269,7 +288,7 @@ export default function Purchasing() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to send purchase order.')
     } finally {
-      setBusy(null)
+      endBusy()
     }
   }
 

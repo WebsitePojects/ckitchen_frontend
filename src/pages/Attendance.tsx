@@ -154,6 +154,7 @@ export default function Attendance() {
   }, [effectiveEmployeeId])
 
   async function punch(type: 'TIME_IN' | 'TIME_OUT', opts?: { noPhoto?: boolean }) {
+    if (submitting !== null) return
     setMsg(null)
     if (!effectiveEmployeeId) {
       return setMsg({ err: isOwner ? 'Select an employee first.' : 'No linked employee record.' })

@@ -154,6 +154,7 @@ export default function IngredientDialog({
   // ── Save ingredient fields (PATCH) ───────────────────────────────────────
   async function handleSave(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (!ingredient) return
     if (!name.trim()) {
       toast.error('Name is required.')
@@ -193,6 +194,7 @@ export default function IngredientDialog({
 
   // ── Add supplier affiliation (PUT upsert) ────────────────────────────────
   async function handleAddSupplier() {
+    if (addingSupplier) return
     if (!ingredient || !addSupplierId) {
       toast.error('Select a supplier to link.')
       return
@@ -224,6 +226,7 @@ export default function IngredientDialog({
 
   // ── Remove supplier affiliation (DELETE) ─────────────────────────────────
   async function handleRemoveSupplier(supplierId: string) {
+    if (removingId !== null) return
     if (!ingredient) return
     setRemovingId(supplierId)
     try {

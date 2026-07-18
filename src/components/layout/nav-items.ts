@@ -6,6 +6,7 @@ import {
   Tags,
   ChefHat,
   Printer,
+  Store,
   UtensilsCrossed,
   Users,
   BarChart3,
@@ -34,9 +35,12 @@ export interface NavGroup {
 
 /**
  * Grouped, role-filtered sidebar nav — platform-ia-navigation.md §4. The old
- * flat 18-item list is retired; '/merchants' ("Merchant Management") has left
- * the nav entirely post-D30 ("merchant" = Brand) — App.tsx redirects that
- * route to /channel-listings so old links don't 404.
+ * flat 18-item list is retired; the legacy '/merchants' route ("Merchant &
+ * Food Brand Management" read-only table) left the nav entirely post-D30
+ * ("merchant" = Brand) — App.tsx redirects that route to /channel-listings so
+ * old links don't 404. '/merchant-management' below is its DIFFERENT,
+ * newer replacement: the full add/edit/remove-brand + items + availability
+ * control surface (MerchantManagement.tsx), not the old read-only table.
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
@@ -55,6 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { to: '/brands', label: 'Brands', icon: Tags },
       { to: '/menu', label: 'Menu', icon: UtensilsCrossed },
       { to: '/channel-listings', label: 'Channel Listings', icon: Link2 },
+      { to: '/merchant-management', label: 'Merchant Management', icon: Store },
     ],
   },
   {

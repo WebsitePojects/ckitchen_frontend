@@ -137,6 +137,7 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: K
   }
 
   async function punch(type: PunchType) {
+    if (submitting !== null) return
     // Photo is MANDATORY on the public kiosk — it is the only identity
     // evidence on an unauthenticated punch. No capture, no punch.
     if (!captured) return

@@ -123,6 +123,7 @@ export default function Outlets() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (saving) return
     setSaving(true)
     setError(null)
 

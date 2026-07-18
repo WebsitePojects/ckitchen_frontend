@@ -65,6 +65,9 @@ export const PAGE_ROLES: Record<string, string[]> = {
 
   // Catalog
   '/brands': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
+  // Full merchant/brand management page (add/edit/remove brands, items, and
+  // system-wide/per-outlet/per-merchant availability) — MerchantManagement.tsx.
+  '/merchant-management': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
   // KITCHEN_CREW is read-only here: Menu.tsx gates every write (add item, availability
   // edits) behind `hasRole(role, ['BRAND_MANAGER'])`, so kitchen crew view but can't mutate.
   '/menu': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'],

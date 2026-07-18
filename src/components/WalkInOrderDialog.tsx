@@ -191,6 +191,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
   }
 
   async function submitOrder(allowOversell: boolean) {
+    if (submitting) return
     if (!brandId || lines.length === 0) return
     setSubmitting(true)
     try {

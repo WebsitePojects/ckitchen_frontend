@@ -107,6 +107,7 @@ export default function PurchaseRequestDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (!department) {
       toast.error('Select a department.')
       return

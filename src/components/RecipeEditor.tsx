@@ -243,6 +243,7 @@ function NewIngredientForm({ suppliers, onCancel, onCreated }: NewIngredientForm
   const noSuppliers = suppliers.length === 0
 
   async function submit() {
+    if (submitting) return
     if (!name.trim()) {
       toast.error('Ingredient name is required.')
       return

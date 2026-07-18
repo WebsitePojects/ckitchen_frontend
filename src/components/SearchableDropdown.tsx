@@ -54,6 +54,11 @@ export default function SearchableDropdown({
   const [query, setQuery] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  // In-flight guard for pick() — see below. A ref (not the `busy` prop) is
+  // what actually stops a double-click on the same option row: `busy` only
+  // flips true after the caller's mutation re-renders this component, which
+  // is too late to block a second click landing in the same tick as the first.
+  const pickingRef = useRef(false)
 
   // Close on outside click / Escape (same idiom as IngredientPicker).
   useEffect(() => {
@@ -87,6 +92,11 @@ export default function SearchableDropdown({
   }, [options, query])
 
   function pick(id: string) {
+    // Early-return if a pick already fired this "session" (reset below when
+    // the trigger re-opens) — blocks a second click on the same option row
+    // from firing onSelect twice before the panel unmounts.
+    if (pickingRef.current) return
+    pickingRef.current = true
     onSelect(id)
     setOpen(false)
     setQuery('')
@@ -99,7 +109,14 @@ export default function SearchableDropdown({
       <button
         type="button"
         disabled={isDisabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Re-opening starts a new pick "session" — release the guard so
+          // the next selection in this (or a future) open can go through.
+          setOpen((v) => {
+            if (!v) pickingRef.current = false
+            return !v
+          })
+        }}
         aria-expanded={open}
         className={cn(
           'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 text-sm text-zinc-300 transition-colors duration-150',

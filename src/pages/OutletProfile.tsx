@@ -725,6 +725,7 @@ export default function OutletProfile() {
                         disabled={unassignEmployee.isPending}
                         onClick={(ev) => {
                           ev.stopPropagation()
+                          if (unassignEmployee.isPending) return
                           unassignEmployee.mutate(e.id)
                         }}
                       >
@@ -794,7 +795,10 @@ export default function OutletProfile() {
       </div>
 
       {/* ── Remove-brand confirm ─────────────────────────────────────────── */}
-      <Dialog open={removeTarget != null} onOpenChange={(o) => !o && setRemoveTarget(null)}>
+      <Dialog
+        open={removeTarget != null}
+        onOpenChange={(o) => !o && !removeBrand.isPending && setRemoveTarget(null)}
+      >
         <DialogContent className="border-border bg-card text-zinc-50 sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Remove brand from this outlet?</DialogTitle>
@@ -809,13 +813,16 @@ export default function OutletProfile() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRemoveTarget(null)}>
+            <Button variant="outline" onClick={() => setRemoveTarget(null)} disabled={removeBrand.isPending}>
               Cancel
             </Button>
             <Button
               className="bg-red-600 text-white hover:bg-red-500"
               disabled={removeBrand.isPending}
-              onClick={() => removeTarget && removeBrand.mutate(removeTarget.brandId)}
+              onClick={() => {
+                if (removeBrand.isPending) return
+                if (removeTarget) removeBrand.mutate(removeTarget.brandId)
+              }}
             >
               {removeBrand.isPending ? 'Removing…' : 'Remove brand'}
             </Button>

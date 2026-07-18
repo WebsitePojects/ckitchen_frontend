@@ -84,6 +84,7 @@ import { useCountdown } from '../hooks/useCountdown'
 import { useListingAttention } from '../hooks/useListingAttention'
 import { useMerchantConsoleOrders } from '../hooks/useMerchantConsoleOrders'
 import { useRecentCancelledOrders } from '../hooks/useRecentCancelledOrders'
+import { useSubmitGuard } from '../hooks/useSubmitGuard'
 import {
   contestOrderCancellation,
   fetchChannelListingDisputes,
@@ -511,7 +512,19 @@ function ItemsPanel({ listing, canEdit, disabledReason }: ItemsPanelProps) {
 
   const handleToggle = useCallback(
     async (item: ChannelListingItem, next: boolean) => {
-      setPendingIds(prev => new Set(prev).add(item.id))
+      // Atomic check-and-set via the functional updater — React applies this
+      // synchronously against the latest state, so a second toggle dispatched
+      // before re-render sees the id already pending and no-ops, instead of
+      // firing a second availability POST for the same item.
+      let alreadyPending = false
+      setPendingIds(prev => {
+        if (prev.has(item.id)) {
+          alreadyPending = true
+          return prev
+        }
+        return new Set(prev).add(item.id)
+      })
+      if (alreadyPending) return
       setItems(prev => prev.map(i => (i.id === item.id ? { ...i, available: next } : i)))
       try {
         await setChannelListingItemAvailability(listing.id, item.id, next)
@@ -611,6 +624,7 @@ function PauseStoreDialog({ open, onOpenChange, onSubmit }: PauseDialogProps) {
   const [submitting, setSubmitting] = useState(false)
 
   const handleSubmit = async () => {
+    if (submitting) return
     const trimmed = reason.trim()
     if (trimmed.length === 0) return
     setSubmitting(true)
@@ -717,6 +731,7 @@ function RejectOrderDialog({ order, onOpenChange, onSubmit }: RejectDialogProps)
   const canSubmit = !noteRequired || note.trim().length > 0
 
   const handleSubmit = async () => {
+    if (submitting) return
     if (!order || !canSubmit) return
     setSubmitting(true)
     try {
@@ -812,6 +827,7 @@ function ContestCancellationDialog({ order, onOpenChange, onSubmit }: ContestDia
   }, [order])
 
   const handleSubmit = async () => {
+    if (submitting) return
     if (!order) return
     setSubmitting(true)
     try {
@@ -988,6 +1004,21 @@ export default function MerchantConsole() {
   const [contestTarget, setContestTarget] = useState<KdsOrder | null>(null)
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set())
 
+  // Pause and resume both mutate the same listing's store-pause state, so
+  // they share one in-flight guard — a resume in flight blocks a pause click
+  // and vice versa, same as the per-order busyIds guard above.
+  const { pending: pauseResumeBusy, guard: guardPauseResume } = useSubmitGuard()
+  // Contest-cancellation's own in-flight guard, independent of the dialog's
+  // local `submitting` (defense in depth — see handleContestSubmit below for
+  // why the Idempotency-Key itself also needs to survive across this guard).
+  const { guard: guardContest } = useSubmitGuard()
+  // Idempotency-Key must be generated ONCE per contest *intent* (one order),
+  // not once per submit attempt — a timeout-retry for the same order has to
+  // reuse the same key so the backend can dedupe it, otherwise every retry
+  // opens a new dispute. Keyed by order id so a NEW contest (different order,
+  // or the same order after a prior contest already succeeded) gets a fresh key.
+  const contestIdemKeyRef = useRef<{ orderId: string; key: string } | null>(null)
+
   // ── Rail search + filters (SITE_VISIT_VIDEO_ANALYSIS.md §7 — "plan the
   // Merchant Console for 50 channel listings per outlet"; the rail was a
   // plain unfiltered scroll of 24) ────────────────────────────────────────
@@ -1160,7 +1191,20 @@ export default function MerchantConsole() {
   // ── Order actions ──────────────────────────────────────────────────────────
 
   const withBusy = useCallback(async (orderId: string, fn: () => Promise<void>) => {
-    setBusyIds(prev => new Set(prev).add(orderId))
+    // Atomic check-and-set via the functional updater — React applies this
+    // synchronously against the latest state, so a second Accept/Reject/Mark-
+    // ready dispatched for the same order before re-render (fast double-click,
+    // key repeat) sees it already busy and no-ops instead of firing a second
+    // command for the same order.
+    let alreadyBusy = false
+    setBusyIds(prev => {
+      if (prev.has(orderId)) {
+        alreadyBusy = true
+        return prev
+      }
+      return new Set(prev).add(orderId)
+    })
+    if (alreadyBusy) return
     try {
       await fn()
     } finally {
@@ -1222,27 +1266,41 @@ export default function MerchantConsole() {
 
   // ── Contest cancellation (SITE_VISIT_VIDEO_ANALYSIS.md §5/§6 row N2) ───────
   const handleContestSubmit = useCallback(
-    async (order: KdsOrder, reason: DisputeReason, evidenceNote: string) => {
+    guardContest(async (order: KdsOrder, reason: DisputeReason, evidenceNote: string) => {
       if (!selectedListing) return
+      // Reuse the same Idempotency-Key across retries of the SAME contest
+      // intent (same order) — only mint a new one when this is a different
+      // order than the last key was issued for. A retry after a timeout must
+      // send the identical key so the backend can dedupe it; generating a
+      // fresh key on every submit call (the previous bug here) would let a
+      // retry open a second dispute for one cancellation.
+      if (contestIdemKeyRef.current?.orderId !== order.id) {
+        contestIdemKeyRef.current = { orderId: order.id, key: makeIdempotencyKey() }
+      }
+      const idempotencyKey = contestIdemKeyRef.current.key
       try {
         await contestOrderCancellation(
           selectedListing.id,
           order.id,
           { dispute_reason: reason, evidence_note: evidenceNote.length > 0 ? evidenceNote : undefined },
-          makeIdempotencyKey(),
+          idempotencyKey,
         )
         toast.success('Cancellation contested', {
           description: 'The aggregator dispute has been filed. Settlement typically takes 2-4 days.',
         })
+        // Succeeded — clear the key so a future, distinct contest (e.g. a
+        // re-contest after this one resolves) mints its own fresh key rather
+        // than reusing this now-consumed one.
+        contestIdemKeyRef.current = null
         await loadDisputes(selectedListing.id)
       } catch (e) {
         toast.error('Failed to contest cancellation', {
           description: e instanceof Error ? e.message : 'Unknown error',
         })
-        throw e // keep the dialog open on failure
+        throw e // keep the dialog open on failure — idempotency key is kept for the retry
       }
-    },
-    [selectedListing, loadDisputes],
+    }),
+    [selectedListing, loadDisputes, guardContest],
   )
 
   const handleMarkReady = useCallback(
@@ -1269,7 +1327,7 @@ export default function MerchantConsole() {
   // ── Store pause / resume ───────────────────────────────────────────────────
 
   const handlePauseSubmit = useCallback(
-    async (durationMinutes: number, reason: string) => {
+    guardPauseResume(async (durationMinutes: number, reason: string) => {
       if (!selectedListing) return
       try {
         await pauseChannelListing(selectedListing.id, { duration_minutes: durationMinutes, reason })
@@ -1287,26 +1345,29 @@ export default function MerchantConsole() {
           description: e instanceof Error ? e.message : 'Unknown error',
         })
       }
-    },
-    [selectedListing],
+    }),
+    [selectedListing, guardPauseResume],
   )
 
-  const handleResume = useCallback(async () => {
-    if (!selectedListing) return
-    try {
-      await resumeChannelListing(selectedListing.id)
-      setListings(prev =>
-        prev.map(l =>
-          l.id === selectedListing.id ? { ...l, status: 'ACTIVE', pausedReason: null, pausedUntil: null } : l,
-        ),
-      )
-      toast.success('Listing resumed')
-    } catch (e) {
-      toast.error('Failed to resume listing', {
-        description: e instanceof Error ? e.message : 'Unknown error',
-      })
-    }
-  }, [selectedListing])
+  const handleResume = useCallback(
+    guardPauseResume(async () => {
+      if (!selectedListing) return
+      try {
+        await resumeChannelListing(selectedListing.id)
+        setListings(prev =>
+          prev.map(l =>
+            l.id === selectedListing.id ? { ...l, status: 'ACTIVE', pausedReason: null, pausedUntil: null } : l,
+          ),
+        )
+        toast.success('Listing resumed')
+      } catch (e) {
+        toast.error('Failed to resume listing', {
+          description: e instanceof Error ? e.message : 'Unknown error',
+        })
+      }
+    }),
+    [selectedListing, guardPauseResume],
+  )
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -1473,19 +1534,19 @@ export default function MerchantConsole() {
                 {selectedListing.status === 'PAUSED' ? (
                   <Button
                     onClick={() => void handleResume()}
-                    disabled={!canPause}
+                    disabled={!canPause || pauseResumeBusy}
                     title={!canPause ? pauseDisabledReason : undefined}
                     data-testid="resume-store-button"
                     className="min-h-[44px] bg-emerald-600 text-white hover:bg-emerald-500"
                   >
-                    <Play className="h-4 w-4" />
+                    {pauseResumeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                     Resume
                   </Button>
                 ) : (
                   <Button
                     variant="outline"
                     onClick={() => setPauseOpen(true)}
-                    disabled={!canPause}
+                    disabled={!canPause || pauseResumeBusy}
                     title={!canPause ? pauseDisabledReason : undefined}
                     data-testid="pause-store-button"
                     className="min-h-[44px] border-red-500/40 text-red-600 hover:bg-red-500/10 dark:text-red-400"

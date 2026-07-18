@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -316,6 +316,7 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!name.trim() || !email.trim() || !role || password.length < 8) {
       setFormError('Name, email, role, and an 8+ character password are required.')
       return
@@ -440,6 +441,7 @@ function EditUserDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!target) return
     if (!name.trim() || !email.trim() || !role) {
       setFormError('Name, email, and role are required.')
@@ -531,6 +533,7 @@ function ResetPasswordDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!target) return
     if (password.length < 8) {
       setFormError('Password must be at least 8 characters.')
@@ -613,6 +616,7 @@ function OutletAccessDialog({
   }, [target])
 
   async function handleSave() {
+    if (submitting) return
     if (!target) return
     setSubmitting(true)
     setFormError(null)
@@ -754,7 +758,23 @@ function PermissionsMatrix() {
     return m
   }, [data])
 
+  // Per-cell in-flight guard — each Switch had no pending state at all, so a
+  // rapid double-toggle on one cell could fire two overlapping PUTs and race
+  // the optimistic-update/rollback below. Set<string> keyed by "role|pageKey".
+  const [pendingCells, setPendingCells] = useState<Set<string>>(new Set())
+
   async function toggle(role: string, pageKey: string, next: boolean) {
+    const cellKey = `${role}|${pageKey}`
+    let alreadyPending = false
+    setPendingCells(prev => {
+      if (prev.has(cellKey)) {
+        alreadyPending = true
+        return prev
+      }
+      return new Set(prev).add(cellKey)
+    })
+    if (alreadyPending) return
+
     const previous = queryClient.getQueryData<RbacResponse>(['admin', 'rbac'])
 
     // Optimistic update
@@ -777,6 +797,12 @@ function PermissionsMatrix() {
     } catch (err) {
       queryClient.setQueryData(['admin', 'rbac'], previous)
       toast.error(errMsg(err, 'Failed to update permission.'))
+    } finally {
+      setPendingCells(prev => {
+        const nextSet = new Set(prev)
+        nextSet.delete(cellKey)
+        return nextSet
+      })
     }
   }
 
@@ -812,11 +838,12 @@ function PermissionsMatrix() {
                   {data.roles.map((r) => {
                     const locked = r === 'OWNER' && OWNER_PROTECTED_PAGES.includes(p)
                     const checked = locked ? true : allowedMap.get(`${r}|${p}`) ?? false
+                    const cellPending = pendingCells.has(`${r}|${p}`)
                     return (
                       <TableCell key={r} className="text-center">
                         <Switch
                           checked={checked}
-                          disabled={locked}
+                          disabled={locked || cellPending}
                           onCheckedChange={(v) => toggle(r, p, v)}
                           aria-label={`${ROLE_LABEL[r] ?? r} — ${pageLabel(p)}`}
                         />
@@ -874,7 +901,15 @@ export default function Users() {
     queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
   }
 
+  // Ref-based in-flight guard — the dropdown menu item fires this from
+  // onClick, not a persistently-disabled button, so a ref (immediate, no
+  // re-render needed) is what actually stops a second click landing before
+  // the menu unmounts from double-blocking/unblocking the same account.
+  const blockingIdsRef = useRef<Set<string>>(new Set())
+
   async function handleToggleBlock(u: AdminUser) {
+    if (blockingIdsRef.current.has(u.id)) return
+    blockingIdsRef.current.add(u.id)
     const blocking = u.status === 'ACTIVE'
     try {
       await post(`/admin/users/${u.id}/${blocking ? 'block' : 'unblock'}`)
@@ -882,6 +917,8 @@ export default function Users() {
       invalidateUsers()
     } catch (err) {
       toast.error(errMsg(err, `Failed to ${blocking ? 'block' : 'unblock'} user.`))
+    } finally {
+      blockingIdsRef.current.delete(u.id)
     }
   }
 

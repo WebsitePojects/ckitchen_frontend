@@ -434,6 +434,7 @@ export default function Employees() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
     if (!form.full_name.trim() || !form.employee_no.trim() || !form.department) {
       setFormError('Employee #, full name, and department are required.')
       return
@@ -493,6 +494,7 @@ export default function Employees() {
 
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (editSubmitting) return
     if (!editTarget) return
     if (!editForm.full_name.trim() || !editForm.department) {
       setEditError('Full name and department are required.')

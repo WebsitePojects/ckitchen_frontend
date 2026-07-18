@@ -184,6 +184,7 @@ export default function ReceivingReportDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (saving) return
     if (supplierId === '') {
       toast.error("Choose who delivered this stock — or pick 'No supplier / internal'.")
       return

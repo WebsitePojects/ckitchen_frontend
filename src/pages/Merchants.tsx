@@ -16,6 +16,7 @@
  *   - Avg Time = placeholder "—" (analytics endpoint returns no per-brand prep time)
  */
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Building2,
   CalendarDays,
@@ -149,6 +150,7 @@ function MerchantStatus({ active }: { active: boolean }) {
 
 export default function Merchants() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const canAddMerchant =
     user?.role === 'SUPER_ADMIN' || user?.role === 'BRAND_MANAGER'
 
@@ -296,6 +298,7 @@ export default function Merchants() {
 
   async function handleAddMerchant(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (submitting) return
     if (!newName.trim()) return
     setSubmitting(true)
     try {
@@ -500,7 +503,7 @@ export default function Merchants() {
         id: 'actions',
         header: '',
         enableSorting: false,
-        cell: () => (
+        cell: ({ row }) => (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -513,12 +516,21 @@ export default function Merchants() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem className="gap-2 text-sm">
+              {/* Full edit/deactivate now lives on Merchant Management (add/edit/remove
+                  brand, items, availability) — cheapest-correct wiring is to hand off
+                  there rather than duplicate those dialogs on this read-only table. */}
+              <DropdownMenuItem
+                className="gap-2 text-sm"
+                onSelect={() => navigate(`/merchant-management?brand=${row.original.id}`)}
+              >
                 <Pencil className="h-3.5 w-3.5" />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="gap-2 text-sm text-red-400 focus:text-red-300">
+              <DropdownMenuItem
+                className="gap-2 text-sm text-red-400 focus:text-red-300"
+                onSelect={() => navigate(`/merchant-management?brand=${row.original.id}`)}
+              >
                 <PowerOff className="h-3.5 w-3.5" />
                 Deactivate
               </DropdownMenuItem>
@@ -528,7 +540,7 @@ export default function Merchants() {
       },
     ],
     // Columns that reference global station/printer state need to re-derive when they change
-    [stations, printers],
+    [stations, printers, navigate],
   )
 
   // ── Date chip ─────────────────────────────────────────────────────────────

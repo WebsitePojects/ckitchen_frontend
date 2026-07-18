@@ -567,6 +567,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     // A row is "bad" if only one of ingredientId/quantity is filled in, or quantity
     // is filled but not a finite number > 0. A fully blank row (extra "Add row" click)
     // is fine to silently ignore.
@@ -1309,7 +1310,19 @@ export default function Inventory() {
   // ── ITO confirm handler ──────────────────────────────────────────────────────
 
   async function handleConfirmIto(itoId: string) {
-    setConfirming(prev => new Set(prev).add(itoId))
+    // Atomic check-and-set — a second Confirm dispatched for the same ITO
+    // before re-render sees it already in-flight and no-ops, so a slow
+    // network + double-tap can't double-confirm one transfer (Business Rule
+    // #4 requires the MAIN/KITCHEN move stays atomic and single-shot).
+    let alreadyConfirming = false
+    setConfirming(prev => {
+      if (prev.has(itoId)) {
+        alreadyConfirming = true
+        return prev
+      }
+      return new Set(prev).add(itoId)
+    })
+    if (alreadyConfirming) return
     try {
       await post(`/itos/${itoId}/confirm`)
       toast.success('ITO confirmed — stock moved MAIN → KITCHEN.')
@@ -1336,7 +1349,18 @@ export default function Inventory() {
     action: 'approve' | 'reject',
     note?: string,
   ) {
-    setDeciding(prev => new Set(prev).add(id))
+    // Same atomic check-and-set as handleConfirmIto above — prevents a
+    // double-tap from firing approve+approve (or approve+reject) twice for
+    // one adjustment.
+    let alreadyDeciding = false
+    setDeciding(prev => {
+      if (prev.has(id)) {
+        alreadyDeciding = true
+        return prev
+      }
+      return new Set(prev).add(id)
+    })
+    if (alreadyDeciding) return
     try {
       await post(`/adjustments/${id}/${action}`, note ? { note } : undefined)
       toast.success(
