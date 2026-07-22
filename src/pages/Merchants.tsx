@@ -36,6 +36,8 @@ import { toast } from 'sonner'
 import { get, post } from '../lib/api'
 import { cn } from '../lib/utils'
 import { useAuth } from '../auth/AuthContext'
+import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import { Button } from '../components/ui/button'
 import {
   Dialog,
@@ -153,6 +155,12 @@ export default function Merchants() {
   const navigate = useNavigate()
   const canAddMerchant =
     user?.role === 'SUPER_ADMIN' || user?.role === 'BRAND_MANAGER'
+  // Outlet-scoping leak fix: this page fetched every brand platform-wide with
+  // no outlet dependency at all, so switching the header outlet never
+  // refetched it. selectedOutletId now drives both the effect's deps AND the
+  // GET /brands request (`?location_id=`, backend parallel wave) so only the
+  // selected outlet's brands/merchants show.
+  const { selectedOutletId } = useOutlet()
 
   // ── Data state ────────────────────────────────────────────────────────────
 
@@ -189,8 +197,8 @@ export default function Merchants() {
       try {
         // Top-level parallel fetches — stations/printers/analytics are optional
         const [brandsRes, stationsRes, printersRes, analyticsRes] = await Promise.all([
-          get<Brand[]>('/brands'),
-          get<Station[]>('/stations').catch(() => ({ data: [] as Station[] })),
+          get<Brand[]>(outletScopedPath('/brands', selectedOutletId)),
+          get<Station[]>(outletScopedPath('/stations', selectedOutletId)).catch(() => ({ data: [] as Station[] })),
           get<Printer[]>('/printers').catch(() => ({ data: [] as Printer[] })),
           get<BrandAnalytic[]>('/analytics/brands').catch(() => ({ data: [] as BrandAnalytic[] })),
         ])
@@ -253,7 +261,7 @@ export default function Merchants() {
     return () => {
       cancelled = true
     }
-  }, [refreshKey])
+  }, [refreshKey, selectedOutletId])
 
   // ── Derived KPIs ──────────────────────────────────────────────────────────
 

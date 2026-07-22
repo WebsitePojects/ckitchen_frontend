@@ -55,6 +55,7 @@ import {
 import { apiClient, get } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
+import { useOutlet } from '../context/OutletContext'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -1129,6 +1130,13 @@ async function resolveExportErrorMessage(err: unknown): Promise<string> {
 }
 
 function SalesReportSection() {
+  // Outlet-scoping leak fix: GET /reports/sales IS outlet-scoped server-side
+  // (routes.ts's resolveOutletContext + outletFilterFromRequest — unlike the
+  // /analytics/* endpoints above, which are deliberately platform-wide), but
+  // this effect never depended on the selected outlet, so switching outlets
+  // left the previous outlet's sales report on screen. selectedOutletId is
+  // now a deliberate re-run trigger below.
+  const { selectedOutletId } = useOutlet()
   const monthDefaults = currentMonthRange()
 
   // Draft controls (edited freely; only take effect on "Apply")
@@ -1158,7 +1166,7 @@ function SalesReportSection() {
       .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load sales report.') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [appliedFrom, appliedTo, appliedGroupBy])
+  }, [appliedFrom, appliedTo, appliedGroupBy, selectedOutletId])
 
   // Sales-over-time chart — only meaningful when day-grouped; sorted
   // chronologically (row order from the API isn't guaranteed).

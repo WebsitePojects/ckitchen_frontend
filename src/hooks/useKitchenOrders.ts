@@ -37,6 +37,7 @@ import {
   onSocketReconnect,
 } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import {
   ACTIVE_STATUSES,
   fetchOrderDetail,
@@ -108,8 +109,8 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
       // ckitchen_backend's orders/service.ts), so this is now a single call
       // for brands/stations/orders instead of 2 + N.
       const [brandsRes, stationsRes, ordersRes] = await Promise.all([
-        get<Brand[]>('/brands'),
-        get<Station[]>('/stations'),
+        get<Brand[]>(outletScopedPath('/brands', selectedOutletId)),
+        get<Station[]>(outletScopedPath('/stations', selectedOutletId)),
         // Comma-separated single param — backend accepts this form.
         get<RawOrderDetail[]>('/orders?status=NEW,PREPARING,READY&detail=1'),
       ])

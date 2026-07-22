@@ -43,6 +43,7 @@ import { toast } from 'sonner'
 import { get } from '../lib/api'
 import { getSocket, initSocket, joinLocation, joinLocations, onSocketEvent, onSocketReconnect } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import { Button } from '../components/ui/button'
 import {
   Select,
@@ -295,11 +296,11 @@ export default function Dashboard() {
   // Rule #9), NOT useQuery.
   const { data: brands = [] } = useQuery({
     queryKey: ['brands', selectedOutletId],
-    queryFn: async () => (await get<Brand[]>('/brands')).data,
+    queryFn: async () => (await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))).data,
   })
   const { data: stations = [] } = useQuery({
     queryKey: ['stations', selectedOutletId],
-    queryFn: async () => (await get<Station[]>('/stations')).data,
+    queryFn: async () => (await get<Station[]>(outletScopedPath('/stations', selectedOutletId))).data,
   })
 
   const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])

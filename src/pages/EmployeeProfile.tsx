@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   Activity,
   BadgeCheck,
@@ -9,6 +11,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronRight as Crumb,
+  Eye,
+  EyeOff,
   History,
   KeyRound,
   ListChecks,
@@ -16,12 +20,19 @@ import {
   UserX,
   Wallet,
 } from 'lucide-react'
-import { get, CKApiError } from '../lib/api'
+import { get, post, CKApiError } from '../lib/api'
 import { cn } from '../lib/utils'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole, normalizeRole, ROLE_LANDING } from '../auth/access'
 import { usePermissions } from '../context/PermissionsContext'
 import { DAY_LABEL, WORK_DAYS, formatWorkDays, sanitizeWorkDays } from '../lib/workdays'
+import {
+  ACCOUNT_ROLES,
+  ACCOUNT_ROLE_LABEL,
+  DEPARTMENT_ACCOUNT_ROLE,
+  isValidAccountEmail,
+  isValidAccountPassword,
+} from '../lib/accountRoles'
 import PhotoLightbox, { photoThumbUrl, type LightboxPhoto } from '../components/PhotoLightbox'
 import PageContainer from '../components/layout/PageContainer'
 import StatusBadge from '../components/common/StatusBadge'
@@ -29,6 +40,14 @@ import EmptyState from '../components/common/EmptyState'
 import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
 import {
   Table,
   TableBody,
@@ -40,6 +59,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog'
@@ -63,6 +83,9 @@ interface ProfileEmployee {
   // Outlet assignment (T1) — absent entirely on an old deploy, null = HQ/unassigned.
   locationId?: string | null
   userId: string | null
+  // Login email (client flaw fix, 2026-07-22) — absent entirely on an old
+  // deploy / when the profile endpoint doesn't send it; degrade gracefully.
+  userEmail?: string | null
   createdAt: string
 }
 
@@ -297,6 +320,174 @@ function StatTile({
 }
 
 // ---------------------------------------------------------------------------
+// Create Login dialog (OWNER-only) — client flaw fix, 2026-07-22: adding an
+// employee didn't create a login, forcing the owner to register a person
+// twice. Posts to POST /employees/:id/account for an EXISTING employee (the
+// Add Employee flow on Employees.tsx handles account creation at signup
+// time). 409 ALREADY_LINKED is treated as a benign race (another tab/owner
+// already linked it) — refetch and surface the linked state instead of
+// erroring the dialog.
+// ---------------------------------------------------------------------------
+
+function CreateLoginDialog({
+  employeeId,
+  employeeName,
+  department,
+  open,
+  onOpenChange,
+  onLinked,
+}: {
+  employeeId: string
+  employeeName: string
+  department: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onLinked: () => void
+}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<string>(() => DEPARTMENT_ACCOUNT_ROLE[department] ?? '')
+  const [showPassword, setShowPassword] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+
+  function resetState() {
+    setEmail('')
+    setPassword('')
+    setRole(DEPARTMENT_ACCOUNT_ROLE[department] ?? '')
+    setShowPassword(false)
+    setFormError(null)
+    setEmailError(null)
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (submitting) return
+    if (!isValidAccountEmail(email)) {
+      setFormError('Enter a valid email address.')
+      return
+    }
+    if (!isValidAccountPassword(password)) {
+      setFormError('Password must be at least 8 characters.')
+      return
+    }
+    if (!role) {
+      setFormError('Select a role.')
+      return
+    }
+    setFormError(null)
+    setEmailError(null)
+    setSubmitting(true)
+    try {
+      const res = await post<{ user?: { id: string; email: string; role: string } }>(
+        `/employees/${employeeId}/account`,
+        { email: email.trim(), password, role },
+      )
+      toast.success(`Login created for ${employeeName}`, {
+        description: res.data?.user?.email ?? email.trim(),
+      })
+      resetState()
+      onLinked()
+      onOpenChange(false)
+    } catch (err) {
+      if (err instanceof CKApiError && err.code === 'ALREADY_LINKED') {
+        toast.info(`${employeeName} already has a login account.`)
+        resetState()
+        onLinked()
+        onOpenChange(false)
+      } else if (err instanceof CKApiError && err.code === 'EMAIL_TAKEN') {
+        setEmailError('This email is already registered.')
+      } else {
+        setFormError(err instanceof Error ? err.message : 'Failed to create login.')
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        onOpenChange(o)
+        if (!o) resetState()
+      }}
+    >
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Create Login</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <p className="text-xs text-zinc-500">
+            Create an ORION login for <span className="text-zinc-300">{employeeName}</span>.
+          </p>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Email</label>
+            <Input
+              type="email"
+              placeholder="name@company.com"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setEmailError(null)
+              }}
+              disabled={submitting}
+              autoComplete="off"
+            />
+            {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Password</label>
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Min. 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={submitting}
+                autoComplete="new-password"
+                className="pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Role</label>
+            <Select value={role} onValueChange={setRole} disabled={submitting}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCOUNT_ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {ACCOUNT_ROLE_LABEL[r] ?? r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {formError && <p className="text-xs text-red-400">{formError}</p>}
+          <DialogFooter>
+            <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
+              {submitting ? 'Creating…' : 'Create Login'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -307,6 +498,7 @@ export default function EmployeeProfile() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const { canAccessPage } = usePermissions()
+  const queryClient = useQueryClient()
 
   // OWNER-only (same idiom as Employees.tsx — empty allow-list means only the
   // OWNER short-circuit passes). Gates the admin performance/activity fetches.
@@ -328,6 +520,8 @@ export default function EmployeeProfile() {
   const [selectedDay, setSelectedDay] = useState<ProfileDay | null>(null)
   const [punchLimit, setPunchLimit] = useState(PUNCH_PAGE)
   const [lightbox, setLightbox] = useState<{ photos: LightboxPhoto[]; index: number } | null>(null)
+  // "Create login" dialog (OWNER-only, client flaw fix 2026-07-22).
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false)
 
   // ── Profile (month-scoped) ────────────────────────────────────────────────
   const profileQuery = useQuery({
@@ -448,6 +642,13 @@ export default function EmployeeProfile() {
   // Calendar layout: leading blanks so day 1 lands on its true weekday column.
   const firstDow = new Date(`${month}-01T00:00:00Z`).getUTCDay() // 0 = Sun
 
+  // After Create Login succeeds (or 409 ALREADY_LINKED races with another tab),
+  // refetch so the header chip reflects the real linked state.
+  function handleLoginLinked() {
+    queryClient.invalidateQueries({ queryKey: ['employees', id, 'profile'] })
+    queryClient.invalidateQueries({ queryKey: ['employees', 'list'] })
+  }
+
   function openDayPhotos(day: ProfileDay, which: 'in' | 'out') {
     const photos: LightboxPhoto[] = []
     if (day.time_in?.photo_url) {
@@ -516,8 +717,17 @@ export default function EmployeeProfile() {
               <StatusBadge status={employee.status} />
               {employee.userId ? (
                 <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-                  <KeyRound className="h-3 w-3" /> Login linked
+                  <KeyRound className="h-3 w-3" />
+                  {employee.userEmail ? `Login linked — ${employee.userEmail}` : 'Login linked'}
                 </Badge>
+              ) : isOwner ? (
+                <button
+                  type="button"
+                  onClick={() => setLoginDialogOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md border border-zinc-500/30 bg-zinc-500/10 px-2.5 py-0.5 text-xs font-semibold text-zinc-400 transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <KeyRound className="h-3 w-3" /> Create login
+                </button>
               ) : (
                 <Badge variant="outline" className="gap-1 border-zinc-500/30 bg-zinc-500/10 text-zinc-400">
                   No login account
@@ -980,6 +1190,18 @@ export default function EmployeeProfile() {
         open={lightbox != null}
         onOpenChange={(o) => !o && setLightbox(null)}
       />
+
+      {/* ── Create Login dialog (OWNER-only) ────────────────────────────── */}
+      {isOwner && (
+        <CreateLoginDialog
+          employeeId={employee.id}
+          employeeName={employee.fullName}
+          department={employee.department}
+          open={loginDialogOpen}
+          onOpenChange={setLoginDialogOpen}
+          onLinked={handleLoginLinked}
+        />
+      )}
     </PageContainer>
   )
 }

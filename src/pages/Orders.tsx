@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ReceiptText, Clock, Copy, Flame, PackageCheck, CheckCircle2, Search, Plus, Percent, ShieldCheck } from 'lucide-react'
+import { ReceiptText, Clock, ClipboardEdit, Copy, Flame, PackageCheck, CheckCircle2, Search, Plus, Percent, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { get } from '../lib/api'
 import {
@@ -11,6 +11,7 @@ import {
   onSocketReconnect,
 } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
 import PageHeader from '../components/common/PageHeader'
@@ -22,6 +23,7 @@ import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
 import PageContainer from '../components/layout/PageContainer'
 import WalkInOrderDialog from '../components/WalkInOrderDialog'
+import LogOrderDialog from '../components/LogOrderDialog'
 import OrderDiscountDialog from '../components/OrderDiscountDialog'
 import DiscountApprovalsDialog from '../components/DiscountApprovalsDialog'
 import { Button } from '../components/ui/button'
@@ -89,6 +91,21 @@ export default function Orders() {
   const canCreateWalkIn = hasRole(user?.role, ['OUTLET_MANAGER', 'BRAND_MANAGER'])
   const [walkInOpen, setWalkInOpen] = useState(false)
 
+  // Staff "Log order" manual encode (interim operations workflow,
+  // 2026-07-22) — distinct from the walk-in dialog above: this is for
+  // encoding an order that was ALREADY taken on a physical aggregator
+  // device, keyed by that device's own order number. Visible to the same
+  // staff roles that act on orders elsewhere (Kitchen.tsx's
+  // ORDER_STAGE_ROLES = KITCHEN_CREW, plus this page's own
+  // OUTLET_MANAGER/BRAND_MANAGER manual-entry roles above; OWNER always
+  // passes via hasRole's short-circuit). The 409 INSUFFICIENT_STOCK oversell
+  // override (S4, walk-in/OTHER channel only) is narrower — managers only,
+  // mirroring canCreateWalkIn — so a KITCHEN_CREW operator can log orders
+  // but not force an oversell.
+  const canLogOrder = hasRole(user?.role, ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'])
+  const canOversellLogOrder = hasRole(user?.role, ['OUTLET_MANAGER', 'BRAND_MANAGER'])
+  const [logOrderOpen, setLogOrderOpen] = useState(false)
+
   // Discount + 3-layer approval UI (live backend, 2026-07-08). Additive to
   // this page — does not touch the socket/refetch effects above. Approvals
   // queue is gated to OUTLET_MANAGER+ (OWNER passes automatically via
@@ -147,7 +164,7 @@ export default function Orders() {
     try {
       const [ordersRes, brandsRes] = await Promise.all([
         get<Order[]>('/orders'),
-        get<Brand[]>('/brands'),
+        get<Brand[]>(outletScopedPath('/brands', selectedOutletId)),
       ])
       if (cancelledRef?.current) return
       setOrders(ordersRes.data)
@@ -194,14 +211,17 @@ export default function Orders() {
     try {
       const [ordersRes, brandsRes] = await Promise.all([
         get<Order[]>('/orders'),
-        get<Brand[]>('/brands'),
+        get<Brand[]>(outletScopedPath('/brands', selectedOutletId)),
       ])
       setOrders(ordersRes.data)
       setBrands(Object.fromEntries(brandsRes.data.map((x) => [x.id, x])))
     } catch {
       // Soft-fail — see comment above.
     }
-  }, [])
+    // selectedOutletId must be a dep — it's read in the body via
+    // outletScopedPath (Brand fetch), so an empty dep array here would close
+    // over a stale outlet forever after the first render.
+  }, [selectedOutletId])
 
   // A dropped-then-restored socket may have missed order.created/updated
   // events entirely — refetch to catch up (Business Rule #9).
@@ -266,7 +286,7 @@ export default function Orders() {
         title="Orders"
         subtitle="Every order across all brands and platforms"
         actions={
-          canApproveDiscounts || canCreateWalkIn ? (
+          canApproveDiscounts || canCreateWalkIn || canLogOrder ? (
             <>
               {canApproveDiscounts && (
                 <Button
@@ -282,6 +302,17 @@ export default function Orders() {
                       {pendingDiscountCount}
                     </Badge>
                   )}
+                </Button>
+              )}
+              {canLogOrder && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setLogOrderOpen(true)}
+                  className="gap-1.5"
+                >
+                  <ClipboardEdit className="h-3.5 w-3.5" />
+                  Log order
                 </Button>
               )}
               {canCreateWalkIn && (
@@ -413,6 +444,13 @@ export default function Orders() {
 
       {/* Controlled dialog — no trigger of its own; opened via the header button above. */}
       <WalkInOrderDialog open={walkInOpen} onOpenChange={setWalkInOpen} />
+
+      {/* Staff manual encode — controlled dialog, opened via the header "Log order" button. */}
+      <LogOrderDialog
+        open={logOrderOpen}
+        onOpenChange={setLogOrderOpen}
+        canOversell={canOversellLogOrder}
+      />
 
       {/* Per-order discount apply/view — opened via each row's "Discount" button. */}
       <OrderDiscountDialog

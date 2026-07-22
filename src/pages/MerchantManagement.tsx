@@ -69,6 +69,7 @@ import {
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import { useSubmitGuard } from '../hooks/useSubmitGuard'
 import { cn } from '../lib/utils'
 import PageContainer from '../components/layout/PageContainer'
@@ -153,9 +154,9 @@ export default function MerchantManagement() {
   // passes hasRole's short-circuit. No finer per-action split is specified for
   // this page, so every mutating control shares this single gate.
   const canWrite = hasRole(user?.role, ['OUTLET_MANAGER', 'BRAND_MANAGER'])
-  const { selectedOutletId } = useOutlet()
+  const { selectedOutletId, setSelectedOutletId } = useOutlet()
   const qc = useQueryClient()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // ── Left rail state ───────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
@@ -166,7 +167,8 @@ export default function MerchantManagement() {
   // ── Brand list (shares the cache key Brands.tsx / Menu.tsx already use) ───
   const brandsQuery = useQuery({
     queryKey: ['brands', selectedOutletId],
-    queryFn: async () => (await get<MerchantBrand[]>('/brands')).data,
+    queryFn: async () =>
+      (await get<MerchantBrand[]>(outletScopedPath('/brands', selectedOutletId))).data,
   })
   const brands = brandsQuery.data ?? []
 
@@ -208,7 +210,8 @@ export default function MerchantManagement() {
 
   const stationsQuery = useQuery({
     queryKey: ['stations', selectedOutletId],
-    queryFn: async () => (await get<MerchantStation[]>('/stations')).data,
+    queryFn: async () =>
+      (await get<MerchantStation[]>(outletScopedPath('/stations', selectedOutletId))).data,
   })
   const stations = stationsQuery.data ?? []
 
@@ -255,6 +258,39 @@ export default function MerchantManagement() {
   const [addBrandColor, setAddBrandColor] = useState('#10B981')
   const [addBrandLogoUrl, setAddBrandLogoUrl] = useState('')
 
+  // Create-a-merchant-from-an-outlet (OutletProfile's pinned "+ Create new
+  // brand…" dropdown option navigates here with these two params). Runs once
+  // per landing: switches the GLOBAL outlet selection to `home_outlet` first
+  // (POST /brands resolves its home outlet from an explicit body location_id
+  // if sent, else the X-Outlet-Id header — see brands/routes.ts's
+  // resolveRequestLocationId; this dialog sends no explicit location_id, so
+  // the header set here is what actually lands the new brand at that
+  // outlet), THEN opens the create-brand dialog pre-set. The ref guards
+  // against re-opening the dialog on every re-render/param-preserving
+  // navigation while `create=1` is still in the URL.
+  const createFlowHandledRef = useRef(false)
+  useEffect(() => {
+    if (createFlowHandledRef.current) return
+    if (searchParams.get('create') !== '1') return
+    createFlowHandledRef.current = true
+    const homeOutlet = searchParams.get('home_outlet')
+    if (homeOutlet) setSelectedOutletId(homeOutlet)
+    setAddBrandOpen(true)
+  }, [searchParams, setSelectedOutletId])
+
+  /** Clears `create`/`home_outlet` from the URL once the flow is done (success or dismiss). */
+  function clearCreateFlowParams() {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('create')
+        next.delete('home_outlet')
+        return next
+      },
+      { replace: true },
+    )
+  }
+
   const handleAddBrand = addBrandGuard.guard(async (e: FormEvent) => {
     e.preventDefault()
     const name = addBrandName.trim()
@@ -272,6 +308,7 @@ export default function MerchantManagement() {
       setAddBrandName('')
       setAddBrandColor('#10B981')
       setAddBrandLogoUrl('')
+      clearCreateFlowParams()
     } catch (e) {
       toast.error('Failed to add brand', { description: errMsg(e, 'Please try again.') })
     }

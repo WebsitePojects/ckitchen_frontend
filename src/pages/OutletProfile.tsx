@@ -9,12 +9,14 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight as Crumb,
+  ExternalLink,
   Home,
   Link2,
   MapPin,
   Pencil,
   PauseCircle,
   Phone,
+  Plus,
   Radio,
   Store,
   Trash2,
@@ -30,6 +32,7 @@ import { cn } from '../lib/utils'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole, normalizeRole, ROLE_LANDING } from '../auth/access'
 import { usePermissions } from '../context/PermissionsContext'
+import { useOutlet } from '../context/OutletContext'
 import { DAY_LABEL, WORK_DAYS, sanitizeWorkDays } from '../lib/workdays'
 import PageContainer from '../components/layout/PageContainer'
 import EmptyState from '../components/common/EmptyState'
@@ -278,6 +281,7 @@ export default function OutletProfile() {
   const { canAccessPage } = usePermissions()
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { setSelectedOutletId } = useOutlet()
 
   // Access gate — mirrors EmployeeProfile.tsx: this route sits OUTSIDE
   // <RequireAccess> (that guard matches the raw '/outlets/<uuid>' pathname
@@ -301,6 +305,11 @@ export default function OutletProfile() {
 
   const enabled = allowed && inScope && !!id
   const [removeTarget, setRemoveTarget] = useState<OutletBrand | null>(null)
+
+  // ── Add-station dialog state ──────────────────────────────────────────────
+  const [addStationOpen, setAddStationOpen] = useState(false)
+  const [addStationName, setAddStationName] = useState('')
+  const [addStationPrinterId, setAddStationPrinterId] = useState('')
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const outletQuery = useQuery({
@@ -350,6 +359,18 @@ export default function OutletProfile() {
     queryKey: ['stations', 'all'],
     queryFn: async () => (await get<Station[]>('/stations')).data,
     enabled,
+  })
+
+  // Printer list for the Add-station dialog's optional "default printer"
+  // picker (POST /stations accepts default_printer_id — see
+  // ckitchen_backend/src/modules/stations/routes.ts createStationSchema).
+  // Same global 'printers' cache key any other page adding this would reuse.
+  // Only needed for OWNER (the only role that can add a station), so it's
+  // gated off the same way the dialog itself is.
+  const printersQuery = useQuery({
+    queryKey: ['printers'],
+    queryFn: async () => (await get<{ id: string; name: string }[]>('/printers')).data,
+    enabled: enabled && isOwner,
   })
 
   // ── Mutations ────────────────────────────────────────────────────────────
@@ -435,6 +456,46 @@ export default function OutletProfile() {
     onError: (e) => onScopeError(e, 'Failed to deploy brand.'),
   })
 
+  // Add-station (Outlet profile full control). POST /stations is OWNER-only
+  // and, per stations/routes.ts's resolveRequestLocationId, resolves its
+  // target outlet from an explicit body `location_id` first, else the
+  // X-Outlet-Id header. api.ts's request interceptor only sets that header
+  // from the GLOBALLY selected outlet, and only when the caller hasn't
+  // already set one — this profile page can be viewed for an outlet that
+  // ISN'T the currently-selected one, so the header is overridden explicitly
+  // here to `id` (the outlet being viewed) rather than relying on the global
+  // selection or a body location_id.
+  const addStation = useMutation({
+    mutationFn: async (form: { name: string; defaultPrinterId: string }) =>
+      (
+        await post(
+          '/stations',
+          {
+            name: form.name,
+            default_printer_id: form.defaultPrinterId || undefined,
+          },
+          { headers: { 'X-Outlet-Id': id } },
+        )
+      ).data,
+    onSuccess: () => {
+      toast.success('Station added.')
+      qc.invalidateQueries({ queryKey: ['stations', 'all'] })
+      setAddStationOpen(false)
+      setAddStationName('')
+      setAddStationPrinterId('')
+    },
+    onError: (e) => onScopeError(e, 'Failed to add station.'),
+  })
+
+  function handleAddStationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (addStation.isPending) return
+    const name = addStationName.trim()
+    if (!name) return
+    const defaultPrinterId = addStationPrinterId !== '_none' ? addStationPrinterId : ''
+    addStation.mutate({ name, defaultPrinterId })
+  }
+
   const removeBrand = useMutation({
     mutationFn: async (brandId: string) => (await del(`/brands/${brandId}/outlets/${id}`)).data,
     onSuccess: () => {
@@ -502,13 +563,29 @@ export default function OutletProfile() {
     return map
   }, [allOutletsQuery.data])
 
-  // Brands available to deploy = all brands not already present here (home or deployed).
+  // Brands available to deploy = all brands not already present here (home or
+  // deployed), plus a pinned "+ Create new brand…" entry at the top (create-
+  // a-merchant-from-an-outlet flow) — handled by id in the dropdown's
+  // onSelect below rather than deployBrand.mutate.
+  const CREATE_BRAND_OPTION_ID = '__create_new_brand__'
   const brandOptions: SearchableOption[] = useMemo(() => {
     const present = new Set(outletBrands.map((b) => b.brandId))
-    return (allBrandsQuery.data ?? [])
+    const deployable = (allBrandsQuery.data ?? [])
       .filter((b) => !present.has(b.id))
       .map((b) => ({ id: b.id, label: b.name, color: b.color }))
+    return [
+      { id: CREATE_BRAND_OPTION_ID, label: '+ Create new brand…', color: undefined },
+      ...deployable,
+    ]
   }, [allBrandsQuery.data, outletBrands])
+
+  function handleBrandOptionSelect(optionId: string) {
+    if (optionId === CREATE_BRAND_OPTION_ID) {
+      navigate(`/merchant-management?create=1&home_outlet=${encodeURIComponent(id ?? '')}`)
+      return
+    }
+    deployBrand.mutate(optionId)
+  }
 
   // Employees available to assign = everyone not already assigned to THIS outlet.
   const employeeOptions: SearchableOption[] = useMemo(() => {
@@ -673,7 +750,7 @@ export default function OutletProfile() {
             isOwner ? (
               <SearchableDropdown
                 options={brandOptions}
-                onSelect={(brandId) => deployBrand.mutate(brandId)}
+                onSelect={handleBrandOptionSelect}
                 placeholder="Deploy a brand…"
                 searchPlaceholder="Search brands…"
                 emptyText={
@@ -899,7 +976,24 @@ export default function OutletProfile() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Stations */}
         <Card className="border-border bg-card">
-          <SectionHeader icon={Radio} title="Stations" count={stations.length} />
+          <SectionHeader
+            icon={Radio}
+            title="Stations"
+            count={stations.length}
+            action={
+              isOwner ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setAddStationOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add station
+                </Button>
+              ) : undefined
+            }
+          />
           {stationsQuery.isPending ? (
             <p className="p-5 text-sm text-zinc-500">Loading…</p>
           ) : stations.length === 0 ? (
@@ -918,12 +1012,19 @@ export default function OutletProfile() {
           )}
         </Card>
 
-        {/* Warehouses */}
+        {/* Warehouses — human names + a short monospace id suffix, never the
+            full raw uuid (client ask). */}
         <Card className="border-border bg-card">
           <SectionHeader icon={Warehouse} title="Warehouses" />
           <div className="flex flex-wrap gap-2 p-5">
-            <WarehousePill label="MAIN" ready={hasMain} />
-            <WarehousePill label="KITCHEN" ready={hasKitchen} />
+            <WarehousePill
+              label="Main Warehouse"
+              warehouse={outlet.warehouses.find((w) => w.type === 'MAIN')}
+            />
+            <WarehousePill
+              label="Kitchen Warehouse"
+              warehouse={outlet.warehouses.find((w) => w.type === 'KITCHEN')}
+            />
           </div>
           <p className="px-5 pb-5 text-[11px] text-zinc-600">
             Two-tier inventory — Main Warehouse and in-house Kitchen. Stock and ITO transfers are
@@ -931,19 +1032,37 @@ export default function OutletProfile() {
           </p>
         </Card>
 
-        {/* Channel Listings — brand-level, not outlet-scoped; link out (cardinal rule 1). */}
+        {/* Channel Listings — brand-level, not outlet-scoped (cardinal rule 1). */}
         <Card className="border-border bg-card">
           <SectionHeader icon={Link2} title="Channel Listings" />
-          <div className="p-5">
+          <div className="flex flex-col gap-2 p-5">
             <p className="text-sm text-zinc-400">
               Foodpanda / GrabFood listings belong to a brand, not a physical outlet.
             </p>
-            <Button asChild variant="outline" size="sm" className="mt-3">
-              <Link to="/channel-listings">
+            <div className="mt-1 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  // Switch the globally selected outlet to THIS one first so
+                  // the destination page's own outlet-scoped fetches land on
+                  // the right outlet, then navigate.
+                  setSelectedOutletId(outlet.id)
+                  navigate('/channel-listings')
+                }}
+              >
                 <Boxes className="h-3.5 w-3.5" />
-                Managed in Channel Listings
-              </Link>
-            </Button>
+                Open Channel Listings
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/merchant-management')}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Manage in Merchant Management
+              </Button>
+            </div>
           </div>
         </Card>
       </div>
@@ -1130,6 +1249,69 @@ export default function OutletProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Add station (Outlet profile full control) ────────────────────── */}
+      <Dialog
+        open={addStationOpen}
+        onOpenChange={(o) => !o && !addStation.isPending && setAddStationOpen(false)}
+      >
+        <DialogContent className="border-border bg-card text-zinc-50">
+          <form onSubmit={handleAddStationSubmit} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Add station</DialogTitle>
+              <DialogDescription>
+                Create a new kitchen station at{' '}
+                <span className="font-medium text-zinc-200">{outlet.name}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Station name</span>
+                <Input
+                  value={addStationName}
+                  onChange={(event) => setAddStationName(event.target.value)}
+                  placeholder="e.g. Grill, Packing"
+                  required
+                  autoFocus
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Default printer (optional)</span>
+                <Select value={addStationPrinterId || '_none'} onValueChange={setAddStationPrinterId}>
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={printersQuery.isPending ? 'Loading printers…' : 'No default printer'}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">No default printer</SelectItem>
+                    {(printersQuery.data ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAddStationOpen(false)}
+                disabled={addStation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addStation.isPending || !addStationName.trim()}>
+                {addStation.isPending ? 'Adding…' : 'Add station'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }
@@ -1162,17 +1344,29 @@ function OutletStatusPill({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
   )
 }
 
-function WarehousePill({ label, ready }: { label: string; ready: boolean }) {
+/**
+ * Warehouse chip — human name ("Main Warehouse" / "Kitchen Warehouse") plus a
+ * short monospace id suffix (`#a1b2c3`, first 6 of the uuid) — client ask:
+ * never show the full random uuid. Amber "not provisioned" state when this
+ * outlet has no row of that type yet.
+ */
+function WarehousePill({ label, warehouse }: { label: string; warehouse?: OutletWarehouse }) {
+  const ready = !!warehouse
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium',
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
         ready
           ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
           : 'border-amber-500/30 bg-amber-500/10 text-amber-300',
       )}
     >
-      {label}
+      {ready ? label : `${label} — not provisioned`}
+      {ready && (
+        <span className="font-mono text-[10px] text-emerald-400/70">
+          #{warehouse.id.slice(0, 6)}
+        </span>
+      )}
     </span>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   Users,
   UserCog,
@@ -9,11 +10,20 @@ import {
   Plus,
   UserCheck,
   Eye,
+  EyeOff,
   Pencil,
+  KeyRound,
 } from 'lucide-react'
-import { get, post, patch } from '../lib/api'
+import { get, post, patch, CKApiError } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
+import {
+  ACCOUNT_ROLES,
+  ACCOUNT_ROLE_LABEL,
+  DEPARTMENT_ACCOUNT_ROLE,
+  isValidAccountEmail,
+  isValidAccountPassword,
+} from '../lib/accountRoles'
 import {
   DEFAULT_WORK_DAYS,
   DAY_LABEL,
@@ -32,6 +42,7 @@ import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
+import { Switch } from '../components/ui/switch'
 import { cn } from '../lib/utils'
 import {
   Select,
@@ -76,8 +87,17 @@ interface Employee {
   hiredAt?: string | null
   // Outlet assignment (T1) — absent entirely on an old deploy, null = HQ/unassigned.
   locationId?: string | null
+  // Employee-login link (client flaw fix, 2026-07-22) — absent entirely on an
+  // old deploy; treat as "no login" rather than crashing.
+  hasLogin?: boolean
+  userEmail?: string | null
   createdAt: string
   updatedAt: string
+}
+
+/** POST /employees response — same Employee shape, plus the created login when `account` was sent. */
+interface CreateEmployeeResponse extends Employee {
+  user?: { id: string; email: string; role: string }
 }
 
 /** Minimal shape consumed from GET /outlets (see pages/Outlets.tsx for the full row). */
@@ -151,6 +171,32 @@ const EMPTY_FORM: FormState = {
   status: 'ACTIVE',
   location_id: UNASSIGNED_OUTLET,
   location_touched: false,
+}
+
+// ---------------------------------------------------------------------------
+// Login-account sub-form (Add Employee dialog only — client flaw fix,
+// 2026-07-22: adding an employee didn't create a login, forcing the owner to
+// register a person twice). `role` starts blank so the department-derived
+// default (DEPARTMENT_ACCOUNT_ROLE) keeps following the Department select
+// until the admin actually picks a role themselves.
+// ---------------------------------------------------------------------------
+
+interface AccountFormState {
+  enabled: boolean
+  email: string
+  password: string
+  role: string
+}
+
+const EMPTY_ACCOUNT: AccountFormState = {
+  enabled: false,
+  email: '',
+  password: '',
+  role: '',
+}
+
+function errMsg(e: unknown, fallback: string): string {
+  return e instanceof Error ? e.message : fallback
 }
 
 // ---------------------------------------------------------------------------
@@ -347,6 +393,113 @@ function EmployeeFormFields({
 }
 
 // ---------------------------------------------------------------------------
+// Login-account section — Add Employee dialog only (client flaw fix,
+// 2026-07-22). `effectiveRole` is the department-derived default until the
+// admin picks a role explicitly; see AccountFormState above.
+// ---------------------------------------------------------------------------
+
+function AccountFields({
+  account,
+  setAccount,
+  effectiveRole,
+  submitting,
+  emailError,
+  clearEmailError,
+  showPassword,
+  setShowPassword,
+}: {
+  account: AccountFormState
+  setAccount: React.Dispatch<React.SetStateAction<AccountFormState>>
+  effectiveRole: string
+  submitting: boolean
+  emailError: string | null
+  clearEmailError: () => void
+  showPassword: boolean
+  setShowPassword: React.Dispatch<React.SetStateAction<boolean>>
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-border bg-background/40 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-zinc-200">Login account</p>
+          <p className="text-xs text-zinc-500">This person will log in to ORION.</p>
+        </div>
+        <Switch
+          checked={account.enabled}
+          onCheckedChange={(v) => {
+            setAccount((a) => ({ ...a, enabled: v }))
+            clearEmailError()
+          }}
+          disabled={submitting}
+          aria-label="Enable login account"
+        />
+      </div>
+      {account.enabled && (
+        <div className="space-y-3 pt-1">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Email</label>
+            <Input
+              type="email"
+              placeholder="name@company.com"
+              value={account.email}
+              onChange={(e) => {
+                setAccount((a) => ({ ...a, email: e.target.value }))
+                clearEmailError()
+              }}
+              disabled={submitting}
+              autoComplete="off"
+            />
+            {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Password</label>
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Min. 8 characters"
+                value={account.password}
+                onChange={(e) => setAccount((a) => ({ ...a, password: e.target.value }))}
+                disabled={submitting}
+                autoComplete="new-password"
+                className="pr-9"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-zinc-400">Role</label>
+            <Select
+              value={effectiveRole}
+              onValueChange={(v) => setAccount((a) => ({ ...a, role: v }))}
+              disabled={submitting}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCOUNT_ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {ACCOUNT_ROLE_LABEL[r] ?? r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -367,6 +520,14 @@ export default function Employees() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Login-account sub-form (Add dialog only) — client flaw fix, 2026-07-22.
+  const [accountForm, setAccountForm] = useState<AccountFormState>(EMPTY_ACCOUNT)
+  const [accountEmailError, setAccountEmailError] = useState<string | null>(null)
+  const [showAccountPassword, setShowAccountPassword] = useState(false)
+  // Department-derived default role, live until the admin picks one explicitly.
+  const effectiveAccountRole =
+    accountForm.role || (form.department ? DEPARTMENT_ACCOUNT_ROLE[form.department] ?? '' : '')
 
   // Edit dialog
   const [editTarget, setEditTarget] = useState<Employee | null>(null)
@@ -432,6 +593,14 @@ export default function Employees() {
 
   // ── Create ───────────────────────────────────────────────────────────
 
+  function resetAddDialogState() {
+    setForm(EMPTY_FORM)
+    setFormError(null)
+    setAccountForm(EMPTY_ACCOUNT)
+    setAccountEmailError(null)
+    setShowAccountPassword(false)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
@@ -443,10 +612,25 @@ export default function Employees() {
       setFormError('Pick at least one working day.')
       return
     }
+    if (accountForm.enabled) {
+      if (!isValidAccountEmail(accountForm.email)) {
+        setFormError('Enter a valid email for the login account.')
+        return
+      }
+      if (!isValidAccountPassword(accountForm.password)) {
+        setFormError('Login password must be at least 8 characters.')
+        return
+      }
+      if (!effectiveAccountRole) {
+        setFormError('Select a role for the login account.')
+        return
+      }
+    }
     setFormError(null)
+    setAccountEmailError(null)
     setSubmitting(true)
     try {
-      await post('/employees', {
+      const res = await post<CreateEmployeeResponse>('/employees', {
         employee_no: form.employee_no.trim(),
         full_name: form.full_name.trim(),
         department: form.department,
@@ -456,13 +640,33 @@ export default function Employees() {
         ...(form.location_touched
           ? { location_id: form.location_id === UNASSIGNED_OUTLET ? null : form.location_id }
           : {}),
+        ...(accountForm.enabled
+          ? {
+              account: {
+                email: accountForm.email.trim(),
+                password: accountForm.password,
+                role: effectiveAccountRole,
+              },
+            }
+          : {}),
       })
+      const createdUser = res.data?.user
+      if (createdUser) {
+        toast.success(`${form.full_name.trim()} created`, {
+          description: `Login account created for ${createdUser.email}`,
+        })
+      } else {
+        toast.success(`${form.full_name.trim()} created`)
+      }
       setDialogOpen(false)
-      setForm(EMPTY_FORM)
+      resetAddDialogState()
       fetchEmployees()
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to create employee'
-      setFormError(msg)
+      if (err instanceof CKApiError && err.code === 'EMAIL_TAKEN') {
+        setAccountEmailError('This email is already registered.')
+      } else {
+        setFormError(errMsg(err, 'Failed to create employee'))
+      }
     } finally {
       setSubmitting(false)
     }
@@ -539,8 +743,7 @@ export default function Employees() {
       onOpenChange={(open) => {
         setDialogOpen(open)
         if (!open) {
-          setForm(EMPTY_FORM)
-          setFormError(null)
+          resetAddDialogState()
         }
       }}
     >
@@ -562,6 +765,16 @@ export default function Employees() {
             mode="add"
             outlets={outlets}
             outletsLoading={outletsQuery.isLoading}
+          />
+          <AccountFields
+            account={accountForm}
+            setAccount={setAccountForm}
+            effectiveRole={effectiveAccountRole}
+            submitting={submitting}
+            emailError={accountEmailError}
+            clearEmailError={() => setAccountEmailError(null)}
+            showPassword={showAccountPassword}
+            setShowPassword={setShowAccountPassword}
           />
           {formError && (
             <p className="text-xs text-red-400">{formError}</p>
@@ -640,6 +853,7 @@ export default function Employees() {
                 <TableHead>Position</TableHead>
                 <TableHead>Schedule</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Login</TableHead>
                 <TableHead className="w-24 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -681,6 +895,25 @@ export default function Employees() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={emp.status} />
+                  </TableCell>
+                  <TableCell>
+                    {emp.hasLogin ? (
+                      <div className="flex flex-col gap-0.5" title={emp.userEmail ?? undefined}>
+                        <Badge
+                          variant="outline"
+                          className="w-fit gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                        >
+                          <KeyRound className="h-3 w-3" /> Has login
+                        </Badge>
+                        {emp.userEmail && (
+                          <span className="max-w-[10rem] truncate text-[10px] text-zinc-500">
+                            {emp.userEmail}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-zinc-600">No login</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

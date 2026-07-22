@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Tags, CheckCircle2, XCircle, Store, History } from 'lucide-react'
 import { get } from '../lib/api'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
@@ -25,18 +26,18 @@ export default function Brands() {
 
   // Cache-first (perf): navigating back to Brands from another page shows
   // the last-fetched list instantly instead of a fresh loading spinner.
-  // Keyed by selectedOutletId per the outlet-cache-correctness rule — GET
-  // /brands isn't currently outlet-filtered server-side (it returns every
-  // brand regardless of X-Outlet-Id), but keying by outlet anyway means this
-  // stays correct for free if/when that filtering lands, at the cost of one
-  // extra (identical) fetch per outlet switch today.
+  // Keyed by selectedOutletId per the outlet-cache-correctness rule. GET
+  // /brands now accepts `?location_id=` (backend parallel wave) to scope the
+  // list to brands deployed at that outlet — 'ALL' (HQ scope) omits it and
+  // sees the full platform list, matching the other outlet-scoped pages
+  // (Merchants.tsx, ChannelListings.tsx).
   const {
     data: brands = [],
     isLoading: loading,
     error: queryError,
   } = useQuery({
     queryKey: ['brands', selectedOutletId],
-    queryFn: async () => (await get<Brand[]>('/brands')).data,
+    queryFn: async () => (await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))).data,
   })
   const error = queryError ? (queryError instanceof Error ? queryError.message : 'Failed to load brands') : null
 

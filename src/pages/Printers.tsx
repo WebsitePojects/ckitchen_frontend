@@ -32,6 +32,8 @@ import { get, post } from '../lib/api'
 import { onSocketEvent, onSocketReconnect } from '../lib/socket'
 import type { PrintStatusPayload, PrinterStatusPayload } from '../lib/socket'
 import { useAuth } from '../auth/AuthContext'
+import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import type { UserRole } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
 import { Button } from '../components/ui/button'
@@ -249,6 +251,13 @@ type RuleId = typeof PRINT_RULES[number]['id']
 export default function Printers() {
   const { user } = useAuth()
   const canReprint = hasRole(user?.role, CAN_REPRINT)
+  // Outlet-scoping leak fix: GET /print-jobs is outlet-scoped server-side
+  // (resolveOutletContext), but `load` below had an empty dep array — it
+  // never re-ran on an outlet switch, so the queue/preview kept showing the
+  // previous outlet's jobs. selectedOutletId is now a deliberate re-run
+  // trigger; the X-Outlet-Id header itself is still supplied by lib/api.ts's
+  // interceptor from localStorage.
+  const { selectedOutletId } = useOutlet()
 
   const [printers,     setPrinters]     = useState<PrinterDevice[]>([])
   const [jobs,         setJobs]         = useState<PrintJob[]>([])
@@ -283,7 +292,7 @@ export default function Printers() {
     try {
       const [printersRes, stationsRes, pendingRes, printedRes, failedRes] = await Promise.all([
         get<PrinterDevice[]>('/printers'),
-        get<Station[]>('/stations'),
+        get<Station[]>(outletScopedPath('/stations', selectedOutletId)),
         get<PrintJob[]>('/print-jobs?status=PENDING'),
         get<PrintJob[]>('/print-jobs?status=PRINTED'),
         get<PrintJob[]>('/print-jobs?status=FAILED'),
@@ -308,7 +317,7 @@ export default function Printers() {
     } finally {
       if (!cancelledRef?.current) setLoading(false)
     }
-  }, [])
+  }, [selectedOutletId])
 
   useEffect(() => {
     const cancelledRef = { current: false }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Link2 } from 'lucide-react'
 import { get } from '../lib/api'
+import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
@@ -42,6 +44,13 @@ interface ChannelListing {
 }
 
 export default function ChannelListings() {
+  // Outlet-scoping leak fix: this page used to fetch every brand platform-wide
+  // with no outlet dependency at all, so switching the header outlet never
+  // refetched it — a Cubao user would keep seeing CloudKitchen ONE's brands
+  // and listings. `?location_id=` (backend, parallel wave) scopes GET /brands
+  // to brands deployed at that outlet; selectedOutletId in the effect's deps
+  // makes an outlet switch actually re-run the fetch.
+  const { selectedOutletId } = useOutlet()
   const [listings, setListings] = useState<ChannelListing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,8 +58,10 @@ export default function ChannelListings() {
   useEffect(() => {
     let alive = true
     ;(async () => {
+      setLoading(true)
+      setError(null)
       try {
-        const { data: brands } = await get<Brand[]>('/brands')
+        const { data: brands } = await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))
         const lists = await Promise.all(
           brands.map((brand) =>
             get<Account[]>(`/brands/${brand.id}/accounts`)
@@ -82,7 +93,7 @@ export default function ChannelListings() {
     return () => {
       alive = false
     }
-  }, [])
+  }, [selectedOutletId])
 
   const stats = useMemo(() => {
     const foodpanda = listings.filter((listing) => listing.aggregator === 'FOODPANDA').length

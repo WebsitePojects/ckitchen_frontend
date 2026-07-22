@@ -24,6 +24,7 @@ import { toast } from 'sonner'
 import { CKApiError, get, post } from '../lib/api'
 import type { StockShortfall } from '../lib/socket'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import {
   Dialog,
   DialogContent,
@@ -116,7 +117,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
     error: brandsError,
   } = useQuery({
     queryKey: ['brands', selectedOutletId],
-    queryFn: async () => (await get<Brand[]>('/brands')).data,
+    queryFn: async () => (await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))).data,
     enabled: open,
   })
   const activeBrands = useMemo(() => brands.filter((b) => b.isActive), [brands])

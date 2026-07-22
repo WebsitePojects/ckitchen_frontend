@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { CKApiError, del, get, patch, post, put } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
 import { useOutlet } from '../context/OutletContext'
+import { outletScopedPath } from '../lib/outletScope'
 import { hasRole } from '../auth/access'
 import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
@@ -206,7 +207,7 @@ export default function Menu() {
     error: brandsQueryError,
   } = useQuery({
     queryKey: ['brands', selectedOutletId],
-    queryFn: async () => (await get<Brand[]>('/brands')).data,
+    queryFn: async () => (await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))).data,
   })
   const errorBrands = brandsQueryError
     ? brandsQueryError instanceof Error ? brandsQueryError.message : 'Failed to load brands.'
@@ -214,7 +215,7 @@ export default function Menu() {
 
   const { data: stations = [] } = useQuery({
     queryKey: ['stations', selectedOutletId],
-    queryFn: async () => (await get<Station[]>('/stations')).data,
+    queryFn: async () => (await get<Station[]>(outletScopedPath('/stations', selectedOutletId))).data,
   })
 
   const { data: kitchenStock = [] } = useQuery({
