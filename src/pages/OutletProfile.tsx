@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -6,10 +7,13 @@ import {
   Boxes,
   Building2,
   CalendarDays,
+  CheckCircle2,
   ChevronRight as Crumb,
   Home,
   Link2,
   MapPin,
+  Pencil,
+  PauseCircle,
   Phone,
   Radio,
   Store,
@@ -18,8 +22,10 @@ import {
   UserMinus,
   Users,
   Warehouse,
+  XCircle,
 } from 'lucide-react'
 import { CKApiError, del, get, patch, post } from '../lib/api'
+import { setOutletMenuAvailability, type Availability } from '../lib/merchant-management-api'
 import { cn } from '../lib/utils'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole, normalizeRole, ROLE_LANDING } from '../auth/access'
@@ -31,6 +37,14 @@ import SearchableDropdown, { type SearchableOption } from '../components/Searcha
 import { Card } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select'
 import {
   Table,
   TableBody,
@@ -111,6 +125,32 @@ interface Station {
   name: string
   locationId: string | null
   defaultPrinter?: { name?: string | null } | null
+}
+
+interface EditOutletForm {
+  code: string
+  name: string
+  address: string
+  timezone: string
+  contactName: string
+  contactPhone: string
+  status: 'ACTIVE' | 'INACTIVE'
+}
+
+const EMPTY_EDIT_FORM: EditOutletForm = {
+  code: '',
+  name: '',
+  address: '',
+  timezone: 'Asia/Manila',
+  contactName: '',
+  contactPhone: '',
+  status: 'ACTIVE',
+}
+
+const AVAIL_LABEL: Record<Availability, string> = {
+  AVAILABLE: 'Available',
+  PAUSED: 'Paused',
+  SOLD_OUT: 'Sold Out',
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +358,73 @@ export default function OutletProfile() {
     else toast.error(errMsg(e, fallback))
   }
 
+  // ── Edit outlet details ────────────────────────────────────────────────────
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState<EditOutletForm>(EMPTY_EDIT_FORM)
+
+  function openEdit() {
+    if (!outlet) return
+    setEditForm({
+      code: outlet.code,
+      name: outlet.name,
+      address: outlet.address ?? '',
+      timezone: outlet.timezone,
+      contactName: outlet.contactName ?? '',
+      contactPhone: outlet.contactPhone ?? '',
+      status: outlet.status,
+    })
+    setEditOpen(true)
+  }
+
+  const editOutlet = useMutation({
+    mutationFn: async (form: EditOutletForm) =>
+      (
+        await patch<OutletDetail>(`/outlets/${id}`, {
+          code: form.code,
+          name: form.name,
+          address: form.address || null,
+          status: form.status,
+          timezone: form.timezone || 'Asia/Manila',
+          contact_name: form.contactName || null,
+          contact_phone: form.contactPhone || null,
+        })
+      ).data,
+    onSuccess: () => {
+      toast.success('Outlet updated.')
+      qc.invalidateQueries({ queryKey: ['outlets', id] })
+      qc.invalidateQueries({ queryKey: ['outlets', 'summary'] })
+      setEditOpen(false)
+    },
+    onError: (e) => onScopeError(e, 'Failed to update outlet.'),
+  })
+
+  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (editOutlet.isPending) return
+    editOutlet.mutate(editForm)
+  }
+
+  // ── Outlet-wide menu availability ──────────────────────────────────────────
+  const [bulkAvailTarget, setBulkAvailTarget] = useState<Availability | null>(null)
+  const bulkAvailability = useMutation({
+    mutationFn: async (availability: Availability) => {
+      if (!id) throw new Error('Outlet is not loaded.')
+      return setOutletMenuAvailability(id, availability)
+    },
+    onSuccess: (res, availability) => {
+      toast.success(
+        `Updated ${res.updated} item${res.updated === 1 ? '' : 's'} to ${AVAIL_LABEL[availability]}.`,
+      )
+      setBulkAvailTarget(null)
+    },
+    onError: (e) => onScopeError(e, 'Failed to update menu availability.'),
+  })
+
+  function confirmBulkAvailability() {
+    if (!bulkAvailTarget || bulkAvailability.isPending) return
+    bulkAvailability.mutate(bulkAvailTarget)
+  }
+
   const deployBrand = useMutation({
     mutationFn: async (brandId: string) =>
       (await post(`/brands/${brandId}/outlets`, { location_id: id })).data,
@@ -494,6 +601,13 @@ export default function OutletProfile() {
               </span>
             </div>
           </div>
+
+          {isOwner && (
+            <Button variant="outline" size="sm" onClick={openEdit}>
+              <Pencil className="h-3.5 w-3.5" />
+              Edit details
+            </Button>
+          )}
         </div>
 
         {/* Counts */}
@@ -508,6 +622,46 @@ export default function OutletProfile() {
           />
         </div>
       </Card>
+
+      {/* ── Outlet-wide menu availability ───────────────────────────────── */}
+      {isOwner && (
+        <Card className="border-border bg-card">
+          <SectionHeader icon={Boxes} title="Outlet-wide menu availability" />
+          <div className="flex flex-wrap items-center gap-3 p-5">
+            <p className="mr-auto max-w-md text-sm text-zinc-400">
+              Bulk-set availability for every menu item currently deployed at this outlet, across
+              all brands.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+              onClick={() => setBulkAvailTarget('AVAILABLE')}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Set all Available
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              onClick={() => setBulkAvailTarget('PAUSED')}
+            >
+              <PauseCircle className="h-3.5 w-3.5" />
+              Pause all
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-red-500/30 text-red-300 hover:bg-red-500/10"
+              onClick={() => setBulkAvailTarget('SOLD_OUT')}
+            >
+              <XCircle className="h-3.5 w-3.5" />
+              Mark all Sold Out
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* ── Brands / Merchants ───────────────────────────────────────────── */}
       <Card className="border-border bg-card">
@@ -825,6 +979,153 @@ export default function OutletProfile() {
               }}
             >
               {removeBrand.isPending ? 'Removing…' : 'Remove brand'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit outlet details ──────────────────────────────────────────── */}
+      <Dialog
+        open={editOpen}
+        onOpenChange={(o) => !o && !editOutlet.isPending && setEditOpen(false)}
+      >
+        <DialogContent className="border-border bg-card text-zinc-50">
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Edit outlet details</DialogTitle>
+              <DialogDescription>Update {outlet.name}&apos;s identity and status.</DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Outlet code</span>
+                <Input
+                  value={editForm.code}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, code: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Outlet name</span>
+                <Input
+                  value={editForm.name}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label className="space-y-1.5 text-sm sm:col-span-2">
+                <span className="text-zinc-300">Address</span>
+                <Input
+                  value={editForm.address}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, address: event.target.value }))
+                  }
+                  placeholder="Street, city"
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Timezone</span>
+                <Input
+                  value={editForm.timezone}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, timezone: event.target.value }))
+                  }
+                  placeholder="Asia/Manila"
+                />
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Status</span>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      status: value as 'ACTIVE' | 'INACTIVE',
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+              <label className="space-y-1.5 text-sm">
+                <span className="text-zinc-300">Contact phone</span>
+                <Input
+                  value={editForm.contactPhone}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, contactPhone: event.target.value }))
+                  }
+                  placeholder="+63 ..."
+                />
+              </label>
+              <label className="space-y-1.5 text-sm sm:col-span-2">
+                <span className="text-zinc-300">Contact person</span>
+                <Input
+                  value={editForm.contactName}
+                  onChange={(event) =>
+                    setEditForm((current) => ({ ...current, contactName: event.target.value }))
+                  }
+                  placeholder="Outlet manager"
+                />
+              </label>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+                disabled={editOutlet.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={editOutlet.isPending}>
+                {editOutlet.isPending ? 'Saving…' : 'Save changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Outlet-wide menu availability confirm ────────────────────────── */}
+      <Dialog
+        open={bulkAvailTarget != null}
+        onOpenChange={(o) => !o && !bulkAvailability.isPending && setBulkAvailTarget(null)}
+      >
+        <DialogContent className="border-border bg-card text-zinc-50 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {bulkAvailTarget ? `Set every item to ${AVAIL_LABEL[bulkAvailTarget]}?` : 'Confirm'}
+            </DialogTitle>
+            <DialogDescription>
+              This affects every menu item currently deployed at{' '}
+              <span className="font-medium text-zinc-200">{outlet.name}</span> — across every
+              brand at this outlet, not just one.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkAvailTarget(null)}
+              disabled={bulkAvailability.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              disabled={bulkAvailability.isPending}
+              onClick={confirmBulkAvailability}
+            >
+              {bulkAvailability.isPending ? 'Applying…' : 'Apply'}
             </Button>
           </DialogFooter>
         </DialogContent>
