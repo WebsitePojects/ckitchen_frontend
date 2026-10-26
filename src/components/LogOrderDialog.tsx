@@ -126,12 +126,39 @@ const AGGREGATOR_CHANNEL_LABEL: Record<Account['aggregator'], string> = {
 
 const WALKIN_CHANNEL_VALUE = '_walkin'
 
+// Remembers which aggregator tablet the cook last keyed from, so the channel defaults to it
+// instead of Walk-in (forgetting to switch logged GrabFood orders as walk-ins). Per-browser
+// convenience only; storage can be unavailable, so every access is guarded.
+const LAST_AGGREGATOR_KEY = 'orion.logOrder.lastAggregator'
+function readLastAggregator(): string | null {
+  try { return window.localStorage.getItem(LAST_AGGREGATOR_KEY) } catch { return null }
+}
+function rememberAggregator(aggregator: string) {
+  try { window.localStorage.setItem(LAST_AGGREGATOR_KEY, aggregator) } catch { /* storage unavailable */ }
+}
+
+/**
+ * Turns the HH:MM shown on the device into an ISO timestamp for today. A time later than
+ * now (e.g. 23:50 keyed in at 00:10) belongs to yesterday. Empty input = now (server default).
+ */
+export function deviceTimeToIso(hhmm: string, now: Date = new Date()): string | undefined {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm)
+  if (!m) return undefined
+  const placed = new Date(now)
+  placed.setHours(Number(m[1]), Number(m[2]), 0, 0)
+  if (placed.getTime() - now.getTime() > 60_000) placed.setDate(placed.getDate() - 1)
+  return placed.toISOString()
+}
+
 export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogOrderDialogProps) {
   const { selectedOutletId } = useOutlet()
 
   const [brandId, setBrandId] = useState('')
   const [channelValue, setChannelValue] = useState<string>(WALKIN_CHANNEL_VALUE)
   const [deviceOrderNo, setDeviceOrderNo] = useState('')
+  const [deviceTime, setDeviceTime] = useState('')
+  // True once the cook picks a channel themselves, so the remembered default never overrides them.
+  const [channelTouched, setChannelTouched] = useState(false)
   const [customerName, setCustomerName] = useState('')
   const [lines, setLines] = useState<OrderLine[]>([])
   const [pickedItemId, setPickedItemId] = useState('')
@@ -174,6 +201,17 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
     [accounts],
   )
 
+  // Default the channel to the aggregator the cook last used (else the brand's first
+  // aggregator listing) once this brand's listings load. Walk-in stays an explicit choice.
+  useEffect(() => {
+    if (!open || channelTouched || channelValue !== WALKIN_CHANNEL_VALUE) return
+    const aggregatorListings = activeAccounts.filter((a) => a.aggregator !== 'OTHER')
+    if (aggregatorListings.length === 0) return
+    const last = readLastAggregator()
+    const preferred = aggregatorListings.find((a) => a.aggregator === last) ?? aggregatorListings[0]
+    setChannelValue(preferred.id)
+  }, [open, activeAccounts, channelTouched, channelValue])
+
   const {
     data: menuItems = [],
     isLoading: loadingMenu,
@@ -193,6 +231,8 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
     setBrandId('')
     setChannelValue(WALKIN_CHANNEL_VALUE)
     setDeviceOrderNo('')
+    setDeviceTime('')
+    setChannelTouched(false)
     setCustomerName('')
     setLines([])
     setPickedItemId('')
@@ -214,6 +254,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
     // Channel + line items belong to the previous brand — switching brands
     // clears both rather than leaving stale cross-brand state.
     setChannelValue(WALKIN_CHANNEL_VALUE)
+    setChannelTouched(false)
     setLines([])
     setPickedItemId('')
     setShortfalls(null)
@@ -272,6 +313,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
         aggregator_account_id: selectedAccount?.id,
         external_ref: deviceOrderNoTrimmed,
         customer_name: customerName.trim() || undefined,
+        placed_at: deviceTimeToIso(deviceTime),
         items: lines.map((l) => ({
           menu_item_id: l.menuItemId,
           qty: l.qty,
@@ -283,6 +325,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
         ...(allowOversell ? { allow_oversell: true } : {}),
       })
 
+      if (selectedAccount) rememberAggregator(selectedAccount.aggregator)
       if (data?.code === 'DUPLICATE_ORDER') {
         // Idempotent replay — the same device order # was already logged.
         // Treat as success, not an error.
@@ -377,7 +420,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
             <label className="text-xs font-medium text-zinc-400">Channel</label>
             <Select
               value={channelValue}
-              onValueChange={(v) => { setChannelValue(v); setShortfalls(null) }}
+              onValueChange={(v) => { setChannelValue(v); setChannelTouched(true); setShortfalls(null) }}
               disabled={!brandId || loadingAccounts}
             >
               <SelectTrigger>
@@ -399,23 +442,43 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Device order # — REQUIRED, becomes external_ref */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Device order #</label>
+            <label htmlFor="log-order-device-no" className="text-xs font-medium text-zinc-400">Device order #</label>
             <Input
+              id="log-order-device-no"
               required
               value={deviceOrderNo}
               onChange={(e) => setDeviceOrderNo(e.target.value)}
               placeholder="Order number shown on the aggregator device/tablet"
             />
             <p className="text-[11px] text-zinc-600">
-              Required — this is the idempotency anchor. Logging the same device order twice
-              replays the existing order instead of creating a duplicate.
+              Required. Copy it exactly from the tablet: logging the same number twice opens the
+              existing order instead of creating a duplicate.
+            </p>
+          </div>
+
+          {/* Time on the device — optional, so a late entry keeps its real order time */}
+          <div className="space-y-1.5">
+            <label htmlFor="log-order-device-time" className="text-xs font-medium text-zinc-400">
+              Time on device (optional)
+            </label>
+            <Input
+              id="log-order-device-time"
+              type="time"
+              value={deviceTime}
+              onChange={(e) => setDeviceTime(e.target.value)}
+              className="w-36"
+            />
+            <p className="text-[11px] text-zinc-600">
+              Leave blank if you are logging it now. Fill it in when entering an order late, so
+              timers and reports use the real order time.
             </p>
           </div>
 
           {/* Customer name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Customer Name (optional)</label>
+            <label htmlFor="log-order-customer" className="text-xs font-medium text-zinc-400">Customer Name (optional)</label>
             <Input
+              id="log-order-customer"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Optional"

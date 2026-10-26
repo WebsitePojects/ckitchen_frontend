@@ -202,6 +202,12 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
   // aggregator external ref (e.g. "SIM-17835…") remains the fallback for old
   // rows/deploys. No copy button here — KDS is touch-first (big targets only).
   const displayRef = order.orderCode ?? order.externalRef
+  // For GrabFood/foodpanda orders the external ref IS the number on the aggregator
+  // tablet. Until the APIs are connected, cooks key these orders in by hand and must
+  // match each ticket back to the tablet (e.g. to mark it ready for the rider), so it
+  // is shown prominently. Walk-in refs are generated locally and mean nothing to staff.
+  const deviceRef =
+    order.aggregator !== 'OTHER' && order.externalRef !== displayRef ? order.externalRef : null
 
   // Items relevant to THIS station only; fall back to all items
   const stationItems  = order.items.filter(i => i.stationId === stationId)
@@ -224,6 +230,14 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
       <div className="flex flex-wrap items-center gap-1.5 px-3 pt-3 pb-2">
         <BrandChip brand={brand} />
         <AggregatorBadge aggregator={order.aggregator} />
+        {deviceRef && (
+          <span
+            className="font-mono text-xs font-semibold text-zinc-100 tabular-nums"
+            title="Order number on the aggregator device"
+          >
+            #{deviceRef}
+          </span>
+        )}
         <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
           {displayRef}
         </span>

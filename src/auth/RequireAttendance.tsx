@@ -17,6 +17,8 @@ import { normalizeRole } from './access'
  *   - No linked employee record (`employee: null` from self/today) — nothing
  *     to clock; admin/service accounts keep working.
  *   - Already clocked in today (`clocked_in: true`).
+ *   - Attendance not required for this employee (`attendance_required: false`,
+ *     the per-employee admin setting). A missing field still gates (fail closed).
  *   - Exempt paths: /attendance itself (the page the gate redirects TO — a
  *     guard that trapped it would loop) and, defensively, /login + /kiosk/*
  *     (both live OUTSIDE <RequireAuth/> so the gate never actually renders
@@ -39,6 +41,8 @@ export interface SelfAttendanceToday {
     department: string
     photoUrl: string | null
   } | null
+  /** Per-employee setting; absent on older backends, which is treated as required. */
+  attendance_required?: boolean
   clocked_in: boolean
   clocked_out: boolean
   last_type: 'TIME_IN' | 'TIME_OUT' | null
@@ -48,6 +52,11 @@ export const SELF_TODAY_QUERY_KEY = ['attendance', 'self-today'] as const
 
 export async function fetchSelfToday(): Promise<SelfAttendanceToday> {
   return (await get<SelfAttendanceToday>('/ems/attendance/self/today')).data
+}
+
+/** True when this employee must punch TIME_IN before using the app today. */
+function mustClockIn(today: SelfAttendanceToday): boolean {
+  return !!today.employee && today.attendance_required !== false && !today.clocked_in
 }
 
 /** Paths the gate must never trap (see doc block). */
@@ -85,8 +94,7 @@ export function RequireAttendance() {
     !isOwner &&
     !exempt &&
     query.isSuccess &&
-    !!query.data.employee &&
-    !query.data.clocked_in
+    mustClockIn(query.data)
 
   // Fire the explanatory modal ONCE per navigation attempt (guard by
   // location.key so React rerenders don't re-fire it). The dialog is buffered
@@ -123,8 +131,7 @@ export function RequireAttendance() {
 
   if (query.isError) return <Outlet /> // fail open — never brick the app on a fetch failure
 
-  const today = query.data
-  if (!today.employee || today.clocked_in) return <Outlet />
+  if (!mustClockIn(query.data)) return <Outlet />
 
   return <Navigate to="/attendance" replace state={{ from: location }} />
 }

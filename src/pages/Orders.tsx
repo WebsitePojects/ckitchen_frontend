@@ -409,6 +409,12 @@ export default function Orders() {
                         <Copy className="h-3 w-3" />
                       </Button>
                     </span>
+                    {/* Aggregator device order #, so staff can match a row to the tablet. */}
+                    {o.aggregator !== 'OTHER' && o.externalRef !== orderDisplayCode(o) && (
+                      <span className="block text-[11px] text-zinc-500" title="Order number on the aggregator device">
+                        Device #{o.externalRef}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-sm text-zinc-400">{fmtTime(o.placedAt)}</TableCell>
                   <TableCell><AggregatorBadge aggregator={o.aggregator} /></TableCell>
