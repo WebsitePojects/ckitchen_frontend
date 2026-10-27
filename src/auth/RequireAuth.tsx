@@ -5,21 +5,23 @@ import { useAuth } from './AuthContext'
  * Route guard: redirects unauthenticated users to /login.
  * Preserves the original destination in location state so Login can
  * redirect back after a successful sign-in.
+ *
+ * Signed in means a loaded ORION `user`, never a stored `token`: Clerk sign-ins keep no
+ * ORION token (Clerk holds it), so a token check bounced every Google login back to /login.
  */
 export function RequireAuth() {
-  const { token, loading } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
-    // Still validating the stored token — render a minimal spinner
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+      <div className="flex h-dvh items-center justify-center bg-background" role="status" aria-label="Loading">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     )
   }
 
-  if (!token) {
+  if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

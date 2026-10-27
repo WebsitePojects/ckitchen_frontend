@@ -1,6 +1,6 @@
-import { SignIn, SignUp } from '@clerk/clerk-react'
+import { SignIn, SignUp, TaskChooseOrganization, useAuth as useClerkAuth, useClerk, useSession } from '@clerk/clerk-react'
 import { dark } from '@clerk/themes'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useAuth } from './AuthContext'
 
@@ -27,9 +27,14 @@ const APPEARANCE = {
 
 export default function ClerkSignInPanel() {
   const { authError, logout } = useAuth()
+  const { isSignedIn } = useClerkAuth()
+  const { session } = useSession()
+  const { signOut } = useClerk()
   const { resolvedTheme } = useTheme()
   const appearance = resolvedTheme === 'light' ? APPEARANCE.light : APPEARANCE.dark
 
+  // Never render <SignIn> while Clerk holds a session: it auto-redirects a signed-in visitor
+  // away from /login, and the route guard sends them straight back (an endless reload loop).
   if (authError) {
     return (
       <div className="space-y-4 border-y border-border py-5" role="alert">
@@ -48,6 +53,37 @@ export default function ClerkSignInPanel() {
           Use a different account
         </button>
       </div>
+    )
+  }
+
+  // A pending session has a Clerk step left (e.g. pick an organization when the Clerk
+  // dashboard requires one). Clerk treats it as signed out, so ORION never sees a token.
+  if (session?.status === 'pending') {
+    if (session.currentTask?.key === 'choose-organization') {
+      return <TaskChooseOrganization redirectUrlComplete="/" appearance={appearance} />
+    }
+    return (
+      <div className="space-y-4 border-y border-border py-5" role="alert">
+        <p className="text-sm text-muted-foreground">
+          Your sign-in has an unfinished step ({session.currentTask?.key ?? 'unknown'}). Sign out and start again.
+        </p>
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="h-11 w-full rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+        >
+          Sign out
+        </button>
+      </div>
+    )
+  }
+
+  // Signed in to Clerk: AuthContext is loading the ORION account; Login leaves once it arrives.
+  if (isSignedIn) {
+    return (
+      <p className="flex items-center gap-2 border-y border-border py-5 text-sm text-muted-foreground" role="status">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Opening ORION…
+      </p>
     )
   }
 
