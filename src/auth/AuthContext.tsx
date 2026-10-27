@@ -112,8 +112,12 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  /** Asks ORION again who the Clerk user is (after joining a workspace with a link). */
+  reloadUser: () => void
   /** True when Clerk (Google / email) sign-in is configured for this deployment. */
   clerkEnabled: boolean
+  /** The signed-in Clerk account's primary email, shown so people can tell which Google account they used. */
+  clerkEmail: string | null
 }
 
 /**
@@ -125,6 +129,7 @@ export interface ClerkSessionApi {
   isSignedIn: boolean
   /** Clerk user id; a change means a different person signed in. */
   userKey: string | null
+  email: string | null
   getToken: () => Promise<string | null>
   signOut: () => Promise<void>
 }
@@ -179,6 +184,8 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
   const clerkUserKey = clerk?.userKey ?? null
   const clerkGetTokenRef = useRef(clerk?.getToken)
   clerkGetTokenRef.current = clerk?.getToken
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const reloadUser = useCallback(() => setReloadNonce((n) => n + 1), [])
   useEffect(() => {
     if (!clerk || state.token || !clerkLoaded) return
     if (!clerkSignedIn) {
@@ -217,7 +224,7 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
       cancelled = true
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clerkLoaded, clerkSignedIn, clerkUserKey, state.token])
+  }, [clerkLoaded, clerkSignedIn, clerkUserKey, state.token, reloadNonce])
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await apiClient.post<{ token: string; user: AuthUser }>(
@@ -255,9 +262,10 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
     if (clerk?.isSignedIn) void clerk.signOut().catch(() => undefined)
   }, [state.token, clerk])
 
+  const clerkEmail = clerk?.email ?? null
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, login, logout, clerkEnabled: !!clerk }),
-    [state, login, logout, clerk],
+    () => ({ ...state, login, logout, reloadUser, clerkEnabled: !!clerk, clerkEmail }),
+    [state, login, logout, reloadUser, clerk, clerkEmail],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

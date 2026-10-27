@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react'
-import { ClerkProvider, useAuth as useClerkAuth } from '@clerk/clerk-react'
+import { ClerkProvider, useAuth as useClerkAuth, useUser } from '@clerk/clerk-react'
 import { AuthProvider } from './AuthContext'
 import { CLERK_PUBLISHABLE_KEY } from './ClerkAuthAdapter'
 
 function ClerkSessionBridge({ children }: { children: ReactNode }) {
   const { isLoaded, isSignedIn, userId, getToken, signOut } = useClerkAuth()
+  const { user } = useUser()
   return (
     <AuthProvider
       clerk={{
         isLoaded,
         isSignedIn: !!isSignedIn,
         userKey: userId ?? null,
+        email: user?.primaryEmailAddress?.emailAddress ?? null,
         getToken: () => getToken(),
         signOut: () => signOut(),
       }}

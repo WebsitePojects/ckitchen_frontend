@@ -69,15 +69,16 @@ import {
 } from '../components/ui/dialog'
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { cn } from '../lib/utils'
 import InviteLinkDialog, { type InviteLinkInfo } from '../components/users/InviteLinkDialog'
+import JoinLinksPanel, { CreateJoinLinkDialog } from '../components/users/JoinLinksPanel'
+import OutletMultiSelect from '../components/users/OutletMultiSelect'
+import { ROLES_V2, ROLE_LABEL } from '../components/users/roles'
 
 // ---------------------------------------------------------------------------
 // Types (mirror backend admin API — ckitchen_backend src/modules/admin/routes.ts)
@@ -121,44 +122,6 @@ interface RbacResponse {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-// Canonical v2 roles only (D24/D29) — matches the backend's V2_ROLES enum that
-// createUserSchema/patchUserSchema/rbacPutSchema all validate against. Legacy
-// v1 tokens (SUPER_ADMIN etc.) can still be *displayed* via ROLE_LABEL/ROLE_CLASS
-// below (a stray pre-migration account), but are never offered as a choice here.
-const ROLES_V2: readonly string[] = [
-  'OWNER',
-  'OUTLET_MANAGER',
-  'BRAND_MANAGER',
-  'KITCHEN_CREW',
-  'WAREHOUSE_MAIN',
-  'WAREHOUSE_OUTLET',
-  'PURCHASING',
-  'HR',
-  'ACCOUNTING',
-]
-
-// v1 (legacy) labels/colors, plus v2 (D24/D29) entries so a v2 role token
-// never renders an undefined badge.
-const ROLE_LABEL: Record<string, string> = {
-  // v1
-  SUPER_ADMIN: 'Super Admin',
-  BRAND_MANAGER: 'Brand Manager',
-  KITCHEN_STAFF: 'Kitchen Staff',
-  WAREHOUSE: 'Warehouse',
-  SUPPLIER_COORDINATOR: 'Supplier Coord.',
-  ACCOUNTANT: 'Accountant',
-  RIDER: 'Rider',
-  // v2
-  OWNER: 'Owner',
-  OUTLET_MANAGER: 'Outlet Manager',
-  KITCHEN_CREW: 'Kitchen Crew',
-  WAREHOUSE_MAIN: 'Warehouse (Main)',
-  WAREHOUSE_OUTLET: 'Warehouse (Outlet)',
-  PURCHASING: 'Purchasing',
-  HR: 'HR',
-  ACCOUNTING: 'Accounting',
-}
 
 const ROLE_CLASS: Record<string, string> = {
   // v1
@@ -235,64 +198,6 @@ function fmtActivityTime(iso: string): string {
 
 function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback
-}
-
-// ---------------------------------------------------------------------------
-// Outlet multi-select (dropdown checklist) — used inside the Create User form
-// ---------------------------------------------------------------------------
-
-function OutletMultiSelect({
-  outlets,
-  selected,
-  onChange,
-  disabled,
-}: {
-  outlets: OutletSummary[]
-  selected: string[]
-  onChange: (ids: string[]) => void
-  disabled?: boolean
-}) {
-  function toggle(id: string) {
-    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
-  }
-
-  const label =
-    outlets.length === 0
-      ? 'No outlets configured'
-      : selected.length === 0
-        ? 'No outlet access'
-        : selected.length === outlets.length
-          ? 'All outlets'
-          : `${selected.length} outlet${selected.length === 1 ? '' : 's'}`
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full justify-start font-normal"
-          disabled={disabled || outlets.length === 0}
-        >
-          {label}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64" align="start">
-        <DropdownMenuLabel>Outlet access</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {outlets.map((o) => (
-          <DropdownMenuCheckboxItem
-            key={o.id}
-            checked={selected.includes(o.id)}
-            onSelect={(e) => e.preventDefault()}
-            onCheckedChange={() => toggle(o.id)}
-          >
-            {o.name} <span className="ml-1 text-xs text-muted-foreground">({o.code})</span>
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
 }
 
 // ---------------------------------------------------------------------------
@@ -381,9 +286,9 @@ function CreateUserDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5">
+        <Button size="sm" variant={clerkEnabled ? 'outline' : 'default'} className="gap-1.5">
           <Plus className="h-4 w-4" />
-          New User
+          {clerkEnabled ? 'Add by email' : 'New User'}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -1010,7 +915,12 @@ export default function Users() {
       <PageHeader
         title="Users & Roles"
         subtitle="Accounts, permissions and security controls"
-        actions={<CreateUserDialog outlets={outlets} onCreated={invalidateUsers} onInviteLink={setInviteLink} />}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {clerkEnabled && <CreateJoinLinkDialog outlets={outlets} />}
+            <CreateUserDialog outlets={outlets} onCreated={invalidateUsers} onInviteLink={setInviteLink} />
+          </div>
+        }
       />
 
       <KpiRibbon>
@@ -1028,7 +938,8 @@ export default function Users() {
         </TabsList>
 
         {/* Users */}
-        <TabsContent value="users" className="mt-4">
+        <TabsContent value="users" className="mt-4 space-y-4">
+          {clerkEnabled && <JoinLinksPanel />}
           <Card className="border-border bg-card">
             <CardHeader>
               <CardTitle className="text-base text-foreground">Team</CardTitle>

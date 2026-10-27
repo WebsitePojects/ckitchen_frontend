@@ -183,7 +183,8 @@ apiClient.interceptors.response.use(
       if (err.response.status === 401) {
         localStorage.removeItem(TOKEN_KEY)
         destroySocket()
-        if (window.location.pathname !== '/login') {
+        // /join serves people who are not in ORION yet; its own page explains a refusal.
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/join') {
           const handled = reportCrucialError({
             kind: 'session',
             title: 'Session expired',

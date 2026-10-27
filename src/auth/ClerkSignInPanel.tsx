@@ -13,7 +13,8 @@ import { useAuth } from './AuthContext'
  */
 // Same palette as index.css; Clerk needs concrete colours, so one map per theme.
 // footer: the "Secured by Clerk" badge (owner's decision; the sign-up link there is unused
-// because sign-ups are invitation-only). An inline style object outranks Clerk's own CSS.
+// because Google sign-in creates the account and ORION decides access). An inline style
+// object outranks Clerk's own CSS.
 const elements = {
   card: 'shadow-none border-0 bg-transparent',
   rootBox: 'w-full',
@@ -39,7 +40,8 @@ const APPEARANCE = {
   },
 }
 
-export default function ClerkSignInPanel() {
+/** `redirectUrl`: where to land after signing in (the join page returns to itself). */
+export default function ClerkSignInPanel({ redirectUrl }: { redirectUrl?: string } = {}) {
   const { authError, logout } = useAuth()
   const { isSignedIn } = useClerkAuth()
   const { session } = useSession()
@@ -105,6 +107,11 @@ export default function ClerkSignInPanel() {
   return invited ? (
     <SignUp routing="hash" appearance={appearance} signInUrl="/login" />
   ) : (
-    <SignIn routing="hash" appearance={appearance} signUpUrl="/login" />
+    <SignIn
+      routing="hash"
+      appearance={appearance}
+      signUpUrl="/login"
+      {...(redirectUrl ? { forceRedirectUrl: redirectUrl, signUpForceRedirectUrl: redirectUrl } : {})}
+    />
   )
 }

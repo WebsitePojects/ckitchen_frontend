@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Loader2, AlertCircle, Mail, Lock } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { CKApiError, warmUpApi } from '../lib/api'
+import { pendingJoinToken } from '../lib/joinToken'
 import AuthShell from '../components/auth/AuthShell'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
@@ -11,7 +12,7 @@ import { Button } from '../components/ui/button'
 const ClerkSignInPanel = lazy(() => import('../auth/ClerkSignInPanel'))
 
 export default function Login() {
-  const { login, user, clerkEnabled } = useAuth()
+  const { login, user, authError, clerkEnabled } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -32,6 +33,12 @@ export default function Login() {
   useEffect(() => {
     if (user) navigate(from, { replace: true })
   }, [user, from, navigate])
+
+  // Someone who opened a join link and came back here after signing in with Google (not in
+  // ORION yet): finish joining on the join page instead of showing "not added".
+  useEffect(() => {
+    if (authError?.code === 'NOT_INVITED' && pendingJoinToken()) navigate('/join', { replace: true })
+  }, [authError, navigate])
 
   // Start waking the backend as soon as the login page loads (cold-start mitigation).
   useEffect(() => {
