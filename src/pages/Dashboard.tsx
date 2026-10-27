@@ -13,7 +13,7 @@
  * Business Rule #9: real-time within ~2 s; distinct audible alert.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bar,
   BarChart,
@@ -268,13 +268,13 @@ interface Filters {
   station_id: string
 }
 
+/** Most orders the live board loads at once (business day + open orders, newest first). */
+const BOARD_LIMIT = 500
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const { selectedOutletId, outlets } = useOutlet()
-  const [orders, setOrders]     = useState<OrderDetail[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
   const [muted, setMuted]       = useState(false)
   // Default the feed to NEW orders (user directive 2026-07-07): the dashboard's
   // job is incoming work; switch to All/other statuses via the filter row.
@@ -301,55 +301,37 @@ export default function Dashboard() {
 
   const brandMap = useMemo(() => new Map(brands.map(b => [b.id, b])), [brands])
 
-  // ── Initial data load (orders — the realtime feed) ─────────────────────────
-  // Wrapped in useCallback (stable identity, no external deps — it fetches
-  // orders fresh from the API every call) so it can also be re-invoked on
-  // socket reconnect to catch up on any missed events (Business Rule #9).
-  // Perf fix (N+1 KDS fetch): this used to fetch a plain order-summary list,
-  // sort/cap it at 100, then `Promise.all(toFetch.map(o =>
-  // fetchOrderDetail(o.id)))` — up to 100 extra sequential-latency round
-  // trips just to hydrate items/print_jobs for the feed. `?detail=1`
-  // bulk-hydrates every order's items[]/print_jobs[] in the SAME response
-  // (O(1) extra queries server-side — see listOrdersWithDetail in
-  // ckitchen_backend's orders/service.ts), so this is now a single request.
-  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const { data: rawOrders } = await get<RawOrderDetail[]>('/orders?detail=1')
-      if (cancelledRef?.current) return
-
-      // Defensive: never assume the body is an array (a proxy/edge error page, a
-      // partial response on a cold backend, etc. could yield a non-array) — a
-      // bad body must not crash the dashboard with "X is not iterable".
-      const list = Array.isArray(rawOrders) ? rawOrders : []
-      // Sort newest-first. Show ALL orders (user directive 2026-07-07) — the old
-      // 100-row cap hid older orders from the table. NOTE: at nationwide scale this
-      // must become server-side pagination (scalability-plan.md P0); acceptable now
-      // that the staging DB is cleaned and the demo dataset is small.
-      list.sort((a, b) => new Date(b.placedAt).getTime() - new Date(a.placedAt).getTime())
-      const loaded = list.map(toOrderDetail)
-      setOrders(loaded)
-    } catch (e) {
-      if (!cancelledRef?.current) {
-        const msg = e instanceof Error ? e.message : 'Failed to load orders.'
-        setError(msg)
-      }
-    } finally {
-      if (!cancelledRef?.current) setLoading(false)
-    }
-    // selectedOutletId is a deliberate re-run trigger (not used in the body): the
-    // X-Outlet-Id header is set from localStorage by the api interceptor, so
-    // switching the outlet must re-invoke load() to refetch the correctly-scoped
-    // order feed (P6 — outlets interchangeable from the header).
-  }, [selectedOutletId])
-
-  useEffect(() => {
-    const cancelledRef = { current: false }
-    void load(cancelledRef)
-    return () => { cancelledRef.current = true }
-  }, [load])
+  // ── Order feed (the live board) ──────────────────────────────────────────
+  // Only the current business day plus still-open orders (server-side scope=board,
+  // newest first, capped), never the whole order history. Kept in the query cache, so
+  // coming back to the dashboard shows the last board instantly while a background
+  // refetch (on every mount) catches anything missed while away; socket events then
+  // patch the cache in place. The X-Outlet-Id header comes from the api interceptor,
+  // so the outlet is part of the cache key.
+  const queryClient = useQueryClient()
+  const boardKey = useMemo(() => ['orders', 'board', selectedOutletId] as const, [selectedOutletId])
+  const {
+    data: orders = [],
+    isLoading: loading,
+    error: boardError,
+  } = useQuery({
+    queryKey: boardKey,
+    queryFn: async () => {
+      const { data: rawOrders } = await get<RawOrderDetail[]>(`/orders?detail=1&scope=board&limit=${BOARD_LIMIT}`)
+      // Defensive: a proxy/edge error page could yield a non-array body.
+      return (Array.isArray(rawOrders) ? rawOrders : []).map(toOrderDetail)
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+  const error = boardError ? (boardError instanceof Error ? boardError.message : 'Failed to load orders.') : null
+  const setOrders = useCallback(
+    (updater: (prev: OrderDetail[]) => OrderDetail[]) => {
+      queryClient.setQueryData<OrderDetail[]>(boardKey, (prev) => updater(prev ?? []))
+    },
+    [queryClient, boardKey],
+  )
+  const load = useCallback(() => queryClient.invalidateQueries({ queryKey: boardKey }), [queryClient, boardKey])
 
   // ── Socket connect + room join ──────────────────────────────────────────
   // Runs whenever `brands` (from the cache-first query above) changes — this
