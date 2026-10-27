@@ -61,7 +61,9 @@ function addCspSources(csp: string, directive: string, sources: string[]): strin
 
 /**
  * With Clerk enabled, allow exactly what its sign-in widget needs (per Clerk's CSP guide):
- * its Frontend API host for script + requests, its image CDN, and Cloudflare's bot check.
+ * its Frontend API host for script + requests, its image CDN, Cloudflare's bot check, and its
+ * fraud/abuse protection (*.protect.clerk.com; connect-src needs :* because a host without a
+ * port only matches 443). Source: clerk.com/docs/guides/secure/best-practices/csp-headers.
  */
 function cspClerkPlugin(publishableKey: string): Plugin {
   return {
@@ -71,10 +73,10 @@ function cspClerkPlugin(publishableKey: string): Plugin {
       if (!host) return html
       return html.replace(/content="(default-src[^"]*)"/, (_m, csp: string) => {
         let next = csp
-        next = addCspSources(next, 'script-src', [`https://${host}`, 'https://challenges.cloudflare.com'])
-        next = addCspSources(next, 'connect-src', [`https://${host}`])
+        next = addCspSources(next, 'script-src', [`https://${host}`, 'https://challenges.cloudflare.com', 'https://*.protect.clerk.com'])
+        next = addCspSources(next, 'connect-src', [`https://${host}`, 'https://*.protect.clerk.com:*'])
         next = addCspSources(next, 'img-src', ['https://img.clerk.com'])
-        next = addCspSources(next, 'frame-src', ["'self'", 'https://challenges.cloudflare.com'])
+        next = addCspSources(next, 'frame-src', ["'self'", 'https://challenges.cloudflare.com', 'https://*.protect.clerk.com'])
         next = addCspSources(next, 'worker-src', ["'self'", 'blob:'])
         return `content="${next}"`
       })
