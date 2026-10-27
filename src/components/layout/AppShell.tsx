@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { WifiOff } from 'lucide-react'
 import { Outlet } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -9,6 +9,7 @@ import { NotificationProvider } from '../../context/NotificationContext'
 import { PageHeaderProvider } from './PageHeaderContext'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import PageFallback from './PageFallback'
 
 /**
  * AppShell — Sidebar (fixed on desktop, Sheet on mobile) + Topbar + <Outlet/>.
@@ -89,7 +90,10 @@ export default function AppShell() {
                 </div>
               )}
               <main className="flex-1 overflow-y-auto">
-                <Outlet />
+                {/* Page chunks load lazily; the shell stays put while a page arrives. */}
+                <Suspense fallback={<PageFallback />}>
+                  <Outlet />
+                </Suspense>
               </main>
             </div>
           </div>

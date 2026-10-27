@@ -19,6 +19,7 @@ import {
   Boxes,
   ShoppingCart,
   Tablet,
+  ShoppingBag,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -47,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Overview',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/pos', label: 'New Order', icon: ShoppingBag },
       { to: '/orders', label: 'Live Orders', icon: ReceiptText },
       { to: '/kitchen', label: 'Kitchen (KDS)', icon: ChefHat },
       { to: '/merchant-console', label: 'Merchant Console', icon: Tablet },

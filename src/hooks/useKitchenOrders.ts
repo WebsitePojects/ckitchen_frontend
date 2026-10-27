@@ -68,12 +68,20 @@ export interface UseKitchenOrdersResult {
   now: number
 }
 
+/**
+ * Last board per outlet, kept for the browser session. Re-opening the KDS (or switching
+ * back to an outlet) paints this instantly while `load` refreshes behind it, instead of
+ * blanking to "Loading…" on every visit. Never trusted as current: `load` always runs.
+ */
+const boardSnapshots = new Map<string, { orders: KdsOrder[]; brands: Brand[]; stations: Station[] }>()
+
 export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitchenOrdersResult {
   const { outlets, selectedOutletId } = useOutlet()
-  const [orders, setOrders] = useState<KdsOrder[]>([])
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [stations, setStations] = useState<Station[]>([])
-  const [loading, setLoading] = useState(true)
+  const snapshot = boardSnapshots.get(selectedOutletId)
+  const [orders, setOrders] = useState<KdsOrder[]>(() => snapshot?.orders ?? [])
+  const [brands, setBrands] = useState<Brand[]>(() => snapshot?.brands ?? [])
+  const [stations, setStations] = useState<Station[]>(() => snapshot?.stations ?? [])
+  const [loading, setLoading] = useState(!snapshot)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
 
@@ -97,7 +105,15 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
   // re-joins the correct socket room(s) AND refetches (the refetch picks up
   // the new X-Outlet-Id header lib/api.ts's interceptor now sends).
   const load = useCallback(async (cancelledRef?: { current: boolean }) => {
-    setLoading(true)
+    // Only show the loading state when there is nothing cached to show for this outlet.
+    const cached = boardSnapshots.get(selectedOutletId)
+    if (cached) {
+      setOrders(cached.orders)
+      setBrands(cached.brands)
+      setStations(cached.stations)
+    } else {
+      setLoading(true)
+    }
     setError(null)
     try {
       // Perf fix (N+1 KDS fetch): this used to be a summary call
@@ -162,6 +178,12 @@ export function useKitchenOrders(options: UseKitchenOrdersOptions = {}): UseKitc
     void load(cancelledRef)
     return () => { cancelledRef.current = true }
   }, [load])
+
+  // Keep the snapshot in step with live patches so the next visit starts from the latest board.
+  // Never snapshot a failed load: that would show an empty board as if there were no orders.
+  useEffect(() => {
+    if (!loading && !error) boardSnapshots.set(selectedOutletId, { orders, brands, stations })
+  }, [orders, brands, stations, loading, error, selectedOutletId])
 
   // ── Reconnect recovery ─────────────────────────────────────────────────────
   // A dropped-then-restored socket may have missed order.created/updated

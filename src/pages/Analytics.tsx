@@ -11,7 +11,7 @@
  *   GET /analytics/brands?from&to        → { brand_id, name, revenue, order_count, avg_order_value, is_weakest }
  *   GET /analytics/orders-by-hour?date   → { hour (0-23), order_count }
  *   GET /analytics/aggregators?from&to   → { aggregator, order_count, revenue }
- *   GET /analytics/margins?from&to       → { brand_id, name, revenue, recipe_cost_total, margin }
+ *   GET /analytics/margins?from&to       → { brand_id, name, revenue, recipe_cost_total, margin, commission, net_margin }
  *
  * Sales Report (W3a, D33 #10) — RBAC OWNER/ACCOUNTING only (backend requireRole):
  *   GET /reports/sales?from&to&group_by=day|brand|outlet|aggregator
@@ -74,6 +74,7 @@ import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
 import DataTable from '../components/common/DataTable'
 import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE, CHART_SINGLE, aggregatorLabel } from '../lib/theme'
+import { useApiQuery } from '../hooks/useApiQuery'
 
 // ─── API response types (snake_case — as the backend sends them) ───────────────
 
@@ -102,7 +103,12 @@ interface ApiMargin {
   name: string
   revenue: number | null | undefined
   recipe_cost_total: number | null | undefined
+  /** Gross food margin: revenue - recipe cost. */
   margin: number | null | undefined
+  /** Aggregator commission on that revenue (frozen rate per order). Absent on older APIs. */
+  commission?: number | null
+  /** What the brand keeps: revenue - recipe cost - commission. Absent on older APIs. */
+  net_margin?: number | null
 }
 
 // ─── Date helpers ──────────────────────────────────────────────────────────────
@@ -260,21 +266,13 @@ function AnalyticsKpiRibbon({ data, loading }: { data: KpiData | null; loading: 
 
 // ─── Section: Per-Brand Performance (FR-AN-01, FR-AN-02) ─────────────────────
 
-function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<ApiBrandPerf[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+// Stable empty list so sections without data yet don't re-render on a fresh [] each time.
+const EMPTY_LIST: never[] = []
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    get<ApiBrandPerf[]>(`/analytics/brands?${rangeParams(from, to)}`)
-      .then(res => { if (!cancelled) setData(res.data ?? []) })
-      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load brand analytics.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [from, to])
+function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
+  // Cached + background refresh (hooks/useApiQuery.ts): no spinner on revisit.
+  const { data: cached, loading, error } = useApiQuery<ApiBrandPerf[]>(`/analytics/brands?${rangeParams(from, to)}`, { fallbackError: 'Failed to load brand analytics.' })
+  const data = cached ?? EMPTY_LIST as ApiBrandPerf[]
 
   const weakest  = data.find(b => b.is_weakest)
   const topBrand = data[0]  // API returns ranked top→weak
@@ -427,20 +425,9 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
 // ─── Section: Orders by Hour (FR-AN-03) ───────────────────────────────────────
 
 function OrdersByHourSection({ date }: { date: string }) {
-  const [data, setData]       = useState<ApiHourBucket[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    get<ApiHourBucket[]>(`/analytics/orders-by-hour?date=${date}`)
-      .then(res => { if (!cancelled) setData(res.data ?? []) })
-      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load hourly data.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [date])
+  // Cached + background refresh (hooks/useApiQuery.ts): no spinner on revisit.
+  const { data: cached, loading, error } = useApiQuery<ApiHourBucket[]>(`/analytics/orders-by-hour?date=${date}`, { fallbackError: 'Failed to load hourly data.' })
+  const data = cached ?? EMPTY_LIST as ApiHourBucket[]
 
   // Build a full 24-hour scaffold (sparse data from API)
   const chartData = Array.from({ length: 24 }, (_, h) => {
@@ -528,20 +515,9 @@ function OrdersByHourSection({ date }: { date: string }) {
 // ─── Section: Aggregator Split (FR-AN-04) ─────────────────────────────────────
 
 function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<ApiAggregatorSplit[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    get<ApiAggregatorSplit[]>(`/analytics/aggregators?${rangeParams(from, to)}`)
-      .then(res => { if (!cancelled) setData(res.data ?? []) })
-      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load aggregator data.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [from, to])
+  // Cached + background refresh (hooks/useApiQuery.ts): no spinner on revisit.
+  const { data: cached, loading, error } = useApiQuery<ApiAggregatorSplit[]>(`/analytics/aggregators?${rangeParams(from, to)}`, { fallbackError: 'Failed to load aggregator data.' })
+  const data = cached ?? EMPTY_LIST as ApiAggregatorSplit[]
 
   const totalOrders  = data.reduce((s, d) => s + (d.order_count ?? 0), 0)
   const totalRevenue = data.reduce((s, d) => s + (d.revenue   ?? 0), 0)
@@ -679,23 +655,14 @@ function marginColor(marginPct: number): string {
 }
 
 function BrandMarginsSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<ApiMargin[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  // Cached + background refresh (hooks/useApiQuery.ts): no spinner on revisit.
+  const { data: cached, loading, error } = useApiQuery<ApiMargin[]>(`/analytics/margins?${rangeParams(from, to)}`, { fallbackError: 'Failed to load margin data.' })
+  const data = cached ?? EMPTY_LIST as ApiMargin[]
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    get<ApiMargin[]>(`/analytics/margins?${rangeParams(from, to)}`)
-      .then(res => { if (!cancelled) setData(res.data ?? []) })
-      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load margin data.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [from, to])
-
-  // Sort by margin descending
-  const sorted = [...data].sort((a, b) => (b.margin ?? 0) - (a.margin ?? 0))
+  // Net margin (after commission) is what the business keeps, so rank by it; older APIs
+  // without commission fall back to the food margin.
+  const netOf = (b: ApiMargin) => b.net_margin ?? b.margin ?? 0
+  const sorted = [...data].sort((a, b) => netOf(b) - netOf(a))
 
   const chartData = sorted.map((b, i) => ({
     name:       b.name,
@@ -703,6 +670,9 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
     cost:       b.recipe_cost_total ?? 0,
     margin:     b.margin ?? 0,
     marginPct:  (b.revenue ?? 0) > 0 ? ((b.margin ?? 0) / (b.revenue ?? 1)) * 100 : 0,
+    commission: b.commission ?? 0,
+    net:        netOf(b),
+    netPct:     (b.revenue ?? 0) > 0 ? (netOf(b) / (b.revenue ?? 1)) * 100 : 0,
     color:      CHART_PALETTE[i % CHART_PALETTE.length],
     brand_id:   b.brand_id,
   }))
@@ -793,8 +763,10 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
                     <th className="px-4 py-2.5 text-left">Brand</th>
                     <th className="px-4 py-2.5 text-right">Revenue</th>
                     <th className="px-4 py-2.5 text-right">Recipe Cost</th>
-                    <th className="px-4 py-2.5 text-right">Margin</th>
-                    <th className="px-4 py-2.5 text-right">Margin %</th>
+                    <th className="px-4 py-2.5 text-right">Food margin</th>
+                    <th className="px-4 py-2.5 text-right">Commission</th>
+                    <th className="px-4 py-2.5 text-right">Net (kept)</th>
+                    <th className="px-4 py-2.5 text-right">Net %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -815,11 +787,17 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
                       <td className="px-4 py-2.5 text-right tabular-nums text-red-400/80">
                         {fmtPHP(b.cost)}
                       </td>
-                      <td className={['px-4 py-2.5 text-right tabular-nums font-semibold', marginColor(b.marginPct)].join(' ')}>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
                         {fmtPHP(b.margin)}
                       </td>
-                      <td className={['px-4 py-2.5 text-right tabular-nums', marginColor(b.marginPct)].join(' ')}>
-                        {fmtPct(b.marginPct)}
+                      <td className="px-4 py-2.5 text-right tabular-nums text-red-400/80">
+                        {fmtPHP(b.commission)}
+                      </td>
+                      <td className={['px-4 py-2.5 text-right tabular-nums font-semibold', marginColor(b.netPct)].join(' ')}>
+                        {fmtPHP(b.net)}
+                      </td>
+                      <td className={['px-4 py-2.5 text-right tabular-nums', marginColor(b.netPct)].join(' ')}>
+                        {fmtPct(b.netPct)}
                       </td>
                     </tr>
                   ))}
@@ -902,20 +880,9 @@ function ProductTooltip({
 }
 
 function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
-  const [data, setData]       = useState<ApiProductPerf[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    get<ApiProductPerf[]>(`/analytics/products?${rangeParams(from, to)}`)
-      .then(res => { if (!cancelled) setData(res.data ?? []) })
-      .catch(e  => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load product performance.') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [from, to])
+  // Cached + background refresh (hooks/useApiQuery.ts): no spinner on revisit.
+  const { data: cached, loading, error } = useApiQuery<ApiProductPerf[]>(`/analytics/products?${rangeParams(from, to)}`, { fallbackError: 'Failed to load product performance.' })
+  const data = cached ?? EMPTY_LIST as ApiProductPerf[]
 
   // API is already revenue-desc; defensively re-sort, then take the top N.
   const topProducts = useMemo(

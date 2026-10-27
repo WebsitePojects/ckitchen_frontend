@@ -46,6 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table'
+import { useApiQuery } from '../hooks/useApiQuery'
 
 interface OutletWarehouse {
   id: string
@@ -121,10 +122,15 @@ function warehousePill(label: string, ready: boolean) {
   )
 }
 
+const NO_OUTLETS: Outlet[] = []
+
 export default function Outlets() {
   const navigate = useNavigate()
-  const [outlets, setOutlets] = useState<Outlet[]>([])
-  const [loading, setLoading] = useState(true)
+  // Cached list: a revisit paints instantly and refreshes in the background.
+  const outletsQuery = useApiQuery<Outlet[]>('/outlets', { fallbackError: 'Failed to load outlets', staleTimeMs: 60_000 })
+  const outlets = outletsQuery.data ?? NO_OUTLETS
+  const loading = outletsQuery.loading
+  // Errors from create/edit actions (shown in the dialog); list-load errors come from the query.
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<OutletForm>(EMPTY_FORM)
@@ -184,26 +190,8 @@ export default function Outlets() {
 
   const loadOutlets = useCallback(async () => {
     setError(null)
-    const { data } = await get<Outlet[]>('/outlets')
-    setOutlets(data)
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      try {
-        const { data } = await get<Outlet[]>('/outlets')
-        if (alive) setOutlets(data)
-      } catch (e) {
-        if (alive) setError((e as { message?: string })?.message ?? 'Failed to load outlets')
-      } finally {
-        if (alive) setLoading(false)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [])
+    await outletsQuery.refetch()
+  }, [outletsQuery.refetch])
 
   const stats = useMemo(() => {
     const active = outlets.filter((outlet) => outlet.status === 'ACTIVE').length
@@ -349,8 +337,8 @@ export default function Outlets() {
       <Card className="border-border bg-card">
         {loading ? (
           <p className="p-6 text-sm text-zinc-500">Loading physical outlets…</p>
-        ) : error && outlets.length === 0 ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+        ) : outletsQuery.error && outlets.length === 0 ? (
+          <p className="p-6 text-sm text-red-400">{outletsQuery.error}</p>
         ) : outlets.length === 0 ? (
           <EmptyState
             icon={Building2}

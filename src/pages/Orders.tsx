@@ -45,6 +45,7 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 interface Brand {
   id: string
@@ -81,6 +82,9 @@ function fmtTime(iso: string) {
   const d = new Date(iso)
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
+
+const NO_ORDERS: Order[] = []
+const NO_BRANDS: Record<string, Brand> = {}
 
 export default function Orders() {
   const { outlets, selectedOutletId } = useOutlet()
@@ -142,86 +146,55 @@ export default function Orders() {
     if (!next) void refreshPendingDiscountCount()
   }
 
-  const [orders, setOrders] = useState<Order[]>([])
-  const [brands, setBrands] = useState<Record<string, Brand>>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [search, setSearch] = useState('')
 
-  // ── Initial load ──────────────────────────────────────────────────────────
-  // Wrapped in useCallback so it can also re-run when the outlet switcher
-  // changes (selectedOutletId/outlets are in its deps — same M2 pattern as
-  // useKitchenOrders.ts): a specific outlet joins exactly that outlet's
-  // socket room; 'ALL' (HQ-scope viewers) joins every outlet's room. This
-  // ALSO toggles `loading`, showing the "Loading orders…" placeholder — that
-  // is correct for a genuinely fresh fetch (mount, or an outlet switch) but
-  // NOT for a live realtime refresh, which must update the table in place
-  // without flashing a reload — see `refetchSilently` below for that case.
-  const load = useCallback(async (cancelledRef?: { current: boolean }) => {
-    setLoading(true)
-    setError(null)
-    try {
+  // ── Data: cached + background refresh ─────────────────────────────────────
+  // Revisiting the page shows the last list instantly (no "Loading…" flash) and
+  // refreshes behind it. staleTime 0: this is a live board and socket events are
+  // missed while the page is closed, so the cache is never trusted as current;
+  // it is only shown while the fresh copy arrives.
+  const queryClient = useQueryClient()
+  const boardKey = useMemo(() => ['orders-board', selectedOutletId] as const, [selectedOutletId])
+  const boardQuery = useQuery({
+    queryKey: boardKey,
+    queryFn: async () => {
       const [ordersRes, brandsRes] = await Promise.all([
         get<Order[]>('/orders'),
         get<Brand[]>(outletScopedPath('/brands', selectedOutletId)),
       ])
-      if (cancelledRef?.current) return
-      setOrders(ordersRes.data)
-      setBrands(Object.fromEntries(brandsRes.data.map((x) => [x.id, x])))
+      return {
+        orders: ordersRes.data,
+        brands: Object.fromEntries(brandsRes.data.map((x) => [x.id, x])) as Record<string, Brand>,
+      }
+    },
+    staleTime: 0,
+  })
+  const orders = boardQuery.data?.orders ?? NO_ORDERS
+  const brands = boardQuery.data?.brands ?? NO_BRANDS
+  const loading = boardQuery.isPending
+  // A failed background refresh keeps the last list on screen; only a first load that
+  // fails shows the error.
+  const error = !boardQuery.data && boardQuery.error
+    ? boardQuery.error instanceof Error ? boardQuery.error.message : 'Failed to load orders'
+    : null
 
-      // Ensure the socket is connected + joined to the room(s) for the
-      // selected outlet (mirrors useKitchenOrders.ts's M2 fix) so
-      // order.created/order.updated events for the right outlet(s) actually
-      // reach this page.
-      if (!getSocket()) initSocket()
-      if (selectedOutletId === 'ALL') {
-        if (outlets.length > 0) joinLocations(outlets.map((o) => o.id))
-      } else {
-        joinLocation(selectedOutletId)
-      }
-    } catch (e) {
-      if (!cancelledRef?.current) {
-        setError(e instanceof Error ? e.message : 'Failed to load orders')
-      }
-    } finally {
-      if (!cancelledRef?.current) setLoading(false)
+  // Join the selected outlet's socket room(s) so order.created/updated reach this page
+  // (mirrors useKitchenOrders.ts's M2 fix); 'ALL' (HQ scope) joins every outlet.
+  useEffect(() => {
+    if (!getSocket()) initSocket()
+    if (selectedOutletId === 'ALL') {
+      if (outlets.length > 0) joinLocations(outlets.map((o) => o.id))
+    } else {
+      joinLocation(selectedOutletId)
     }
   }, [selectedOutletId, outlets])
 
-  useEffect(() => {
-    const cancelledRef = { current: false }
-    void load(cancelledRef)
-    return () => {
-      cancelledRef.current = true
-    }
-  }, [load])
-
-  // ── Background refetch (realtime events + reconnect) ────────────────────
-  // Re-fetches the same list but WITHOUT touching `loading` — the table
-  // already has data on screen, so a live update must patch it in place
-  // (Business Rule #9: "real-time or it doesn't count" implies no visible
-  // reload). Socket room membership is already established by `load` above
-  // (and re-applied automatically on reconnect by lib/socket.ts), so this
-  // doesn't need to repeat the join step. Soft-fails on error (keeps
-  // whatever was last shown rather than blanking the page over a transient
-  // background refresh failure) — the next event or reconnect gets another
-  // chance.
-  const refetchSilently = useCallback(async () => {
-    try {
-      const [ordersRes, brandsRes] = await Promise.all([
-        get<Order[]>('/orders'),
-        get<Brand[]>(outletScopedPath('/brands', selectedOutletId)),
-      ])
-      setOrders(ordersRes.data)
-      setBrands(Object.fromEntries(brandsRes.data.map((x) => [x.id, x])))
-    } catch {
-      // Soft-fail — see comment above.
-    }
-    // selectedOutletId must be a dep — it's read in the body via
-    // outletScopedPath (Brand fetch), so an empty dep array here would close
-    // over a stale outlet forever after the first render.
-  }, [selectedOutletId])
+  // Live updates refresh in place (Business Rule #9) without a loading flash.
+  const refetchSilently = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: boardKey }),
+    [queryClient, boardKey],
+  )
 
   // A dropped-then-restored socket may have missed order.created/updated
   // events entirely — refetch to catch up (Business Rule #9).

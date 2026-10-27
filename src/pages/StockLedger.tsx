@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '../components/ui/table'
+import { useApiQuery } from '../hooks/useApiQuery'
 
 interface LedgerEntry {
   id: string
@@ -63,6 +64,8 @@ function fmtTime(iso: string) {
   })
 }
 
+const NO_ENTRIES: LedgerEntry[] = []
+
 export default function StockLedger() {
   // Outlet-scoping leak fix: GET /stock-ledger is outlet-scoped server-side
   // (X-Outlet-Id), but this effect never depended on the selected outlet, so
@@ -70,11 +73,6 @@ export default function StockLedger() {
   // screen until some other filter changed. selectedOutletId is now a
   // deliberate re-run trigger for the ledger-rows effect below.
   const { selectedOutletId } = useOutlet()
-  const [entries, setEntries] = useState<LedgerEntry[]>([])
-  const [ingredients, setIngredients] = useState<Record<string, Ingredient>>({})
-  const [warehouses, setWarehouses] = useState<Record<string, Warehouse>>({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [module, setModule] = useState('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -87,46 +85,32 @@ export default function StockLedger() {
     return () => clearTimeout(t)
   }, [search])
 
-  // Static lookups (ingredient + warehouse names) — fetched once. On failure the
-  // table degrades to short ids rather than blocking the ledger.
-  useEffect(() => {
-    let alive = true
-    Promise.all([get<Ingredient[]>('/ingredients'), get<Warehouse[]>('/warehouses')])
-      .then(([ing, wh]) => {
-        if (!alive) return
-        setIngredients(Object.fromEntries(ing.data.map((x) => [x.id, x])))
-        setWarehouses(Object.fromEntries(wh.data.map((x) => [x.id, x])))
-      })
-      .catch(() => {
-        /* names degrade to ids — non-fatal */
-      })
-    return () => {
-      alive = false
-    }
-  }, [])
+  // Name lookups change rarely: cached for 5 minutes and shared with other pages. On
+  // failure the table degrades to short ids rather than blocking the ledger.
+  const ingredientsQuery = useApiQuery<Ingredient[]>('/ingredients', { fallbackError: '', staleTimeMs: 300_000 })
+  const warehousesQuery = useApiQuery<Warehouse[]>('/warehouses', { fallbackError: '', staleTimeMs: 300_000 })
+  const ingredients = useMemo(
+    () => Object.fromEntries((ingredientsQuery.data ?? []).map((x) => [x.id, x])) as Record<string, Ingredient>,
+    [ingredientsQuery.data],
+  )
+  const warehouses = useMemo(
+    () => Object.fromEntries((warehousesQuery.data ?? []).map((x) => [x.id, x])) as Record<string, Warehouse>,
+    [warehousesQuery.data],
+  )
 
-  // Ledger rows — refetch on module filter or debounced search. The backend
-  // accepts `q=` (case-insensitive over ingredient name / source_ref / doc no);
-  // older deploys ignore it, so we ALSO filter client-side in `rows` below.
-  useEffect(() => {
-    let alive = true
-    setLoading(true)
+  // Ledger rows — cached per filter (module + debounced search + outlet). The backend
+  // accepts `q=`; older deploys ignore it, so `rows` below ALSO filters client-side.
+  const ledgerUrl = useMemo(() => {
     const params = new URLSearchParams()
     if (module !== 'ALL') params.set('source_module', module)
     if (debouncedSearch.trim()) params.set('q', debouncedSearch.trim())
     const qs = params.toString()
-    get<LedgerEntry[]>(`/stock-ledger${qs ? `?${qs}` : ''}`)
-      .then((l) => {
-        if (!alive) return
-        setEntries(l.data)
-        setError(null)
-      })
-      .catch((e) => alive && setError(e?.message ?? 'Failed to load stock ledger'))
-      .finally(() => alive && setLoading(false))
-    return () => {
-      alive = false
-    }
-  }, [module, debouncedSearch, selectedOutletId])
+    return `/stock-ledger${qs ? `?${qs}` : ''}`
+  }, [module, debouncedSearch])
+  const ledger = useApiQuery<LedgerEntry[]>(ledgerUrl, { fallbackError: 'Failed to load stock ledger', staleTimeMs: 15_000 })
+  const entries = ledger.data ?? NO_ENTRIES
+  const loading = ledger.loading
+  const error = ledger.error
 
   async function copyRef(text: string) {
     try {

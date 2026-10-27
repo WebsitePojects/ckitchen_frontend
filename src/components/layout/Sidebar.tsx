@@ -8,6 +8,8 @@ import { usePermissions } from '../../context/PermissionsContext'
 import { useNotifications } from '../../context/NotificationContext'
 import { useSignOut } from './useSignOut'
 import { PLATFORM_NAME } from '../../lib/branding'
+import { prefetchPage, prefetchPages } from '../../lib/pageLoaders'
+import { useEffect } from 'react'
 
 function initials(name: string | undefined): string {
   if (!name) return '?'
@@ -39,6 +41,13 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     onNavigate?.()
   }
 
+  // After the shell is up, download the code for every page this user can open during
+  // idle time, so later navigation never waits on the network for code.
+  const accessibleKey = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.to))
+    .filter((to) => user != null && canAccessPage(to))
+    .join('|')
+  useEffect(() => prefetchPages(accessibleKey ? accessibleKey.split('|') : []), [accessibleKey])
+
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       {/* Brand mark */}
@@ -68,6 +77,10 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                     to={to}
                     end={to === '/'}
                     onClick={onNavigate}
+                    // Warm the page's code on intent so the click renders immediately.
+                    onMouseEnter={() => prefetchPage(to)}
+                    onFocus={() => prefetchPage(to)}
+                    onTouchStart={() => prefetchPage(to)}
                     className={({ isActive }) =>
                       cn(
                         'group flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',

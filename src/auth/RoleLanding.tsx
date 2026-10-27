@@ -1,7 +1,10 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { ROLE_LANDING, normalizeRole } from './access'
-import Dashboard from '../pages/Dashboard'
+import { lazyPage } from '../lib/pageLoaders'
+
+// Lazy: the Dashboard carries the charting library, which kitchen roles never land on.
+const Dashboard = lazyPage('/')
 
 /**
  * Index-route ('/') element. Most roles land on the Dashboard, but a handful

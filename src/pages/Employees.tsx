@@ -67,6 +67,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../components/ui/dialog'
+import { useApiQuery } from '../hooks/useApiQuery'
 
 // ---------------------------------------------------------------------------
 // Types (mirror backend schema camelCase as returned by Drizzle).
@@ -503,15 +504,19 @@ function AccountFields({
 // Component
 // ---------------------------------------------------------------------------
 
+const NO_EMPLOYEES: Employee[] = []
+
 export default function Employees() {
   const { user } = useAuth()
   const navigate = useNavigate()
   // OWNER-only (+ legacy SUPER_ADMIN, via hasRole's alias normalization).
   const isSuperAdmin = hasRole(user?.role, [])
 
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Cached list: a revisit paints instantly and refreshes in the background.
+  const employeesQuery = useApiQuery<Employee[]>('/employees', { fallbackError: 'Failed to load employees', staleTimeMs: 30_000 })
+  const employees = employeesQuery.data ?? NO_EMPLOYEES
+  const loading = employeesQuery.loading
+  const error = employeesQuery.error
 
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState<string>('ALL')
@@ -537,19 +542,10 @@ export default function Employees() {
 
   // ── Fetch ────────────────────────────────────────────────────────────────
 
+  /** Refresh after add/edit; the current list stays on screen while it reloads. */
   function fetchEmployees() {
-    setLoading(true)
-    setError(null)
-    get<Employee[]>('/employees')
-      .then((r) => setEmployees(r.data))
-      .catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : 'Failed to load employees'
-        setError(msg)
-      })
-      .finally(() => setLoading(false))
+    void employeesQuery.refetch()
   }
-
-  useEffect(fetchEmployees, [])
 
   // ── Outlets (T1 — Outlet select options + list-column name lookup) ─────
   // Cached TanStack Query so the Add/Edit dialogs and the table's Outlet

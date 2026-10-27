@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from './lib/queryClient'
@@ -12,29 +13,35 @@ import { SimulatorProvider } from './context/SimulatorContext'
 import { PermissionsProvider } from './context/PermissionsContext'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
-import Kitchen from './pages/Kitchen'
-import Tv from './pages/Tv'
-import Inventory from './pages/Inventory'
-import Analytics from './pages/Analytics'
-import Settings from './pages/Settings'
-import Menu from './pages/Menu'
-import Printers from './pages/Printers'
-import UsersPage from './pages/Users'
-import Orders from './pages/Orders'
-import Brands from './pages/Brands'
-import Outlets from './pages/Outlets'
-import OutletProfile from './pages/OutletProfile'
-import ChannelListings from './pages/ChannelListings'
-import MerchantManagement from './pages/MerchantManagement'
-import Employees from './pages/Employees'
-import EmployeeProfile from './pages/EmployeeProfile'
-import AuditTrail from './pages/AuditTrail'
-import StockLedger from './pages/StockLedger'
-import Attendance from './pages/Attendance'
-import AttendanceKiosk from './pages/AttendanceKiosk'
-import MasterData from './pages/MasterData'
-import Purchasing from './pages/Purchasing'
-import MerchantConsole from './pages/MerchantConsole'
+import { lazyPage } from './lib/pageLoaders'
+import PageFallback from './components/layout/PageFallback'
+
+// Pages load as separate chunks (see lib/pageLoaders.ts); Login and the shell stay eager
+// so the first screen paints immediately.
+const Kitchen = lazyPage('/kitchen')
+const Tv = lazyPage('/tv')
+const Inventory = lazyPage('/inventory')
+const Analytics = lazyPage('/reports')
+const Settings = lazyPage('/settings')
+const Menu = lazyPage('/menu')
+const Printers = lazyPage('/printers')
+const UsersPage = lazyPage('/users')
+const Orders = lazyPage('/orders')
+const Pos = lazyPage('/pos')
+const Brands = lazyPage('/brands')
+const Outlets = lazyPage('/outlets')
+const OutletProfile = lazyPage('/outlet-profile')
+const ChannelListings = lazyPage('/channel-listings')
+const MerchantManagement = lazyPage('/merchant-management')
+const Employees = lazyPage('/employees')
+const EmployeeProfile = lazyPage('/employee-profile')
+const AuditTrail = lazyPage('/audit')
+const StockLedger = lazyPage('/stock-ledger')
+const Attendance = lazyPage('/attendance')
+const AttendanceKiosk = lazyPage('/kiosk/attendance')
+const MasterData = lazyPage('/master-data')
+const Purchasing = lazyPage('/purchasing')
+const MerchantConsole = lazyPage('/merchant-console')
 
 export default function App() {
   return (
@@ -45,6 +52,7 @@ export default function App() {
       <PermissionsProvider>
       <SimulatorProvider>
         <BrowserRouter>
+          <Suspense fallback={<PageFallback />}>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<Login />} />
@@ -87,6 +95,7 @@ export default function App() {
                 <Route element={<RequireAccess />}>
                 <Route index element={<RoleLanding />} />
                 <Route path="orders" element={<Orders />} />
+                <Route path="pos" element={<Pos />} />
                 <Route path="outlets" element={<Outlets />} />
                 <Route path="channel-listings" element={<ChannelListings />} />
                 <Route path="merchant-management" element={<MerchantManagement />} />
@@ -123,6 +132,7 @@ export default function App() {
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </SimulatorProvider>
       </PermissionsProvider>

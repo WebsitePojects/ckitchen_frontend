@@ -55,6 +55,8 @@ export const PAGE_ROLES: Record<string, string[]> = {
   // have no override, so '/' is their real home.
   '/': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
   '/orders': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW', 'ACCOUNTING'],
+  // POS order entry (tablet-keyed aggregator orders + walk-ins). Mirrors backend rbac-defaults.
+  '/pos': ['OUTLET_MANAGER', 'BRAND_MANAGER', 'KITCHEN_CREW'],
   '/kitchen': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
   '/printers': ['OUTLET_MANAGER', 'KITCHEN_CREW'],
   // TV display board (D32) — big-screen KDS/ops view. Same viewers as '/kitchen'
