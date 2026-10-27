@@ -198,14 +198,19 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        const refused = err instanceof CKApiError && err.status === 403
+        // 403 = ORION refused this person (message from the server); 401 = the sign-in itself
+        // was not accepted; anything else = ORION could not be reached.
+        const apiErr = err instanceof CKApiError ? err : null
         setState({
           token: null,
           user: null,
           loading: false,
-          authError: refused
-            ? { code: err.code, message: err.message }
-            : { code: 'UNAVAILABLE', message: 'Could not load your account. Check the connection and try again.' },
+          authError:
+            apiErr?.status === 403
+              ? { code: apiErr.code, message: apiErr.message }
+              : apiErr?.status === 401
+                ? { code: 'SIGN_IN_REJECTED', message: 'ORION could not verify this sign-in. Try again, or use a different account. (401)' }
+                : { code: 'UNAVAILABLE', message: 'Could not reach ORION. Check the connection and try again.' },
         })
       })
     return () => {

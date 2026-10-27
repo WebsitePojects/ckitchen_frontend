@@ -25,8 +25,9 @@ export default function Login() {
   // ~50s wake). Show that instead of a silent spinner so it doesn't read as broken.
   const [slowHint, setSlowHint] = useState(false)
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // With Clerk on, the password form is the IT team's break-glass, tucked behind a toggle.
-  const [showPassword, setShowPassword] = useState(!clerkEnabled)
+  // With Clerk on, business users sign in with Google/email only; Prince IT's own access
+  // moves to a separate operator console. The password form remains for Clerk-less local dev.
+  const showPassword = !clerkEnabled
 
   // A Clerk sign-in completes outside handleSubmit: leave the page once ORION accepts it.
   useEffect(() => {
@@ -107,19 +108,8 @@ export default function Login() {
             </Suspense>
           )}
 
-          {clerkEnabled && (
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-expanded={showPassword}
-              className="mt-5 self-start text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              {showPassword ? 'Hide Prince IT sign-in' : 'Prince IT staff: sign in with password'}
-            </button>
-          )}
-
           {showPassword && (
-            <form onSubmit={handleSubmit} className="mt-4 space-y-5 border-t border-border pt-5" noValidate>
+            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
               <div>
                 <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
                   Email address

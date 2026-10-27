@@ -12,7 +12,16 @@ import { useAuth } from './AuthContext'
  * signs someone in, ORION decides whether they may enter (AuthContext loads /auth/me).
  */
 // Same palette as index.css; Clerk needs concrete colours, so one map per theme.
-const elements = { card: 'shadow-none border-0 bg-transparent', rootBox: 'w-full', cardBox: 'w-full shadow-none', headerTitle: 'hidden', headerSubtitle: 'hidden' }
+// footer: the "Secured by Clerk" badge (owner's decision; the sign-up link there is unused
+// because sign-ups are invitation-only). An inline style object outranks Clerk's own CSS.
+const elements = {
+  card: 'shadow-none border-0 bg-transparent',
+  rootBox: 'w-full',
+  cardBox: 'w-full shadow-none',
+  headerTitle: 'hidden',
+  headerSubtitle: 'hidden',
+  footer: { display: 'none' },
+}
 const APPEARANCE = {
   dark: {
     baseTheme: dark,
