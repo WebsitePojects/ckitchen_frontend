@@ -71,6 +71,8 @@ import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import DataTable from '../components/common/DataTable'
 import EmptyState from '../components/common/EmptyState'
+import BrandList from '../components/menu/BrandList'
+import SearchableDropdown from '../components/SearchableDropdown'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,6 +82,9 @@ interface Brand {
   id: string
   name: string
   color: string
+  isActive?: boolean
+  /** From GET /brands (one query); the selected brand's count is taken from its loaded menu. */
+  menuItemCount?: number
 }
 
 interface MenuItem {
@@ -247,12 +252,19 @@ export default function Menu() {
     return map
   }, [brandDiscounts])
 
-  // Default to the first brand once the brand list loads.
+  // Menus are kept for active brands only; inactive brands stay out of the picker.
+  const activeBrands = useMemo(
+    () => brands.filter((b) => b.isActive !== false).sort((a, b) => a.name.localeCompare(b.name)),
+    [brands],
+  )
+  const selectedBrandName = activeBrands.find((b) => b.id === selectedBrandId)?.name ?? ''
+
+  // Default to the first active brand once the brand list loads.
   useEffect(() => {
-    if (!selectedBrandId && brands.length > 0) {
-      setSelectedBrandId(brands[0].id)
+    if (!selectedBrandId && activeBrands.length > 0) {
+      setSelectedBrandId(activeBrands[0].id)
     }
-  }, [brands, selectedBrandId])
+  }, [activeBrands, selectedBrandId])
 
   const menuQueryKey = useMemo(
     () => ['menu', selectedOutletId, selectedBrandId] as const,
@@ -967,7 +979,7 @@ export default function Menu() {
           className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <Plus className="h-3.5 w-3.5" />
-          Add New Item
+          <span className="max-w-[14rem] truncate">{selectedBrandName ? `Add item to ${selectedBrandName}` : 'Add item'}</span>
         </Button>
       </DialogTrigger>
       {/* max-h + overflow-y-auto keep the taller recipe-enabled form scrollable
@@ -1423,33 +1435,27 @@ export default function Menu() {
         actions={addItemDialog}
       />
 
-      {/* ── Brand selector ─────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-medium text-muted-foreground">Brand</span>
-        <Select
-          value={selectedBrandId}
-          onValueChange={setSelectedBrandId}
-          disabled={loadingBrands || brands.length === 0}
-        >
-          <SelectTrigger className="h-8 w-52 text-sm">
-            <SelectValue placeholder={loadingBrands ? 'Loading…' : 'Select brand…'} />
-          </SelectTrigger>
-          <SelectContent>
-            {brands.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                <span className="flex items-center gap-2">
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: b.color ?? '#10B981' }}
-                  />
-                  {b.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* ── Brand picker (phones/tablets); laptops get the brand list beside the menu ── */}
+      <div className="lg:hidden">
+        <SearchableDropdown
+          options={activeBrands.map((b) => ({ id: b.id, label: b.name, color: b.color, hint: b.menuItemCount === 0 ? 'No items yet' : undefined }))}
+          onSelect={setSelectedBrandId}
+          placeholder={loadingBrands ? 'Loading brands…' : selectedBrandName || 'Choose a brand'}
+          searchPlaceholder="Search brands"
+          emptyText="No brand matches."
+          disabled={loadingBrands || activeBrands.length === 0}
+        />
       </div>
 
+      <div className="flex min-w-0 flex-col gap-ws-gap lg:flex-row lg:items-start">
+      <aside className="hidden w-60 shrink-0 lg:block xl:w-64">
+        <BrandList
+          brands={activeBrands.map((b) => (b.id === selectedBrandId && !loadingMenu ? { ...b, menuItemCount: menuItems.length } : b))}
+          selectedId={selectedBrandId}
+          onSelect={setSelectedBrandId}
+        />
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
       {/* ── KPI ribbon ─────────────────────────────────────────────────────── */}
       <KpiRibbon>
         <KpiCard icon={UtensilsCrossed} label="Total Items" value={kpi.total} />
@@ -1459,7 +1465,7 @@ export default function Menu() {
       </KpiRibbon>
 
       {/* ── Main content: table + stock alerts ─────────────────────────────── */}
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row">
+      <div className="flex min-w-0 flex-col gap-4 2xl:flex-row">
 
         {/* ── Menu table ─────────────────────────────────────────────────── */}
         <section className="flex min-w-0 flex-1 flex-col gap-3">
@@ -1491,7 +1497,7 @@ export default function Menu() {
         </section>
 
         {/* ── Stock Alerts panel ──────────────────────────────────────────── */}
-        <aside className="w-full shrink-0 lg:w-72">
+        <aside className="w-full shrink-0 2xl:w-72">
           <Card className="border-border bg-card">
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -1533,6 +1539,9 @@ export default function Menu() {
             </CardContent>
           </Card>
         </aside>
+      </div>
+
+      </div>
       </div>
 
       {/* Edit dialog — no DialogTrigger; opened via openEditDialog() from row actions */}
