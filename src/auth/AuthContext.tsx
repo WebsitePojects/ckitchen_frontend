@@ -140,6 +140,33 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 const TOKEN_KEY = 'ck_jwt'
 
+/**
+ * The last account ORION confirmed for a Clerk user, so a reload can open the app at once
+ * instead of waiting a full round trip to the API (about 1-2 s from the Philippines) before
+ * anything renders. /auth/me still runs right after and replaces or revokes it; every data
+ * request is authorized by the server on its own, so a stale copy can never grant access.
+ */
+const LAST_USER_KEY = 'orion.lastUser'
+
+function readLastUser(clerkUserKey: string | null): AuthUser | null {
+  if (!clerkUserKey) return null
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_USER_KEY) ?? 'null') as { clerkUserKey?: string; user?: AuthUser } | null
+    return saved?.clerkUserKey === clerkUserKey && saved.user ? saved.user : null
+  } catch {
+    return null
+  }
+}
+
+function saveLastUser(clerkUserKey: string | null, user: AuthUser | null): void {
+  try {
+    if (clerkUserKey && user) localStorage.setItem(LAST_USER_KEY, JSON.stringify({ clerkUserKey, user }))
+    else localStorage.removeItem(LAST_USER_KEY)
+  } catch {
+    // Storage blocked: the app just waits for /auth/me as before.
+  }
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?: ClerkSessionApi }) {
@@ -195,12 +222,19 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
     }
     setClerkTokenGetter(() => clerkGetTokenRef.current?.() ?? Promise.resolve(null))
     let cancelled = false
-    setState((s) => ({ ...s, loading: true, authError: null }))
+    // Same Clerk account as last time: open with the remembered account while /auth/me confirms.
+    const remembered = readLastUser(clerkUserKey)
+    setState((s) =>
+      remembered
+        ? { token: null, user: remembered, loading: false, authError: null }
+        : { ...s, loading: true, authError: null },
+    )
     apiClient
       .get<{ user: AuthUser }>('/auth/me')
       .then(({ data }) => {
         if (cancelled) return
-        dropSelfAttendanceCache()
+        if (!remembered) dropSelfAttendanceCache()
+        saveLastUser(clerkUserKey, data.user)
         setState({ token: null, user: data.user, loading: false, authError: null })
       })
       .catch((err: unknown) => {
@@ -208,6 +242,11 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
         // 403 = ORION refused this person (message from the server); 401 = the sign-in itself
         // was not accepted; anything else = ORION could not be reached.
         const apiErr = err instanceof CKApiError ? err : null
+        const refused = apiErr?.status === 401 || apiErr?.status === 403
+        // ORION unreachable but this account was confirmed before: stay open (pages show
+        // their own errors) rather than throw someone out over a network blip.
+        if (!refused && remembered) return
+        saveLastUser(null, null)
         setState({
           token: null,
           user: null,
@@ -255,6 +294,7 @@ export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?:
     // here rather than imported, matching the same key already duplicated in
     // lib/api.ts, to avoid a circular import between auth/ and context/.
     localStorage.removeItem('orion.outletId')
+    saveLastUser(null, null)
     dropSelfAttendanceCache()
     setClerkTokenGetter(null)
     setState({ token: null, user: null, loading: false, authError: null })

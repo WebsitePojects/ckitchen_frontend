@@ -96,6 +96,27 @@ function cspConnectSrcPlugin(apiUrl: string): Plugin {
   }
 }
 
+/**
+ * Opens the connections to the API and to Clerk while the app bundle is still downloading.
+ * From the Philippines a new TLS connection to the Paris API costs about two round trips
+ * (~0.5 s), and the first API and Clerk calls only start after the JavaScript runs.
+ * The API link carries `crossorigin` because the app's fetches are anonymous CORS requests;
+ * Clerk's script and its credentialed calls share a connection without it.
+ */
+function preconnectPlugin(apiUrl: string, publishableKey: string): Plugin {
+  return {
+    name: 'preconnect',
+    transformIndexHtml(html) {
+      const links: string[] = []
+      const api = apiUrl.replace(/\/+$/, '')
+      if (/^https?:\/\//.test(api)) links.push(`<link rel="preconnect" href="${new URL(api).origin}" crossorigin />`)
+      const clerkHost = clerkFrontendApiHost(publishableKey)
+      if (clerkHost) links.push(`<link rel="preconnect" href="https://${clerkHost}" />`)
+      return links.length ? html.replace('</head>', `  ${links.join('\n    ')}\n  </head>`) : html
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -106,6 +127,7 @@ export default defineConfig(({ mode }) => {
       react(),
       cspConnectSrcPlugin(env.VITE_API_URL || env.VITE_API_PROXY_TARGET || ''),
       cspClerkPlugin(env.VITE_CLERK_PUBLISHABLE_KEY || ''),
+      preconnectPlugin(env.VITE_API_URL || '', env.VITE_CLERK_PUBLISHABLE_KEY || ''),
     ],
     resolve: {
       alias: {
