@@ -77,6 +77,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
 import { cn } from '../lib/utils'
+import InviteLinkDialog, { type InviteLinkInfo } from '../components/users/InviteLinkDialog'
 
 // ---------------------------------------------------------------------------
 // Types (mirror backend admin API — ckitchen_backend src/modules/admin/routes.ts)
@@ -298,7 +299,15 @@ function OutletMultiSelect({
 // New User dialog
 // ---------------------------------------------------------------------------
 
-function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; onCreated: () => void }) {
+function CreateUserDialog({
+  outlets,
+  onCreated,
+  onInviteLink,
+}: {
+  outlets: OutletSummary[]
+  onCreated: () => void
+  onInviteLink: (invite: InviteLinkInfo) => void
+}) {
   // With Clerk sign-in, staff get an email invitation and sign in with Google or email,
   // so no password is needed; without it, the owner still sets one.
   const { clerkEnabled } = useAuth()
@@ -335,14 +344,16 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
     setFormError(null)
     setSubmitting(true)
     try {
-      const { data } = await post<{ invitation?: 'sent' | 'failed' | 'not_configured' }>('/admin/users', {
+      const { data } = await post<{ invitation?: 'sent' | 'failed' | 'not_configured'; inviteUrl?: string | null }>('/admin/users', {
         name: name.trim(),
         email: email.trim(),
         role,
         ...(password ? { password } : {}),
         outlet_ids: outletIds,
       })
-      if (data?.invitation === 'sent') {
+      if (data?.invitation === 'sent' && data.inviteUrl) {
+        onInviteLink({ name: name.trim(), email: email.trim(), url: data.inviteUrl })
+      } else if (data?.invitation === 'sent') {
         toast.success(`${name.trim()} added`, { description: `Invitation emailed to ${email.trim()}.` })
       } else if (data?.invitation === 'failed') {
         toast.warning(`${name.trim()} added, but the invitation email failed`, {
@@ -948,6 +959,9 @@ export default function Users() {
     }
   }
 
+  // Private sign-up link from the last invite, shown once in InviteLinkDialog.
+  const [inviteLink, setInviteLink] = useState<InviteLinkInfo | null>(null)
+
   // Same per-row ref guard as block/unblock: a double tap must not send two invitations.
   const invitingIdsRef = useRef<Set<string>>(new Set())
 
@@ -955,8 +969,9 @@ export default function Users() {
     if (invitingIdsRef.current.has(u.id)) return
     invitingIdsRef.current.add(u.id)
     try {
-      await post(`/admin/users/${u.id}/invite`)
-      toast.success(`Invitation sent to ${u.email}`)
+      const { data } = await post<{ inviteUrl?: string | null }>(`/admin/users/${u.id}/invite`)
+      if (data?.inviteUrl) setInviteLink({ name: u.name, email: u.email, url: data.inviteUrl })
+      else toast.success(`Invitation sent to ${u.email}`)
     } catch (err) {
       toast.error(errMsg(err, 'Failed to send the invitation.'))
     } finally {
@@ -995,7 +1010,7 @@ export default function Users() {
       <PageHeader
         title="Users & Roles"
         subtitle="Accounts, permissions and security controls"
-        actions={<CreateUserDialog outlets={outlets} onCreated={invalidateUsers} />}
+        actions={<CreateUserDialog outlets={outlets} onCreated={invalidateUsers} onInviteLink={setInviteLink} />}
       />
 
       <KpiRibbon>
@@ -1185,6 +1200,7 @@ export default function Users() {
         outlets={outlets}
         onOpenChange={(o) => !o && setPerfTarget(null)}
       />
+      <InviteLinkDialog invite={inviteLink} onClose={() => setInviteLink(null)} />
     </PageContainer>
   )
 }
