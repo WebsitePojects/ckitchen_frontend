@@ -21,15 +21,20 @@ const elements = {
   headerTitle: 'hidden',
   headerSubtitle: 'hidden',
   footer: { display: 'none' },
+  // Same size scale as ORION's own controls (index.css). Inline style objects, because Clerk
+  // injects its CSS after ours and would win a class-for-class tie.
+  socialButtonsBlockButton: { height: 'var(--control-h)', fontSize: 'var(--fs-small)' },
+  formFieldInput: { height: 'var(--control-h)', fontSize: 'var(--fs-input)' },
+  formButtonPrimary: { height: 'var(--control-h)', fontSize: 'var(--fs-small)' },
 }
 const APPEARANCE = {
   dark: {
     baseTheme: dark,
-    variables: { colorPrimary: '#34D399', colorTextOnPrimaryBackground: '#04261A', colorBackground: '#0A0F0D', colorInputBackground: '#111815', colorText: '#E8EFEA', colorTextSecondary: '#9DADA4', colorDanger: '#FF8A7A', borderRadius: '0.6rem', fontFamily: '"Hanken Grotesk Variable", system-ui, sans-serif' },
+    variables: { colorPrimary: '#34D399', colorTextOnPrimaryBackground: '#04261A', colorBackground: '#0A0F0D', colorInputBackground: '#111815', colorText: '#E8EFEA', colorTextSecondary: '#9DADA4', colorDanger: '#FF8A7A', borderRadius: '0.375rem', fontFamily: '"Hanken Grotesk Variable", system-ui, sans-serif' },
     elements,
   },
   light: {
-    variables: { colorPrimary: '#0A5C41', colorTextOnPrimaryBackground: '#FFFFFF', colorBackground: '#F5F2EA', colorInputBackground: '#FFFDF8', colorText: '#15201B', colorTextSecondary: '#56645C', colorDanger: '#B3311F', borderRadius: '0.6rem', fontFamily: '"Hanken Grotesk Variable", system-ui, sans-serif' },
+    variables: { colorPrimary: '#0A5C41', colorTextOnPrimaryBackground: '#FFFFFF', colorBackground: '#F5F2EA', colorInputBackground: '#FFFDF8', colorText: '#15201B', colorTextSecondary: '#56645C', colorDanger: '#B3311F', borderRadius: '0.375rem', fontFamily: '"Hanken Grotesk Variable", system-ui, sans-serif' },
     elements,
   },
 }
@@ -47,7 +52,7 @@ export default function ClerkSignInPanel() {
   if (authError) {
     return (
       <div className="space-y-4 border-y border-border py-5" role="alert">
-        <div className="flex items-start gap-2 text-sm">
+        <div className="flex items-start gap-2 text-ws-small">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warn-text" aria-hidden />
           <div>
             <p className="font-medium text-foreground">You can't open ORION yet</p>
@@ -57,7 +62,7 @@ export default function ClerkSignInPanel() {
         <button
           type="button"
           onClick={logout}
-          className="h-11 w-full rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+          className="h-ws-control w-full rounded-md border border-input text-ws-small font-medium text-foreground transition-colors hover:bg-secondary"
         >
           Use a different account
         </button>
@@ -73,13 +78,13 @@ export default function ClerkSignInPanel() {
     }
     return (
       <div className="space-y-4 border-y border-border py-5" role="alert">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-ws-small text-muted-foreground">
           Your sign-in has an unfinished step ({session.currentTask?.key ?? 'unknown'}). Sign out and start again.
         </p>
         <button
           type="button"
           onClick={() => void signOut()}
-          className="h-11 w-full rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+          className="h-ws-control w-full rounded-md border border-input text-ws-small font-medium text-foreground transition-colors hover:bg-secondary"
         >
           Sign out
         </button>
@@ -90,7 +95,7 @@ export default function ClerkSignInPanel() {
   // Signed in to Clerk: AuthContext is loading the ORION account; Login leaves once it arrives.
   if (isSignedIn) {
     return (
-      <p className="flex items-center gap-2 border-y border-border py-5 text-sm text-muted-foreground" role="status">
+      <p className="flex items-center gap-2 border-y border-border py-5 text-ws-small text-muted-foreground" role="status">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Opening ORION…
       </p>
     )

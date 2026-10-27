@@ -9,8 +9,27 @@ export default {
     extend: {
       fontFamily: {
         sans: ['"Hanken Grotesk Variable"', 'system-ui', 'sans-serif'],
-        // Display face: page titles, auth headlines and the wordmark only (never numbers).
-        display: ['"Instrument Serif"', 'Georgia', 'serif'],
+      },
+      // Size scale from src/index.css (five device classes, interpolated). Use these instead
+      // of fixed px sizes so text and controls grow and shrink together with the screen.
+      fontSize: {
+        'ws-micro': ['var(--fs-micro)', { lineHeight: '1.4' }],
+        'ws-small': ['var(--fs-small)', { lineHeight: '1.45' }],
+        'ws-body': ['var(--fs-body)', { lineHeight: '1.55' }],
+        'ws-input': ['var(--fs-input)', { lineHeight: '1.4' }],
+        'ws-section': ['var(--fs-section)', { lineHeight: '1.35' }],
+        'ws-figure': ['var(--fs-figure)', { lineHeight: '1.15' }],
+        'ws-title': ['var(--fs-title)', { lineHeight: '1.2' }],
+        'ws-display': ['var(--fs-display)', { lineHeight: '1.15' }],
+      },
+      spacing: {
+        'ws-control': 'var(--control-h)',
+        'ws-gutter': 'var(--sp-gutter)',
+        'ws-gap': 'var(--sp-gap)',
+        'ws-section': 'var(--sp-section)',
+      },
+      maxWidth: {
+        'ws-form': 'var(--form-max)',
       },
       colors: {
         // Legacy brand scale — retained so the not-yet-reskinned content pages

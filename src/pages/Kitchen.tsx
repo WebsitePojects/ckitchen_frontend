@@ -117,7 +117,7 @@ interface StageStyle {
 const STAGE_STYLE: Record<string, StageStyle> = {
   NEW: {
     cardBorder: 'border-blue-500/40',
-    btnClass:   'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white',
+    btnClass:   'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white',
   },
   PREPARING: {
     cardBorder: 'border-amber-500/40',

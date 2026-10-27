@@ -9,7 +9,6 @@ import { NotificationProvider } from '../../context/NotificationContext'
 import { PageHeaderProvider } from './PageHeaderContext'
 import Sidebar from './Sidebar'
 import MobileTabBar from './MobileTabBar'
-import { OrionBackdrop } from '../brand/OrionArt'
 import Topbar from './Topbar'
 import PageFallback from './PageFallback'
 
@@ -93,7 +92,6 @@ export default function AppShell() {
     <PageHeaderProvider>
       <ErrorDialogProvider>
         <NotificationProvider>
-          <OrionBackdrop />
           <div className="relative flex h-dvh overflow-hidden text-foreground">
             {/* Desktop sidebar: full (256px) or icon rail (72px) */}
             <div

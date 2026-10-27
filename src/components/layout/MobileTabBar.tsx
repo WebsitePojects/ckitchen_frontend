@@ -88,7 +88,7 @@ export default function MobileTabBar() {
         <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-3xl border-border bg-card px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
           <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-border" aria-hidden />
           <p className="eyebrow">Menu</p>
-          <SheetTitle className="font-display text-3xl font-normal">Everything else</SheetTitle>
+          <SheetTitle className="text-ws-title font-semibold tracking-tight">Everything else</SheetTitle>
           <ul className="mt-4 grid grid-cols-3 gap-2">
             {rest.map(({ to, label, icon: Icon }, index) => (
               <li key={to} className="animate-fade-in-up" style={{ animationDelay: `${index * 40}ms`, animationFillMode: 'both' }}>
@@ -118,7 +118,7 @@ export default function MobileTabBar() {
                   type="button"
                   role="radio"
                   aria-checked={theme === value}
-                  onClick={(e) => switchTo(value, e.currentTarget)}
+                  onClick={() => switchTo(value)}
                   className={cn(
                     'flex h-10 items-center justify-center gap-1.5 rounded-full text-xs font-medium transition-colors',
                     theme === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground',

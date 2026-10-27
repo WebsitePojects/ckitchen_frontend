@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Sheet, SheetContent, SheetTitle } from '../ui/sheet'
 import { NAV_LOOKUP } from './nav-items'
 import { PLATFORM_NAME } from '../../lib/branding'
+import Wordmark from '../brand/Wordmark'
 import { usePageHeaderContext } from './PageHeaderContext'
 import Sidebar from './Sidebar'
 import ThemeToggle, { useThemeSwitch } from './ThemeToggle'
@@ -75,7 +76,7 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
         {inPageTitles > 0 ? (
           // The page draws its own h1 (PageHeader): show where we are, plus the wordmark on phones.
           <>
-            <span className="font-display text-2xl leading-none lg:hidden">{PLATFORM_NAME}</span>
+            <Wordmark className="lg:hidden" />
             {crumb && (
               <nav aria-label="Breadcrumb" className="hidden truncate text-sm lg:block">
                 <span className="text-muted-foreground">{crumb.group}</span>
@@ -91,7 +92,7 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
                 {crumb.group} <span aria-hidden>/</span> {crumb.label}
               </p>
             )}
-            <h1 className="truncate font-display text-[1.375rem] leading-tight tracking-tight text-foreground sm:text-2xl">{title}</h1>
+            <h1 className="truncate text-ws-section font-semibold tracking-tight text-foreground">{title}</h1>
             {subtitle && <p className="hidden truncate text-xs text-muted-foreground md:block">{subtitle}</p>}
           </>
         )}

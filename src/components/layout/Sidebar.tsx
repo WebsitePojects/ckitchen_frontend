@@ -1,12 +1,12 @@
 import { useEffect } from 'react'
-import { ChevronsLeft, ChevronsRight, Orbit } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { cn } from '../../lib/utils'
 import { NAV_GROUPS } from './nav-items'
 import { usePermissions } from '../../context/PermissionsContext'
 import { useNotifications } from '../../context/NotificationContext'
-import { PLATFORM_NAME } from '../../lib/branding'
+import Wordmark from '../brand/Wordmark'
 import { prefetchPage, prefetchPages } from '../../lib/pageLoaders'
 
 interface SidebarProps {
@@ -37,8 +37,7 @@ export default function Sidebar({ onNavigate, collapsed = false, onToggleCollaps
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className={cn('flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border', collapsed ? 'justify-center px-0' : 'px-5')}>
-        <Orbit className="h-6 w-6 shrink-0 text-ink-accent" aria-hidden />
-        {!collapsed && <span className="font-display text-2xl leading-none tracking-tight">{PLATFORM_NAME}</span>}
+        <Wordmark compact={collapsed} />
       </div>
 
       <nav aria-label="Main" className={cn('flex-1 overflow-y-auto py-4', collapsed ? 'px-2' : 'px-3')}>
