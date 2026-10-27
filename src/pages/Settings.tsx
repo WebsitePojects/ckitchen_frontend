@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
   SlidersHorizontal,
@@ -10,6 +10,7 @@ import {
   Clock,
   ShieldCheck,
   ArrowRight,
+  Boxes,
 } from 'lucide-react'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
@@ -22,6 +23,10 @@ import { PLATFORM_NAME, PLATFORM_ATTRIBUTION } from '../lib/branding'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole, canAccess } from '../auth/access'
 import { NAV_GROUPS } from '../components/layout/nav-items'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { get, put } from '../lib/api'
+import { usePermissions } from '../context/PermissionsContext'
 
 function ToggleRow({
   icon: Icon,
@@ -117,7 +122,81 @@ function AccessControlCard() {
   )
 }
 
+interface BusinessModule {
+  key: string
+  label: string
+  description: string
+  enabled: boolean
+}
+
+/**
+ * Owner switches whole parts of ORION on or off for this business; disabled modules
+ * disappear from everyone's sidebar (backend: /business-modules + /me/permissions).
+ */
+function ModulesCard() {
+  const queryClient = useQueryClient()
+  const { refresh } = usePermissions()
+  const { data: modules = [], isPending, error } = useQuery({
+    queryKey: ['business-modules'],
+    queryFn: async () => (await get<BusinessModule[]>('/business-modules')).data,
+  })
+  // Per-module in-flight guard: a double tap on one switch must send one request.
+  const pendingRef = useRef<Set<string>>(new Set())
+  const [pendingKeys, setPendingKeys] = useState<Set<string>>(() => new Set())
+
+  async function toggle(mod: BusinessModule, enabled: boolean) {
+    if (pendingRef.current.has(mod.key)) return
+    pendingRef.current.add(mod.key)
+    setPendingKeys(new Set(pendingRef.current))
+    try {
+      await put(`/business-modules/${mod.key}`, { enabled })
+      await queryClient.invalidateQueries({ queryKey: ['business-modules'] })
+      refresh()
+      toast.success(`${mod.label} ${enabled ? 'turned on' : 'turned off'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not change the module.')
+    } finally {
+      pendingRef.current.delete(mod.key)
+      setPendingKeys(new Set(pendingRef.current))
+    }
+  }
+
+  return (
+    <Card className="border-border bg-card lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+          <Boxes className="h-4 w-4 text-emerald-400" aria-hidden /> Modules
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Turn off what this business doesn't use. Its pages disappear for everyone and come back when you turn it on.
+          Ordering, kitchen, menu, inventory, reports, outlets, users and settings are always on.
+        </p>
+      </CardHeader>
+      <CardContent className="divide-y divide-border">
+        {isPending && <p className="py-3 text-sm text-muted-foreground">Loading modules…</p>}
+        {error && <p className="py-3 text-sm text-red-400">Could not load modules.</p>}
+        {modules.map((m) => (
+          <div key={m.key} className="flex items-center justify-between gap-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-zinc-100">{m.label}</p>
+              <p className="text-xs text-muted-foreground">{m.description}</p>
+            </div>
+            <Switch
+              checked={m.enabled}
+              disabled={pendingKeys.has(m.key)}
+              onCheckedChange={(v) => void toggle(m, v)}
+              aria-label={`${m.label}: ${m.enabled ? 'on' : 'off'}`}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function Settings() {
+  const { user } = useAuth()
+  const isOwner = hasRole(user?.role, ['OWNER'])
   const [t, setT] = useState({
     sound: true,
     lowstock: true,
@@ -131,6 +210,9 @@ export default function Settings() {
       <PageHeader title="Settings" subtitle="System configuration" />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* Business modules — owner only */}
+        {isOwner && <ModulesCard />}
+
         {/* Access Control — live */}
         <AccessControlCard />
 

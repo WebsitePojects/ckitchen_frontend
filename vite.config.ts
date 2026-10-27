@@ -33,6 +33,55 @@ function resolveApiConnectSrc(apiUrl: string): string {
  * production outage when the backend moved. Fails the build instead of shipping a CSP
  * that would silently block every API call.
  */
+/**
+ * Clerk's Frontend API host, decoded from the publishable key (pk_test_/pk_live_ + base64
+ * of "<host>$"). Clerk's sign-in widget loads its script from and talks to that host, so
+ * the CSP must allow exactly it. Returns null when Clerk is not configured.
+ */
+function clerkFrontendApiHost(publishableKey: string): string | null {
+  const key = publishableKey.trim()
+  if (!key) return null
+  const match = /^pk_(test|live)_(.+)$/.exec(key)
+  if (!match) throw new Error('VITE_CLERK_PUBLISHABLE_KEY must look like pk_test_... or pk_live_...')
+  const decoded = Buffer.from(match[2]!, 'base64').toString('utf8').replace(/\$$/, '')
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(decoded)) {
+    throw new Error('VITE_CLERK_PUBLISHABLE_KEY does not decode to a valid Clerk host')
+  }
+  return decoded
+}
+
+/** Adds sources to one CSP directive, creating the directive if it is absent. */
+function addCspSources(csp: string, directive: string, sources: string[]): string {
+  // Doubled backslashes: inside a template string a lone \s would collapse to a plain "s".
+  const re = new RegExp(`(^|;\\s*)${directive}\\s+([^;]*)`)
+  return re.test(csp)
+    ? csp.replace(re, (_m, lead: string, existing: string) => `${lead}${directive} ${existing} ${sources.join(' ')}`)
+    : `${csp}; ${directive} ${sources.join(' ')}`
+}
+
+/**
+ * With Clerk enabled, allow exactly what its sign-in widget needs (per Clerk's CSP guide):
+ * its Frontend API host for script + requests, its image CDN, and Cloudflare's bot check.
+ */
+function cspClerkPlugin(publishableKey: string): Plugin {
+  return {
+    name: 'csp-clerk',
+    transformIndexHtml(html) {
+      const host = clerkFrontendApiHost(publishableKey)
+      if (!host) return html
+      return html.replace(/content="(default-src[^"]*)"/, (_m, csp: string) => {
+        let next = csp
+        next = addCspSources(next, 'script-src', [`https://${host}`, 'https://challenges.cloudflare.com'])
+        next = addCspSources(next, 'connect-src', [`https://${host}`])
+        next = addCspSources(next, 'img-src', ['https://img.clerk.com'])
+        next = addCspSources(next, 'frame-src', ["'self'", 'https://challenges.cloudflare.com'])
+        next = addCspSources(next, 'worker-src', ["'self'", 'blob:'])
+        return `content="${next}"`
+      })
+    },
+  }
+}
+
 function cspConnectSrcPlugin(apiUrl: string): Plugin {
   return {
     name: 'csp-connect-src',
@@ -51,7 +100,11 @@ export default defineConfig(({ mode }) => {
   const apiTarget = env.VITE_API_PROXY_TARGET ?? 'http://localhost:5003'
 
   return {
-    plugins: [react(), cspConnectSrcPlugin(env.VITE_API_URL || env.VITE_API_PROXY_TARGET || '')],
+    plugins: [
+      react(),
+      cspConnectSrcPlugin(env.VITE_API_URL || env.VITE_API_PROXY_TARGET || ''),
+      cspClerkPlugin(env.VITE_CLERK_PUBLISHABLE_KEY || ''),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

@@ -4,10 +4,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
-import { apiClient } from '../lib/api'
+import { apiClient, CKApiError } from '../lib/api'
+import { setClerkTokenGetter } from '../lib/authToken'
 import { queryClient } from '../lib/queryClient'
 import { destroySocket } from '../lib/socket'
 import { decodeJwtPayload } from './jwt'
@@ -103,11 +105,28 @@ interface AuthState {
   token: string | null
   user: AuthUser | null
   loading: boolean
+  /** Why a signed-in Clerk user was refused (e.g. NOT_INVITED, ACCOUNT_BLOCKED). */
+  authError: { code: string; message: string } | null
 }
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  /** True when Clerk (Google / email) sign-in is configured for this deployment. */
+  clerkEnabled: boolean
+}
+
+/**
+ * The slice of Clerk's session the provider needs, supplied by ClerkAuthAdapter (App.tsx)
+ * so this module never imports Clerk and keeps working when Clerk is not configured.
+ */
+export interface ClerkSessionApi {
+  isLoaded: boolean
+  isSignedIn: boolean
+  /** Clerk user id; a change means a different person signed in. */
+  userKey: string | null
+  getToken: () => Promise<string | null>
+  signOut: () => Promise<void>
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -118,18 +137,20 @@ const TOKEN_KEY = 'ck_jwt'
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, clerk }: { children: ReactNode; clerk?: ClerkSessionApi }) {
   const [state, setState] = useState<AuthState>({
     token: localStorage.getItem(TOKEN_KEY),
     user: null,
     loading: true,
+    authError: null,
   })
 
   // On mount (or token change), validate the stored token via /auth/me
   useEffect(() => {
     const token = state.token
     if (!token) {
-      setState((s) => ({ ...s, loading: false }))
+      // Clerk mode: the Clerk effect below decides once Clerk has loaded.
+      if (!clerk) setState((s) => ({ ...s, loading: false }))
       return
     }
 
@@ -139,15 +160,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .then(({ data }) => {
         // /auth/me returns { user: {...} } — unwrap it (login returns it nested too).
-        setState({ token, user: withTenancyClaims(data.user, token), loading: false })
+        setState({ token, user: withTenancyClaims(data.user, token), loading: false, authError: null })
       })
       .catch(() => {
         // Token invalid or expired — clear it
         localStorage.removeItem(TOKEN_KEY)
-        setState({ token: null, user: null, loading: false })
+        setState({ token: null, user: null, loading: !!clerk, authError: null })
       })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // run once on mount
+
+  // ── Clerk session (Google / email sign-in) ────────────────────────────────
+  // A password-login token takes precedence (IT break-glass). Otherwise follow Clerk:
+  // signed in -> load the ORION user (role/outlets decided by the server) with a fresh
+  // Clerk token; refused -> keep the reason for the login page; signed out -> clear.
+  const clerkLoaded = clerk?.isLoaded ?? false
+  const clerkSignedIn = clerk?.isSignedIn ?? false
+  const clerkUserKey = clerk?.userKey ?? null
+  const clerkGetTokenRef = useRef(clerk?.getToken)
+  clerkGetTokenRef.current = clerk?.getToken
+  useEffect(() => {
+    if (!clerk || state.token || !clerkLoaded) return
+    if (!clerkSignedIn) {
+      setClerkTokenGetter(null)
+      setState({ token: null, user: null, loading: false, authError: null })
+      return
+    }
+    setClerkTokenGetter(() => clerkGetTokenRef.current?.() ?? Promise.resolve(null))
+    let cancelled = false
+    setState((s) => ({ ...s, loading: true, authError: null }))
+    apiClient
+      .get<{ user: AuthUser }>('/auth/me')
+      .then(({ data }) => {
+        if (cancelled) return
+        dropSelfAttendanceCache()
+        setState({ token: null, user: data.user, loading: false, authError: null })
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        const refused = err instanceof CKApiError && err.status === 403
+        setState({
+          token: null,
+          user: null,
+          loading: false,
+          authError: refused
+            ? { code: err.code, message: err.message }
+            : { code: 'UNAVAILABLE', message: 'Could not load your account. Check the connection and try again.' },
+        })
+      })
+    return () => {
+      cancelled = true
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clerkLoaded, clerkSignedIn, clerkUserKey, state.token])
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await apiClient.post<{ token: string; user: AuthUser }>(
@@ -156,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
     localStorage.setItem(TOKEN_KEY, data.token)
     dropSelfAttendanceCache()
-    setState({ token: data.token, user: withTenancyClaims(data.user, data.token), loading: false })
+    setState({ token: data.token, user: withTenancyClaims(data.user, data.token), loading: false, authError: null })
   }, [])
 
   const logout = useCallback(async () => {
@@ -179,12 +244,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // lib/api.ts, to avoid a circular import between auth/ and context/.
     localStorage.removeItem('orion.outletId')
     dropSelfAttendanceCache()
-    setState({ token: null, user: null, loading: false })
-  }, [state.token])
+    setClerkTokenGetter(null)
+    setState({ token: null, user: null, loading: false, authError: null })
+    // End the Clerk session too, so the next person at a shared tablet must sign in.
+    if (clerk?.isSignedIn) void clerk.signOut().catch(() => undefined)
+  }, [state.token, clerk])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, login, logout }),
-    [state, login, logout],
+    () => ({ ...state, login, logout, clerkEnabled: !!clerk }),
+    [state, login, logout, clerk],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

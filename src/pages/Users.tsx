@@ -23,6 +23,7 @@ import {
   History,
   BarChart3,
   Plus,
+  Send,
 } from 'lucide-react'
 import { get, post, patch, put } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
@@ -91,6 +92,8 @@ interface AdminUser {
   lastLoginAt: string | null
   outletIds: string[]
   brandIds: string[]
+  /** Has signed in with Clerk at least once (absent on older APIs). */
+  clerkLinked?: boolean
 }
 
 interface ActivityRow {
@@ -296,6 +299,9 @@ function OutletMultiSelect({
 // ---------------------------------------------------------------------------
 
 function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; onCreated: () => void }) {
+  // With Clerk sign-in, staff get an email invitation and sign in with Google or email,
+  // so no password is needed; without it, the owner still sets one.
+  const { clerkEnabled } = useAuth()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -317,21 +323,34 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (submitting) return
-    if (!name.trim() || !email.trim() || !role || password.length < 8) {
-      setFormError('Name, email, role, and an 8+ character password are required.')
+    const needsPassword = !clerkEnabled || password.length > 0
+    if (!name.trim() || !email.trim() || !role || (needsPassword && password.length < 8)) {
+      setFormError(
+        clerkEnabled
+          ? 'Name, email and role are required (a password, if you set one, needs 8+ characters).'
+          : 'Name, email, role, and an 8+ character password are required.',
+      )
       return
     }
     setFormError(null)
     setSubmitting(true)
     try {
-      await post('/admin/users', {
+      const { data } = await post<{ invitation?: 'sent' | 'failed' | 'not_configured' }>('/admin/users', {
         name: name.trim(),
         email: email.trim(),
         role,
-        password,
+        ...(password ? { password } : {}),
         outlet_ids: outletIds,
       })
-      toast.success(`${name.trim()} created`)
+      if (data?.invitation === 'sent') {
+        toast.success(`${name.trim()} added`, { description: `Invitation emailed to ${email.trim()}.` })
+      } else if (data?.invitation === 'failed') {
+        toast.warning(`${name.trim()} added, but the invitation email failed`, {
+          description: 'Use "Resend invite" from their row in a moment.',
+        })
+      } else {
+        toast.success(`${name.trim()} created`)
+      }
       setOpen(false)
       reset()
       onCreated()
@@ -385,15 +404,22 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Password</label>
+            <label className="text-xs font-medium text-zinc-400">
+              Password{clerkEnabled ? ' (optional)' : ''}
+            </label>
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={submitting}
-              placeholder="Min. 8 characters"
+              placeholder={clerkEnabled ? 'Leave blank: they sign in with Google or email' : 'Min. 8 characters'}
               autoComplete="new-password"
             />
+            {clerkEnabled && (
+              <p className="text-[11px] text-zinc-500">
+                They'll get an email invitation. Only set a password for IT break-glass accounts.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-zinc-400">Outlet access</label>
@@ -871,7 +897,7 @@ function PermissionsMatrix() {
 // ---------------------------------------------------------------------------
 
 export default function Users() {
-  const { user } = useAuth()
+  const { user, clerkEnabled } = useAuth()
   const isOwner = hasRole(user?.role, ['OWNER'])
   const { outlets } = useOutlet()
   const queryClient = useQueryClient()
@@ -919,6 +945,22 @@ export default function Users() {
       toast.error(errMsg(err, `Failed to ${blocking ? 'block' : 'unblock'} user.`))
     } finally {
       blockingIdsRef.current.delete(u.id)
+    }
+  }
+
+  // Same per-row ref guard as block/unblock: a double tap must not send two invitations.
+  const invitingIdsRef = useRef<Set<string>>(new Set())
+
+  async function handleResendInvite(u: AdminUser) {
+    if (invitingIdsRef.current.has(u.id)) return
+    invitingIdsRef.current.add(u.id)
+    try {
+      await post(`/admin/users/${u.id}/invite`)
+      toast.success(`Invitation sent to ${u.email}`)
+    } catch (err) {
+      toast.error(errMsg(err, 'Failed to send the invitation.'))
+    } finally {
+      invitingIdsRef.current.delete(u.id)
     }
   }
 
@@ -1041,6 +1083,11 @@ export default function Users() {
                                 <DropdownMenuItem onClick={() => setEditTarget(u)}>
                                   <Pencil className="h-3.5 w-3.5" /> Edit
                                 </DropdownMenuItem>
+                                {clerkEnabled && u.clerkLinked === false && u.status === 'ACTIVE' && (
+                                  <DropdownMenuItem onClick={() => void handleResendInvite(u)}>
+                                    <Send className="h-3.5 w-3.5" /> Resend invite
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => setResetTarget(u)}>
                                   <KeyRound className="h-3.5 w-3.5" /> Reset password
                                 </DropdownMenuItem>

@@ -1,4 +1,5 @@
 import { io, type Socket } from 'socket.io-client'
+import { currentBearerToken } from './authToken'
 
 // Same origin resolution as api.ts: absolute backend URL in production (Vercel → Render),
 // empty (same-origin, Vite-proxied) in dev. Set VITE_API_URL / VITE_API_PROXY_TARGET at build.
@@ -166,11 +167,13 @@ export function initSocket(locationId: string = DEFAULT_LOCATION_ID): Socket {
   _socket = io(SOCKET_ORIGIN || '/', {
     // Dev: same-origin (Vite proxies /socket.io). Prod: absolute backend origin.
     path: '/socket.io',
-    // Send the user JWT in the handshake — the backend rejects sockets without a
-    // valid token (see backend realtime/hub.ts). Read directly from storage to
-    // avoid a circular import with api.ts (which imports destroySocket here).
-    // socket.io re-sends this same auth payload on every reconnect.
-    auth: { token: localStorage.getItem('ck_jwt') ?? undefined, locationId },
+    // The backend rejects sockets without a valid token (backend realtime/hub.ts).
+    // Callback form: socket.io calls it on EVERY (re)connect, so a reconnect after a
+    // network blip presents a fresh token. Clerk tokens live ~60 s; a static object
+    // would make every reconnect fail once the first token expired.
+    auth: (cb) => {
+      void currentBearerToken().then((token) => cb({ token: token ?? undefined, locationId }))
+    },
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionDelay: 1000,

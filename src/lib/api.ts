@@ -5,6 +5,7 @@ import axios, {
   isAxiosError,
 } from 'axios'
 import { destroySocket } from './socket'
+import { currentBearerToken } from './authToken'
 
 // ─── Error shape from CK1-API-003 §1 ─────────────────────────────────────────
 
@@ -30,12 +31,9 @@ export class CKApiError extends Error {
 
 const TOKEN_KEY = 'ck_jwt'
 
-function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY)
-}
 
 // Outlet context switcher (platform-ia-navigation.md §5). Read directly from
-// localStorage — same pattern as getToken() above — rather than threading
+// localStorage (like the password-login token in lib/authToken.ts) rather than threading
 // React context into this plain axios module. 'ALL' (or unset) means no
 // outlet filter; the backend doesn't scope by it yet (D22 is a separate
 // backend-wave item), so this header is inert until that lands.
@@ -139,9 +137,10 @@ function reportCrucialError(error: CrucialError): boolean {
 
 const MUTATION_METHODS = new Set(['post', 'put', 'patch', 'delete'])
 
-// Attach stored JWT + selected outlet on every request (unless the caller already set one)
-apiClient.interceptors.request.use((config) => {
-  const token = getToken()
+// Attach the bearer token (Clerk session or password-login JWT, see lib/authToken.ts) +
+// selected outlet on every request (unless the caller already set one).
+apiClient.interceptors.request.use(async (config) => {
+  const token = config.headers.Authorization ? null : await currentBearerToken()
   if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`
   }

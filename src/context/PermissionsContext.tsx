@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -42,6 +43,8 @@ interface PermissionsContextValue {
   loading: boolean
   /** True if `key` (a page path, e.g. '/reports') is accessible to the current user. */
   canAccessPage: (key: string) => boolean
+  /** Re-reads permissions, e.g. right after the owner switches a module on or off. */
+  refresh: () => void
 }
 
 const PermissionsContext = createContext<PermissionsContextValue | null>(null)
@@ -49,6 +52,9 @@ const PermissionsContext = createContext<PermissionsContextValue | null>(null)
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [allowedPages, setAllowedPages] = useState<Set<string> | null>(null)
+  // Pages of modules the owner switched off: hidden for EVERY role, owner included.
+  const [disabledPages, setDisabledPages] = useState<Set<string>>(() => new Set())
+  const [version, setVersion] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -61,8 +67,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     ;(async () => {
       try {
-        const { data } = await get<{ pages: string[] }>('/me/permissions')
+        const { data } = await get<{ pages: string[]; disabled_pages?: string[] }>('/me/permissions')
         if (!alive) return
+        setDisabledPages(new Set(Array.isArray(data?.disabled_pages) ? data.disabled_pages : []))
         // Fail OPEN on a malformed or empty response — see class doc above.
         if (Array.isArray(data?.pages) && data.pages.length > 0) {
           setAllowedPages(new Set(data.pages))
@@ -80,11 +87,12 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false
     }
-  }, [user])
+  }, [user, version])
 
   const canAccessPage = useMemo(() => {
     return (key: string): boolean => {
       if (!user) return false
+      if (disabledPages.has(key)) return false
       const role = normalizeRole(user.role)
       // OWNER is never restricted — always full access, regardless of the matrix or load state.
       if (role === 'OWNER') return true
@@ -95,11 +103,13 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (allowedPages === null) return canAccess(user.role, key)
       return allowedPages.has(key)
     }
-  }, [user, allowedPages])
+  }, [user, allowedPages, disabledPages])
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), [])
 
   const value = useMemo<PermissionsContextValue>(
-    () => ({ allowedPages, loading, canAccessPage }),
-    [allowedPages, loading, canAccessPage],
+    () => ({ allowedPages, loading, canAccessPage, refresh }),
+    [allowedPages, loading, canAccessPage, refresh],
   )
 
   return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>

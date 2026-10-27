@@ -1,12 +1,15 @@
-import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { type FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Orbit, Loader2, AlertCircle, Mail, Lock } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { CKApiError, warmUpApi } from '../lib/api'
 import { PLATFORM_NAME, PLATFORM_TAGLINE, PLATFORM_ATTRIBUTION } from '../lib/branding'
 
+// Clerk's sign-in widget is its own chunk: password-only deployments never download it.
+const ClerkSignInPanel = lazy(() => import('../auth/ClerkSignInPanel'))
+
 export default function Login() {
-  const { login } = useAuth()
+  const { login, user, clerkEnabled } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -20,6 +23,13 @@ export default function Login() {
   // ~50s wake). Show that instead of a silent spinner so it doesn't read as broken.
   const [slowHint, setSlowHint] = useState(false)
   const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // With Clerk on, the password form is the IT team's break-glass, tucked behind a toggle.
+  const [showPassword, setShowPassword] = useState(!clerkEnabled)
+
+  // A Clerk sign-in completes outside handleSubmit: leave the page once ORION accepts it.
+  useEffect(() => {
+    if (user) navigate(from, { replace: true })
+  }, [user, from, navigate])
 
   // Start waking the backend as soon as the login page loads, so it's usually
   // warm by the time the user finishes typing (fixes the cold-start timeout).
@@ -76,6 +86,24 @@ export default function Login() {
           <p className="mt-1 text-sm text-zinc-500">{PLATFORM_TAGLINE}</p>
         </div>
 
+        {clerkEnabled && (
+          <Suspense fallback={<div className="mx-auto h-80 w-full max-w-sm animate-pulse rounded-xl bg-muted/50" role="status" aria-label="Loading sign-in" />}>
+            <ClerkSignInPanel />
+          </Suspense>
+        )}
+
+        {clerkEnabled && (
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-expanded={showPassword}
+            className="mx-auto mt-4 block text-xs text-zinc-500 underline-offset-4 hover:text-zinc-300 hover:underline"
+          >
+            {showPassword ? 'Hide IT sign-in' : 'IT team: sign in with password'}
+          </button>
+        )}
+
+        {showPassword && (
         <form
           onSubmit={handleSubmit}
           className="rounded-2xl border border-border bg-card/90 p-7 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.55),0_0_45px_-10px_rgba(16,185,129,0.25)] backdrop-blur-xl"
@@ -161,6 +189,7 @@ export default function Login() {
             </p>
           )}
         </form>
+        )}
 
         <p className="mt-4 text-center text-xs text-zinc-600">
           {PLATFORM_NAME} — {PLATFORM_ATTRIBUTION}

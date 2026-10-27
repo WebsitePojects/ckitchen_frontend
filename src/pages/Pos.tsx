@@ -554,7 +554,7 @@ interface CartPanelProps {
   setDeviceTime: (v: string) => void
   customer: string
   setCustomer: (v: string) => void
-  deviceInputRef: React.RefObject<HTMLInputElement | null>
+  deviceInputRef: React.RefObject<HTMLInputElement>
   noteFor: string | null
   setNoteFor: (k: string | null) => void
   changeQty: (key: string, delta: number) => void

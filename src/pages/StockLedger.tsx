@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ListOrdered, ArrowDownToLine, ArrowUpFromLine, Layers, Search } from 'lucide-react'
 import { toast } from 'sonner'
-import { get } from '../lib/api'
-import { useOutlet } from '../context/OutletContext'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
@@ -67,12 +65,8 @@ function fmtTime(iso: string) {
 const NO_ENTRIES: LedgerEntry[] = []
 
 export default function StockLedger() {
-  // Outlet-scoping leak fix: GET /stock-ledger is outlet-scoped server-side
-  // (X-Outlet-Id), but this effect never depended on the selected outlet, so
-  // switching outlets in the header left the previous outlet's ledger rows on
-  // screen until some other filter changed. selectedOutletId is now a
-  // deliberate re-run trigger for the ledger-rows effect below.
-  const { selectedOutletId } = useOutlet()
+  // GET /stock-ledger is outlet-scoped server-side (X-Outlet-Id); useApiQuery keys its
+  // cache by the selected outlet, so switching outlets never shows another outlet's rows.
   const [module, setModule] = useState('ALL')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')

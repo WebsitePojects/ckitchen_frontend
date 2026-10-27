@@ -5,6 +5,7 @@ import { get } from '../lib/api'
 import { showAppDialog } from '../lib/appDialog'
 import { useAuth } from './AuthContext'
 import { normalizeRole } from './access'
+import { usePermissions } from '../context/PermissionsContext'
 
 /**
  * Attendance gate — the "second middleware after login" (client directive,
@@ -74,7 +75,11 @@ export function RequireAttendance() {
   const navigate = useNavigate()
 
   const isOwner = user ? normalizeRole(user.role) === 'OWNER' : false
-  const exempt = isExemptPath(location.pathname)
+  // The owner can switch the whole People & attendance module off (Settings > Modules);
+  // then nobody is gated on clocking in.
+  const { canAccessPage } = usePermissions()
+  const attendanceOff = !!user && !canAccessPage('/attendance')
+  const exempt = isExemptPath(location.pathname) || attendanceOff
 
   // Hooks run unconditionally; the query itself only fires for non-OWNER
   // authed users (a disabled query stays isPending forever, so every branch
