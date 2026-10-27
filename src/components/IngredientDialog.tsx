@@ -245,12 +245,12 @@ export default function IngredientDialog({
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!saving) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
+      <DialogContent className="bg-card border-border text-foreground max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50">
+          <DialogTitle className="text-foreground">
             Edit ingredient — {ingredient?.name ?? ''}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogDescription className="text-muted-foreground">
             Update master fields and manage which suppliers this ingredient is purchased from.
           </DialogDescription>
         </DialogHeader>
@@ -259,27 +259,27 @@ export default function IngredientDialog({
         <form onSubmit={e => void handleSave(e)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Name</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Name</label>
               <Input
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
                 placeholder="e.g. Chicken thigh"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Unit</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Unit</label>
               <Input
                 value={unit}
                 onChange={e => setUnit(e.target.value)}
                 required
                 placeholder="kg, g, L, pcs"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Unit cost (₱)</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Unit cost (₱)</label>
               <Input
                 type="number"
                 min="0"
@@ -288,11 +288,11 @@ export default function IngredientDialog({
                 onChange={e => setUnitCost(e.target.value)}
                 required
                 placeholder="0.00"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
             </div>
             <div className="col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                 Low-stock threshold ({unit || 'unit'})
               </label>
               <Input
@@ -303,9 +303,9 @@ export default function IngredientDialog({
                 onChange={e => setLowStockThreshold(e.target.value)}
                 required
                 placeholder="0"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
-              <p className="mt-1 text-[11px] text-zinc-600">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 Below this level, the ingredient raises a low-stock alert (repurchase / ITO).
               </p>
             </div>
@@ -316,7 +316,7 @@ export default function IngredientDialog({
               type="submit"
               disabled={saving}
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
             >
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
@@ -324,24 +324,24 @@ export default function IngredientDialog({
         </form>
 
         {/* ── Suppliers section ── */}
-        <div className="mt-1 border-t border-[#1F2A24] pt-4">
+        <div className="mt-1 border-t border-border pt-4">
           <div className="mb-2 flex items-center gap-2">
             <Building2 className="h-4 w-4 text-emerald-500" aria-hidden />
-            <h3 className="text-sm font-semibold text-zinc-100">Suppliers</h3>
+            <h3 className="text-sm font-semibold text-foreground">Suppliers</h3>
           </div>
 
           {/* Current affiliations */}
           {affiliationsLoading ? (
-            <div className="flex items-center gap-2 py-3 text-xs text-zinc-500">
+            <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
               Loading suppliers…
             </div>
           ) : affiliationsError ? (
-            <p className="py-2 text-xs text-amber-400">
+            <p className="py-2 text-xs text-warn-text">
               Could not load supplier links (the endpoint may not be deployed yet).
             </p>
           ) : affiliations.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-[#1F2A24] bg-[#0A0F0D] px-3 py-2.5 text-xs text-zinc-500">
+            <p className="rounded-lg border border-dashed border-border bg-background px-3 py-2.5 text-xs text-muted-foreground">
               No supplier linked — link where this ingredient is purchased from.
             </p>
           ) : (
@@ -349,15 +349,15 @@ export default function IngredientDialog({
               {affiliations.map(aff => (
                 <li
                   key={aff.id}
-                  className="flex items-center gap-2 rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2"
+                  className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-zinc-200">
-                      <span className="font-mono text-[11px] text-zinc-500">{aff.supplier?.code}</span>
+                    <p className="truncate text-sm font-medium text-foreground">
+                      <span className="font-mono text-[11px] text-muted-foreground">{aff.supplier?.code}</span>
                       {aff.supplier?.code ? ' — ' : ''}
                       {aff.supplier?.name ?? aff.supplierId}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {aff.supplierSku
                         ? `Supplier item code ${aff.supplierSku}`
                         : 'No supplier item code'}
@@ -373,7 +373,7 @@ export default function IngredientDialog({
                     disabled={removingId === aff.supplierId}
                     aria-label={`Unlink ${aff.supplier?.name ?? 'supplier'}`}
                     title="Unlink supplier"
-                    className="h-8 w-8 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                    className="h-8 w-8 flex-none text-muted-foreground hover:text-danger-text hover:bg-red-500/10 disabled:opacity-50"
                   >
                     {removingId === aff.supplierId ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -388,29 +388,29 @@ export default function IngredientDialog({
 
           {/* Add supplier row */}
           {noSuppliersExist ? (
-            <p className="mt-3 rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-300/90">
+            <p className="mt-3 rounded-lg border border-dashed border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-xs text-warn-text">
               No suppliers exist yet. Add them in{' '}
               <span className="font-semibold">Master Data → Suppliers</span> first, then link them here.
             </p>
           ) : (
-            <div className="mt-3 space-y-2 rounded-lg border border-[#1F2A24] bg-[#0A0F0D]/60 p-3">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+            <div className="mt-3 space-y-2 rounded-lg border border-border bg-background/60 p-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Link a supplier
               </p>
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-[10rem] flex-1">
-                  <label className="mb-1 block text-[11px] text-zinc-500">Supplier</label>
+                  <label className="mb-1 block text-[11px] text-muted-foreground">Supplier</label>
                   <Select
                     value={addSupplierId || '_none'}
                     onValueChange={v => setAddSupplierId(v === '_none' ? '' : v)}
                   >
-                    <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+                    <SelectTrigger className="bg-background border-border text-foreground text-sm h-9">
                       <SelectValue placeholder="Select supplier…" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#121A17] border-[#1F2A24]">
-                      <SelectItem value="_none" className="text-zinc-400">Select supplier…</SelectItem>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="_none" className="text-muted-foreground">Select supplier…</SelectItem>
                       {availableSuppliers.map(s => (
-                        <SelectItem key={s.id} value={s.id} className="text-zinc-200">
+                        <SelectItem key={s.id} value={s.id} className="text-foreground">
                           {s.code} — {s.name}
                         </SelectItem>
                       ))}
@@ -418,18 +418,18 @@ export default function IngredientDialog({
                   </Select>
                 </div>
                 <div className="w-32">
-                  <label className="mb-1 block text-[11px] text-zinc-500">
+                  <label className="mb-1 block text-[11px] text-muted-foreground">
                     Supplier item code
                   </label>
                   <Input
                     value={addSku}
                     onChange={e => setAddSku(e.target.value)}
                     placeholder="optional"
-                    className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                    className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
                   />
                 </div>
                 <div className="w-24">
-                  <label className="mb-1 block text-[11px] text-zinc-500">Last ₱</label>
+                  <label className="mb-1 block text-[11px] text-muted-foreground">Last ₱</label>
                   <Input
                     type="number"
                     min="0"
@@ -437,7 +437,7 @@ export default function IngredientDialog({
                     value={addCost}
                     onChange={e => setAddCost(e.target.value)}
                     placeholder="opt."
-                    className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                    className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
                   />
                 </div>
                 <Button
@@ -445,7 +445,7 @@ export default function IngredientDialog({
                   size="sm"
                   onClick={() => void handleAddSupplier()}
                   disabled={addingSupplier || !addSupplierId}
-                  className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+                  className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
                 >
                   {addingSupplier ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -455,12 +455,12 @@ export default function IngredientDialog({
                   Link
                 </Button>
               </div>
-              <p className="text-[11px] text-zinc-600">
+              <p className="text-[11px] text-muted-foreground">
                 Supplier item code — the code this supplier uses for the item on their invoices
                 (optional).
               </p>
               {availableSuppliers.length === 0 && (
-                <p className="text-[11px] text-zinc-600">
+                <p className="text-[11px] text-muted-foreground">
                   Every active supplier is already linked to this ingredient.
                 </p>
               )}

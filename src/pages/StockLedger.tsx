@@ -49,11 +49,11 @@ interface Warehouse { id: string; type: string; locationId?: string }
 const MODULES = ['RECEIVE', 'ITO', 'ORDER_DEDUCTION', 'ADJUSTMENT', 'RESTOCK']
 
 const MODULE_CLASS: Record<string, string> = {
-  RECEIVE: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  ITO: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  ORDER_DEDUCTION: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  ADJUSTMENT: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
-  RESTOCK: 'bg-teal-500/15 text-teal-300 border-teal-500/30',
+  RECEIVE: 'bg-emerald-500/15 text-ink-accent border-emerald-500/30',
+  ITO: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+  ORDER_DEDUCTION: 'bg-amber-500/15 text-warn-text border-amber-500/30',
+  ADJUSTMENT: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30',
+  RESTOCK: 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30',
 }
 
 function fmtTime(iso: string) {
@@ -147,7 +147,7 @@ export default function StockLedger() {
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search ref, doc #, ingredient, module…"
             value={search}
@@ -164,14 +164,14 @@ export default function StockLedger() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-sm text-zinc-500">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
       </div>
 
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading ledger…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading ledger…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-danger-text">{error}</p>
         ) : rows.length === 0 ? (
           <EmptyState icon={ListOrdered} title="No movements" description="Receive stock, confirm an ITO, or advance an order to post ledger entries." />
         ) : (
@@ -192,13 +192,13 @@ export default function StockLedger() {
             <TableBody>
               {rows.map((e) => (
                 <TableRow key={e.id} className="border-border">
-                  <TableCell className="whitespace-nowrap text-sm text-zinc-400">{fmtTime(e.postedAt)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtTime(e.postedAt)}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${MODULE_CLASS[e.sourceModule] ?? 'border-zinc-600 text-zinc-400'}`}>
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${MODULE_CLASS[e.sourceModule] ?? 'border-input text-muted-foreground'}`}>
                       {e.sourceModule}
                     </span>
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-zinc-400">
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     {e.sourceDocumentNo.slice(0, 12)}{e.sourceLineNo ? `·${e.sourceLineNo.slice(0, 6)}` : ''}
                   </TableCell>
                   <TableCell>
@@ -207,30 +207,30 @@ export default function StockLedger() {
                         type="button"
                         onClick={() => void copyRef(e.source_ref!)}
                         title="Click to copy"
-                        className="font-mono text-xs text-emerald-300/90 transition-colors hover:text-emerald-200 hover:underline"
+                        className="font-mono text-xs text-ink-accent transition-colors hover:text-emerald-200 hover:underline"
                       >
                         {e.source_ref}
                       </button>
                     ) : (
                       <span
-                        className="font-mono text-xs text-zinc-500"
+                        className="font-mono text-xs text-muted-foreground"
                         title={e.sourceDocumentNo}
                       >
                         {e.sourceDocumentNo.slice(0, 8)}…
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-zinc-200">{ingredients[e.ingredientId]?.name ?? e.ingredientId.slice(0, 8)}</TableCell>
-                  <TableCell className="text-sm text-zinc-400">{warehouses[e.warehouseId]?.type ?? e.warehouseId.slice(0, 8)}</TableCell>
+                  <TableCell className="text-sm text-foreground">{ingredients[e.ingredientId]?.name ?? e.ingredientId.slice(0, 8)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{warehouses[e.warehouseId]?.type ?? e.warehouseId.slice(0, 8)}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.movementType === 'IN' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.movementType === 'IN' ? 'bg-emerald-500/15 text-ink-accent' : 'bg-amber-500/15 text-warn-text'}`}>
                       {e.movementType}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums text-zinc-100">
+                  <TableCell className="text-right font-medium tabular-nums text-foreground">
                     {Number(e.quantity ?? 0).toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-zinc-400">
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
                     ₱{Number(e.unitCost ?? 0).toLocaleString()}
                   </TableCell>
                 </TableRow>

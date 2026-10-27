@@ -1,28 +1,39 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
-import { PLATFORM_NAME } from '../../lib/branding'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 
 interface PageHeaderState {
+  /** Route the title belongs to; a title set on another route is ignored (no stale titles). */
+  path: string
   title: string
   subtitle?: string
 }
 
-interface PageHeaderContextValue extends PageHeaderState {
+interface PageHeaderContextValue {
+  header: PageHeaderState | null
   setHeader: (state: PageHeaderState) => void
+  /** How many in-page <PageHeader> titles are mounted; the Topbar drops its h1 when > 0. */
+  inPageTitles: number
+  registerInPageTitle: () => () => void
 }
 
 const PageHeaderContext = createContext<PageHeaderContextValue | null>(null)
 
 /**
- * Lets a page (rendered inside <Outlet/>) push its title/subtitle up to the
- * Topbar without prop-drilling through the router. Pages call usePageHeader()
- * once near the top of their render.
+ * Lets a page push a title to the Topbar, and lets the in-page <PageHeader> claim the page's
+ * single h1 so the Topbar shows only the breadcrumb.
  */
 export function PageHeaderProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<PageHeaderState>({ title: PLATFORM_NAME })
+  const [header, setHeader] = useState<PageHeaderState | null>(null)
+  const [inPageTitles, setInPageTitles] = useState(0)
+
+  const registerInPageTitle = useCallback(() => {
+    setInPageTitles((n) => n + 1)
+    return () => setInPageTitles((n) => n - 1)
+  }, [])
 
   const value = useMemo<PageHeaderContextValue>(
-    () => ({ ...state, setHeader: setState }),
-    [state],
+    () => ({ header, setHeader, inPageTitles, registerInPageTitle }),
+    [header, inPageTitles, registerInPageTitle],
   )
 
   return <PageHeaderContext.Provider value={value}>{children}</PageHeaderContext.Provider>
@@ -37,11 +48,14 @@ export function usePageHeaderContext(): PageHeaderContextValue {
 /** Call from a page component to set the Topbar title/subtitle for the current route. */
 export function usePageHeader(title: string, subtitle?: string) {
   const { setHeader } = usePageHeaderContext()
-  // Intentionally not using useEffect deps array tricks here — pages call this
-  // once per render with stable strings; React Router unmounts pages on nav
-  // so there is no stale-title flash between routes.
-  useMemo(() => {
-    setHeader({ title, subtitle })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, subtitle])
+  const { pathname } = useLocation()
+  useEffect(() => {
+    setHeader({ path: pathname, title, subtitle })
+  }, [setHeader, pathname, title, subtitle])
+}
+
+/** For pages that draw their own h1 without <PageHeader>: the Topbar then shows only the breadcrumb. */
+export function useInPageTitle() {
+  const { registerInPageTitle } = usePageHeaderContext()
+  useEffect(() => registerInPageTitle(), [registerInPageTitle])
 }

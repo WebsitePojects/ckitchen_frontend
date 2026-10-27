@@ -3,131 +3,211 @@
 @tailwind utilities;
 
 /*
- * CloudKitchen ONE — dark theme tokens (UI Reskin Plan)
- * Base: shadcn/ui "zinc" palette. Primary overridden to emerald.
- * Dark surfaces use the client-mockup-derived hexes:
- *   app bg #0A0F0D · card #121A17 · border #27332C · sidebar #0C1310
+ * ORION design tokens (revamp 2026-10-27, .claude/context/revamp-and-ems-plan.md).
+ * Dark-first night ground with emerald; light = warm paper. shadcn variable names are kept
+ * so every shadcn component follows the theme; their meaning is:
+ *   background = canvas · card = surface · popover = raised · secondary/muted/accent = active
+ *   (hover/selected ground) · primary = FILLED controls · ink-accent = accent TEXT (links,
+ *   active icons, rings). Accent is a text colour; primary is a fill (never white on emerald-400).
+ * Contrast measured with elegant-design-for-system/scripts/contrast.mjs; ratio vs canvas
+ * unless stated.
  */
 @layer base {
   :root {
-    /* Light theme kept for completeness; app runs dark-only (see <html class="dark">) */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
-    --primary: 160 84% 39%;
+    --background: 44 35% 94%;          /* canvas #F5F2EA paper */
+    --foreground: 153 21% 10%;         /* ink #15201B 14.97:1 */
+    --card: 43 100% 99%;               /* surface #FFFDF8 */
+    --card-foreground: 153 21% 10%;
+    --popover: 0 0% 100%;              /* raised #FFFFFF */
+    --popover-foreground: 153 21% 10%;
+    --primary: 160 80% 20%;            /* fill #0A5C41, text on it #FFFFFF 8.01:1 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
-    --destructive: 0 84% 60%;
+    --secondary: 42 34% 89%;           /* active #ECE6D8 */
+    --secondary-foreground: 153 21% 10%;
+    --muted: 42 34% 89%;
+    --muted-foreground: 146 8% 36%;    /* muted #56645C 5.57:1 (6.12:1 on surface) */
+    --accent: 42 34% 89%;
+    --accent-foreground: 153 21% 10%;
+    --destructive: 7 70% 41%;          /* fill #B3311F, white 5.9:1; as text 5.56:1 */
     --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 160 84% 39%;
+    --border: 41 28% 85%;              /* hairline #E3DCCD (decorative) */
+    --input: 39 9% 52%;                /* field edge #8F8778 3.50:1 on surface */
+    --ring: 161 87% 24%;
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 6% 10%;
-    --sidebar-border: 240 6% 90%;
-    --sidebar-accent: 160 84% 95%;
-    --sidebar-accent-foreground: 160 84% 30%;
+    --ink-accent: 161 87% 24%;         /* #08704F 5.46:1 (6.00:1 on surface) */
+    --danger-text: 7 70% 41%;          /* #B3311F 5.56:1 */
+    --warn-text: 39 100% 27%;          /* #8A5A00 5.30:1 */
+    --star: 42 86% 45%;                /* art only */
+
+    --sidebar-background: 43 100% 99%;
+    --sidebar-foreground: 153 21% 10%;
+    --sidebar-border: 41 28% 85%;
+    --sidebar-accent: 42 34% 89%;
+    --sidebar-accent-foreground: 161 87% 24%;
+
+    color-scheme: light;
   }
 
   .dark {
-    /* App background — near-black green (#0A0F0D) */
-    --background: 156 20% 5%;
-    --foreground: 0 0% 98%;
-
-    /* Card surface (#121A17) with visible border (#27332C) */
-    --card: 158 18% 9%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 158 18% 9%;
-    --popover-foreground: 0 0% 98%;
-
-    /* Primary/accent — emerald */
-    --primary: 160 84% 39%;        /* emerald-500 #10B981 */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 240 4% 16%;        /* zinc-800 */
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%; /* zinc-400 */
-
-    --accent: 161 94% 30%;          /* emerald-600 #059669 */
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;       /* red-500 #EF4444 */
+    --background: 156 20% 5%;          /* canvas #0A0F0D night */
+    --foreground: 137 18% 92%;         /* ink #E8EFEA 16.53:1 */
+    --card: 154 17% 8%;                /* surface #111815 */
+    --card-foreground: 137 18% 92%;
+    --popover: 150 16% 10%;            /* raised #151D19 */
+    --popover-foreground: 137 18% 92%;
+    --primary: 158 64% 52%;            /* fill #34D399, ink on it #04261A 8.42:1 */
+    --primary-foreground: 159 81% 8%;
+    --secondary: 150 17% 11%;          /* active #18221D */
+    --secondary-foreground: 137 18% 92%;
+    --muted: 150 17% 11%;
+    --muted-foreground: 146 9% 65%;    /* muted #9DADA4 8.23:1 (7.68:1 on surface) */
+    --accent: 150 17% 11%;
+    --accent-foreground: 137 18% 92%;
+    --destructive: 7 62% 46%;          /* fill #BE4230, white 4.9:1 */
     --destructive-foreground: 0 0% 100%;
+    --border: 153 11% 15%;             /* hairline #232C28 (decorative) */
+    --input: 148 9% 39%;               /* field edge #5B6E64 3.31:1 on surface */
+    --ring: 155 77% 64%;
 
-    --border: 145 13% 18%;          /* #27332C */
-    --input: 145 13% 18%;
-    --ring: 160 84% 39%;
+    --ink-accent: 155 77% 64%;         /* #5EEAB0 12.76:1 */
+    --danger-text: 7 100% 74%;         /* #FF8A7A 8.43:1 */
+    --warn-text: 42 86% 63%;           /* #F2C14E 11.51:1 */
+    --star: 42 86% 63%;
 
-    /* Sidebar — distinct, slightly darker than the card surface (#0C1310) */
-    --sidebar-background: 154 23% 6%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-border: 145 13% 18%;
-    --sidebar-accent: 160 84% 39% / 0.15;
-    --sidebar-accent-foreground: 160 84% 60%;
+    --sidebar-background: 154 17% 8%;
+    --sidebar-foreground: 137 18% 92%;
+    --sidebar-border: 153 11% 15%;
+    --sidebar-accent: 150 17% 11%;
+    --sidebar-accent-foreground: 155 77% 64%;
+
+    color-scheme: dark;
   }
 
   * {
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: 'tnum' 1;
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
-  /* Tailwind's preflight resets native <button> cursor to `default` (removing
-     the browser's own pointer cursor). Restore it app-wide instead of adding
-     `cursor-pointer` to every button one at a time (W4a design rule #2). */
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
+  }
+
+  /* Tailwind's preflight resets native <button> cursor to `default`; restore it app-wide. */
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
   }
 
-  /* Respect the OS-level reduced-motion preference (W4a design rule #1). */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
     *::after {
       animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
   }
 }
 
-/* ─── Thin, zinc-toned scrollbars, app-wide (W4a design rule #5) ─────────────── */
+@layer components {
+  /* ── Ledger layout: hairlines before cards (elegant-design-for-system §12) ── */
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase text-muted-foreground;
+    letter-spacing: 0.22em;
+  }
+  .display-title {
+    @apply font-display text-3xl leading-[1.05] tracking-tight text-foreground sm:text-[2.125rem] lg:text-4xl;
+  }
+  .rule-double {
+    border-bottom: 3px double hsl(var(--border));
+  }
+  .ledger-section {
+    @apply border-t border-border pt-5;
+  }
+  /* Key/value list: label left, value right, one hairline between rows. */
+  .facts > div {
+    @apply flex items-baseline justify-between gap-4 border-b border-border py-2.5 text-sm last:border-b-0;
+  }
+  .facts dt {
+    @apply text-muted-foreground;
+  }
+  .facts dd {
+    @apply text-right font-medium tabular-nums text-foreground;
+  }
+  /* KPI grid whose dividers survive wrapping: each item draws its own hairline. */
+  .figures {
+    @apply grid grid-cols-2 overflow-hidden lg:grid-cols-4;
+  }
+  .figures > * {
+    @apply px-4 py-4 first:pl-0;
+    box-shadow: -1px 0 0 hsl(var(--border)), 0 -1px 0 hsl(var(--border));
+  }
+  /* Status = 7px dot + text, colour from meaning; never a filled pill. */
+  .status {
+    @apply inline-flex items-center gap-2 whitespace-nowrap text-sm text-foreground;
+  }
+  .status::before {
+    content: '';
+    @apply h-[7px] w-[7px] shrink-0 rounded-full bg-current;
+    color: var(--status-color, hsl(var(--muted-foreground)));
+  }
+  .status-ok { --status-color: hsl(var(--ink-accent)); }
+  .status-warn { --status-color: hsl(var(--warn-text)); }
+  .status-danger { --status-color: hsl(var(--danger-text)); }
+  .status-info { --status-color: #2563EB; }
+  .dark .status-info { --status-color: #6B9BFF; }
+}
 
+/* ── Chart tooltips: recharts paints each row in its series colour inline, which is unreadable
+   on the light popover (emerald on paper ~2.5:1). Each row still names its series. ── */
+.recharts-tooltip-item,
+.recharts-tooltip-label {
+  color: hsl(var(--popover-foreground)) !important;
+}
+
+/* ── Backdrop art: fixed, decorative, masked away from the reading area ── */
+.orion-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 70% 65% at 55% 45%, transparent 35%, #000 100%);
+  mask-image: radial-gradient(ellipse 70% 65% at 55% 45%, transparent 35%, #000 100%);
+}
+.orion-art-dark { display: none; }
+.dark .orion-art-dark { display: block; }
+.dark .orion-art-light { display: none; }
+
+/* ── Theme switch: the new theme bursts out of the toggle as a star (ThemeToggle.tsx) ── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* ── Scrollbars follow the theme ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--input) / 0.6) transparent;
+}
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: hsl(var(--input) / 0.6);
   border-radius: 4px;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
-}
-
 ::-webkit-scrollbar-track {
   background: transparent;
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
 }

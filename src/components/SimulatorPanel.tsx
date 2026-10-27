@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { Activity, Play, Square } from 'lucide-react'
 import type { Brand } from '../pages/Dashboard'
 import { useSimulator } from '../context/SimulatorContext'
+import { readableTextOn } from '../lib/theme'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
@@ -91,13 +92,13 @@ export default function SimulatorPanel({ brands }: Props) {
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-sm font-semibold text-zinc-200">
+        <CardTitle className="flex items-center justify-between text-sm font-semibold text-foreground">
           <span className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-emerald-500" aria-hidden />
             Order Simulator
           </span>
           {running && (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-ink-accent">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
               Running
             </span>
@@ -109,7 +110,7 @@ export default function SimulatorPanel({ brands }: Props) {
         {/* Brand toggles */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Brands
             </span>
             {!running && activeBrands.length > 0 && (
@@ -117,14 +118,14 @@ export default function SimulatorPanel({ brands }: Props) {
                 <button
                   type="button"
                   onClick={selectAll}
-                  className="rounded text-xs text-emerald-500 transition-colors duration-200 hover:text-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  className="rounded text-xs text-ink-accent transition-colors duration-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   All
                 </button>
                 <button
                   type="button"
                   onClick={clearAll}
-                  className="rounded text-xs text-zinc-500 transition-colors duration-200 hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  className="rounded text-xs text-muted-foreground transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   None
                 </button>
@@ -133,7 +134,7 @@ export default function SimulatorPanel({ brands }: Props) {
           </div>
 
           {activeBrands.length === 0 ? (
-            <p className="text-xs text-zinc-500 italic">No active brands</p>
+            <p className="text-xs text-muted-foreground italic">No active brands</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {activeBrands.map(brand => {
@@ -149,10 +150,10 @@ export default function SimulatorPanel({ brands }: Props) {
                       'disabled:cursor-not-allowed disabled:opacity-50',
                       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                       selected
-                        ? 'text-white ring-transparent'
-                        : 'bg-transparent text-zinc-400 ring-zinc-700 hover:ring-zinc-500',
+                        ? 'ring-transparent'
+                        : 'bg-transparent text-muted-foreground ring-border hover:ring-input',
                     ].join(' ')}
-                    style={selected ? { backgroundColor: brand.color, borderColor: brand.color } : {}}
+                    style={selected ? { backgroundColor: brand.color, borderColor: brand.color, color: readableTextOn(brand.color) } : {}}
                   >
                     {brand.name}
                   </button>
@@ -164,7 +165,7 @@ export default function SimulatorPanel({ brands }: Props) {
 
         {/* Rate */}
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium uppercase tracking-wide text-zinc-500 shrink-0">
+          <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground shrink-0">
             Rate
           </label>
           <input
@@ -177,12 +178,12 @@ export default function SimulatorPanel({ brands }: Props) {
             onChange={e => setRate(e.target.value)}
             disabled={running}
             className={[
-              'w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-zinc-200',
+              'w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground',
               'tabular-nums focus:outline-none focus:ring-1 focus:ring-ring',
               'disabled:cursor-not-allowed disabled:opacity-50',
             ].join(' ')}
           />
-          <span className="text-xs text-zinc-500">orders / min</span>
+          <span className="text-xs text-muted-foreground">orders / min</span>
         </div>
 
         {/* Start / Stop */}
@@ -190,7 +191,7 @@ export default function SimulatorPanel({ brands }: Props) {
           <Button
             onClick={() => void handleStart()}
             disabled={loading || activeBrands.length === 0}
-            className="w-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             size="sm"
           >
             <Play className="h-3.5 w-3.5" />
@@ -211,11 +212,11 @@ export default function SimulatorPanel({ brands }: Props) {
 
         {/* Error — client-side validation takes priority over a stale API error */}
         {(validationError ?? error) && (
-          <p className="text-xs text-red-400">{validationError ?? error}</p>
+          <p className="text-xs text-danger-text">{validationError ?? error}</p>
         )}
 
         {/* Helper note */}
-        <p className="text-[10px] leading-snug text-zinc-600">
+        <p className="text-[10px] leading-snug text-muted-foreground">
           Orders will appear in the feed in real time. Only SUPER_ADMIN can start/stop the simulator.
         </p>
       </CardContent>

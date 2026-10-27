@@ -108,9 +108,9 @@ const CAN_REPRINT: UserRole[] = ['KITCHEN_CREW']
 
 function printJobBadgeClass(status: PrintJobStatus): string {
   switch (status) {
-    case 'PENDING': return 'bg-amber-500/15 text-amber-400 ring-1 ring-inset ring-amber-500/30'
-    case 'PRINTED': return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30'
-    case 'FAILED':  return 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/30'
+    case 'PENDING': return 'bg-amber-500/15 text-warn-text ring-1 ring-inset ring-amber-500/30'
+    case 'PRINTED': return 'bg-emerald-500/15 text-ink-accent ring-1 ring-inset ring-emerald-500/30'
+    case 'FAILED':  return 'bg-red-500/15 text-danger-text ring-1 ring-inset ring-red-500/30'
   }
 }
 
@@ -118,17 +118,17 @@ function printJobBadgeClass(status: PrintJobStatus): string {
 
 function printerBadgeClass(status: PrinterStatus): string {
   switch (status) {
-    case 'ONLINE':  return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30'
-    case 'OFFLINE': return 'bg-zinc-500/15 text-zinc-400 ring-1 ring-inset ring-zinc-500/30'
-    case 'ERROR':   return 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/30'
+    case 'ONLINE':  return 'bg-emerald-500/15 text-ink-accent ring-1 ring-inset ring-emerald-500/30'
+    case 'OFFLINE': return 'bg-zinc-500/15 text-muted-foreground ring-1 ring-inset ring-zinc-500/30'
+    case 'ERROR':   return 'bg-red-500/15 text-danger-text ring-1 ring-inset ring-red-500/30'
   }
 }
 
 function ConnIcon({ status }: { status: PrinterStatus }) {
   if (status === 'ONLINE') {
-    return <Wifi className="h-4 w-4 text-emerald-400" aria-hidden />
+    return <Wifi className="h-4 w-4 text-ink-accent" aria-hidden />
   }
-  return <WifiOff className="h-4 w-4 text-zinc-500" aria-hidden />
+  return <WifiOff className="h-4 w-4 text-muted-foreground" aria-hidden />
 }
 
 // ─── Time helpers ──────────────────────────────────────────────────────────────
@@ -167,39 +167,39 @@ function ThermalPreview({ job }: { job: PrintJob | null }) {
 
   return (
     <div
-      className="rounded-lg border border-zinc-700 bg-zinc-950 p-4 font-mono text-[11px] leading-relaxed text-zinc-200"
+      className="rounded-lg border border-border bg-background p-4 font-mono text-[11px] leading-relaxed text-foreground"
       role="region"
       aria-label="KOT ticket preview (read-only)"
     >
       {/* Brand / header */}
-      <div className="mb-1 text-center text-[13px] font-bold uppercase tracking-widest text-zinc-50">
+      <div className="mb-1 text-center text-[13px] font-bold uppercase tracking-widest text-foreground">
         {brand ?? 'Kitchen'}
       </div>
       {aggregator && (
-        <div className="mb-0.5 text-center text-zinc-400">[{aggregator}]</div>
+        <div className="mb-0.5 text-center text-muted-foreground">[{aggregator}]</div>
       )}
-      <div className="mb-3 text-center text-zinc-300">
+      <div className="mb-3 text-center text-foreground">
         Order:{' '}
-        <span className="font-bold tabular-nums text-zinc-50">{order_ref ?? '—'}</span>
+        <span className="font-bold tabular-nums text-foreground">{order_ref ?? '—'}</span>
       </div>
 
       {/* Divider */}
-      <div className="mb-2 border-t border-dashed border-zinc-700" />
+      <div className="mb-2 border-t border-dashed border-border" />
 
       {/* Station */}
       {station && (
-        <div className="mb-2 text-zinc-400">Station: {station}</div>
+        <div className="mb-2 text-muted-foreground">Station: {station}</div>
       )}
 
       {/* Items */}
       {items.length > 0 ? (
         <table className="w-full">
           <thead>
-            <tr className="border-b border-dashed border-zinc-700">
-              <th className="pb-1 text-left text-[10px] font-normal uppercase tracking-wide text-zinc-500">
+            <tr className="border-b border-dashed border-border">
+              <th className="pb-1 text-left text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
                 Qty
               </th>
-              <th className="pb-1 text-left text-[10px] font-normal uppercase tracking-wide text-zinc-500">
+              <th className="pb-1 text-left text-[10px] font-normal uppercase tracking-wide text-muted-foreground">
                 Item
               </th>
             </tr>
@@ -208,11 +208,11 @@ function ThermalPreview({ job }: { job: PrintJob | null }) {
             {items.map((item, i) => (
               // eslint-disable-next-line react/no-array-index-key
               <tr key={i}>
-                <td className="py-0.5 pr-3 tabular-nums text-zinc-300">{item.qty}x</td>
-                <td className="py-0.5 text-zinc-200">
+                <td className="py-0.5 pr-3 tabular-nums text-foreground">{item.qty}x</td>
+                <td className="py-0.5 text-foreground">
                   {item.name}
                   {item.notes && (
-                    <div className="text-[10px] text-zinc-500">* {item.notes}</div>
+                    <div className="text-[10px] text-muted-foreground">* {item.notes}</div>
                   )}
                 </td>
               </tr>
@@ -220,15 +220,15 @@ function ThermalPreview({ job }: { job: PrintJob | null }) {
           </tbody>
         </table>
       ) : (
-        <div className="text-zinc-500">No items in payload</div>
+        <div className="text-muted-foreground">No items in payload</div>
       )}
 
       {/* Footer */}
-      <div className="mt-3 border-t border-dashed border-zinc-700 pt-2 text-center text-zinc-500">
+      <div className="mt-3 border-t border-dashed border-border pt-2 text-center text-muted-foreground">
         -- KOT --&nbsp;
         {new Date(job.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </div>
-      <div className="mt-1 text-center text-[9px] uppercase tracking-widest text-zinc-600">
+      <div className="mt-1 text-center text-[9px] uppercase tracking-widest text-muted-foreground">
         Printed by {PLATFORM_NAME} Print Agent
       </div>
     </div>
@@ -416,7 +416,7 @@ export default function Printers() {
         header: 'Order Ref',
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="font-mono text-xs tabular-nums text-zinc-200">
+          <span className="font-mono text-xs tabular-nums text-foreground">
             {row.original.payload?.order_ref ?? row.original.orderId.slice(0, 8)}
           </span>
         ),
@@ -426,7 +426,7 @@ export default function Printers() {
         header: 'Station',
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-sm text-zinc-300">
+          <span className="text-sm text-foreground">
             {stationMap.get(row.original.stationId) ?? '—'}
           </span>
         ),
@@ -436,7 +436,7 @@ export default function Printers() {
         header: 'Printer',
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-sm text-zinc-300">
+          <span className="text-sm text-foreground">
             {printerMap.get(row.original.printerId) ?? '—'}
           </span>
         ),
@@ -466,7 +466,7 @@ export default function Printers() {
               ? row.original.printedAt
               : row.original.createdAt
           return (
-            <span className="tabular-nums text-xs text-zinc-400">
+            <span className="tabular-nums text-xs text-muted-foreground">
               {shortTime(ts)}
             </span>
           )
@@ -479,11 +479,11 @@ export default function Printers() {
         cell: ({ row }) => {
           const { status, error } = row.original
           if (status !== 'FAILED' || !error) {
-            return <span className="text-xs text-zinc-600">—</span>
+            return <span className="text-xs text-muted-foreground">—</span>
           }
           return (
             <span
-              className="max-w-[160px] truncate text-xs text-red-400"
+              className="max-w-[160px] truncate text-xs text-danger-text"
               title={error}
             >
               {error}
@@ -503,7 +503,7 @@ export default function Printers() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => setSelectedJob(job)}
               >
                 Preview
@@ -512,7 +512,7 @@ export default function Printers() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-7 gap-1 border-amber-500/30 px-2 text-xs text-amber-400 hover:border-amber-500/60 hover:text-amber-300"
+                  className="h-7 gap-1 border-amber-500/30 px-2 text-xs text-warn-text hover:border-amber-500/60 hover:text-warn-text"
                   onClick={() => void handleReprint(job.id)}
                   disabled={!!reprintingId}
                   aria-label={`Reprint job ${job.payload?.order_ref ?? job.id}`}
@@ -541,7 +541,7 @@ export default function Printers() {
           subtitle="Print queue, printer health, reprints"
         />
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-red-400">{error}</p>
+          <p className="text-sm font-medium text-danger-text">{error}</p>
           <p className="mt-1 text-xs text-red-500/70">
             Make sure the backend is running on :4000
           </p>
@@ -561,14 +561,14 @@ export default function Printers() {
       />
 
       {/* Print-separation notice — Business Rule #6 */}
-      <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-400">
+      <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-warn-text">
         <Printer className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
           The web app queues print jobs only — it does not print directly.
           The desktop{' '}
-          <span className="font-semibold text-amber-300">Print Agent</span>
+          <span className="font-semibold text-warn-text">Print Agent</span>
           {' '}polls this queue and drives physical printers via ESC/POS.
-          Use <span className="font-semibold text-amber-300">Reprint</span> to re-enqueue a failed job for the Agent.
+          Use <span className="font-semibold text-warn-text">Reprint</span> to re-enqueue a failed job for the Agent.
         </span>
       </div>
 
@@ -605,10 +605,10 @@ export default function Printers() {
           {/* Live Print Queue */}
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Clock className="h-4 w-4 text-emerald-500" aria-hidden />
                 Live Print Queue
-                <span className="ml-auto text-xs font-normal tabular-nums text-zinc-500">
+                <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
                   {jobs.length} job{jobs.length !== 1 ? 's' : ''}
                 </span>
               </CardTitle>
@@ -629,10 +629,10 @@ export default function Printers() {
           {/* Printer Health */}
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Printer className="h-4 w-4 text-emerald-500" aria-hidden />
                 Printer Health
-                <span className="ml-auto text-xs font-normal tabular-nums text-zinc-500">
+                <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
                   {kpi.online}/{kpi.totalPrinters} online
                 </span>
               </CardTitle>
@@ -643,7 +643,7 @@ export default function Printers() {
                   {[1, 2, 3].map(i => (
                     <div
                       key={i}
-                      className="h-14 animate-pulse rounded-lg bg-zinc-800/60"
+                      className="h-14 animate-pulse rounded-lg bg-secondary/60"
                     />
                   ))}
                 </div>
@@ -663,7 +663,7 @@ export default function Printers() {
                       <ConnIcon status={printer.status} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-zinc-200">
+                          <span className="text-sm font-medium text-foreground">
                             {printer.name}
                           </span>
                           <span
@@ -676,7 +676,7 @@ export default function Printers() {
                             {printer.status}
                           </span>
                         </div>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-zinc-500">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                           <span>{printer.connection}</span>
                           {printer.address && (
                             <>
@@ -706,14 +706,14 @@ export default function Printers() {
           {/* Station-wise Ticket Preview */}
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Printer className="h-4 w-4 text-emerald-500" aria-hidden />
                 Ticket Preview
               </CardTitle>
-              <p className="text-[11px] leading-snug text-zinc-500">
+              <p className="text-[11px] leading-snug text-muted-foreground">
                 Read-only KOT from the print-job payload.
                 Click{' '}
-                <span className="font-medium text-zinc-400">Preview</span>
+                <span className="font-medium text-muted-foreground">Preview</span>
                 {' '}on any queue row.
               </p>
             </CardHeader>
@@ -725,10 +725,10 @@ export default function Printers() {
           {/* Smart Print Rules (presentational) */}
           <Card className="border-border bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-zinc-300">
+              <CardTitle className="text-sm font-semibold text-foreground">
                 Smart Print Rules
               </CardTitle>
-              <p className="text-[11px] leading-snug text-zinc-500">
+              <p className="text-[11px] leading-snug text-muted-foreground">
                 Presentational only — configure routing in the Print Agent settings
                 for production use.
               </p>
@@ -739,7 +739,7 @@ export default function Printers() {
                   key={rule.id}
                   className="flex items-center justify-between gap-3"
                 >
-                  <span className="text-sm text-zinc-300">{rule.label}</span>
+                  <span className="text-sm text-foreground">{rule.label}</span>
                   <Switch
                     checked={printRules[rule.id] ?? rule.defaultOn}
                     onCheckedChange={val =>

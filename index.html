@@ -2,6 +2,8 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <!-- Applies the saved theme before first paint (external file: the CSP forbids inline scripts). -->
+    <script src="/theme-boot.js"></script>
     <!--
       Content-Security-Policy (XSS hardening — mitigates localStorage-JWT theft).
       script-src 'self' blocks injected inline/eval scripts (the main XSS token-exfil

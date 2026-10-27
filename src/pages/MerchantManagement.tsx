@@ -70,6 +70,7 @@ import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
 import { useOutlet } from '../context/OutletContext'
 import { outletScopedPath } from '../lib/outletScope'
+import { readableTextOn } from '../lib/theme'
 import { useSubmitGuard } from '../hooks/useSubmitGuard'
 import { cn } from '../lib/utils'
 import PageContainer from '../components/layout/PageContainer'
@@ -695,7 +696,7 @@ export default function MerchantManagement() {
       <PageContainer>
         <PageHeader title="Merchant Management" subtitle="Manage merchants, items, and availability" />
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-red-400">{errMsg(brandsQuery.error, 'Failed to load brands.')}</p>
+          <p className="text-sm font-medium text-danger-text">{errMsg(brandsQuery.error, 'Failed to load brands.')}</p>
         </div>
       </PageContainer>
     )
@@ -740,7 +741,7 @@ export default function MerchantManagement() {
                     <Button
                       size="sm"
                       data-testid="brand-add"
-                      className="h-8 w-full gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                      className="h-8 w-full gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Add Brand
@@ -777,7 +778,7 @@ export default function MerchantManagement() {
                         <Button type="button" variant="outline" size="sm" onClick={() => setAddBrandOpen(false)} disabled={addBrandGuard.pending}>
                           Cancel
                         </Button>
-                        <Button type="submit" size="sm" disabled={addBrandGuard.pending} className="bg-emerald-600 text-white hover:bg-emerald-500">
+                        <Button type="submit" size="sm" disabled={addBrandGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
                           {addBrandGuard.pending ? 'Adding…' : 'Add Brand'}
                         </Button>
                       </DialogFooter>
@@ -805,8 +806,8 @@ export default function MerchantManagement() {
                       )}
                     >
                       <span
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
-                        style={{ backgroundColor: b.color || '#71717A' }}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                        style={{ backgroundColor: b.color || '#71717A', color: readableTextOn(b.color || '#71717A') }}
                       >
                         {b.name.charAt(0).toUpperCase()}
                       </span>
@@ -831,8 +832,11 @@ export default function MerchantManagement() {
                 <CardContent className="p-5">
                   <div className="flex flex-wrap items-start gap-4">
                     <span
-                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
-                      style={{ backgroundColor: selectedBrand.color || '#71717A' }}
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-lg font-bold"
+                      style={{
+                        backgroundColor: selectedBrand.color || '#71717A',
+                        color: readableTextOn(selectedBrand.color || '#71717A'),
+                      }}
                     >
                       {selectedBrand.logoUrl ? (
                         <img src={selectedBrand.logoUrl} alt="" className="h-full w-full rounded-xl object-cover" />
@@ -864,7 +868,7 @@ export default function MerchantManagement() {
                           size="sm"
                           data-testid="brand-delete"
                           onClick={openDeleteDialog}
-                          className="gap-1.5 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                          className="gap-1.5 text-red-500 hover:bg-red-500/10 hover:text-danger-text"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Delete
@@ -921,7 +925,7 @@ export default function MerchantManagement() {
                     <div className="flex justify-end">
                       <Dialog open={addItemOpen} onOpenChange={(o) => { setAddItemOpen(o); if (!o) resetAddItemForm() }}>
                         <DialogTrigger asChild>
-                          <Button size="sm" data-testid="item-add" className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500">
+                          <Button size="sm" data-testid="item-add" className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
                             <Plus className="h-3.5 w-3.5" />
                             Add Item
                           </Button>
@@ -981,7 +985,7 @@ export default function MerchantManagement() {
                             </div>
                             <DialogFooter>
                               <Button type="button" variant="outline" size="sm" onClick={() => setAddItemOpen(false)} disabled={addItemGuard.pending}>Cancel</Button>
-                              <Button type="submit" size="sm" disabled={addItemGuard.pending} className="bg-emerald-600 text-white hover:bg-emerald-500">
+                              <Button type="submit" size="sm" disabled={addItemGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
                                 {addItemGuard.pending ? 'Adding…' : 'Add Item'}
                               </Button>
                             </DialogFooter>
@@ -1050,7 +1054,7 @@ export default function MerchantManagement() {
                                         <Copy className="h-3 w-3" /> Duplicate
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
-                                        className="gap-2 text-xs text-red-500 focus:text-red-400"
+                                        className="gap-2 text-xs text-red-500 focus:text-danger-text"
                                         disabled={!canWrite}
                                         onSelect={() => setDeleteItemTarget(item)}
                                       >
@@ -1103,7 +1107,7 @@ export default function MerchantManagement() {
                     <div className="flex justify-end">
                       <Dialog open={addListingOpen} onOpenChange={(o) => { setAddListingOpen(o); if (!o) { setAddListingExternalId(''); setAddListingCredentialRef(''); setAddListingLocationId('') } }}>
                         <DialogTrigger asChild>
-                          <Button size="sm" data-testid="listing-add" className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500">
+                          <Button size="sm" data-testid="listing-add" className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90">
                             <Plus className="h-3.5 w-3.5" />
                             Add Listing
                           </Button>
@@ -1145,7 +1149,7 @@ export default function MerchantManagement() {
                             </div>
                             <DialogFooter>
                               <Button type="button" variant="outline" size="sm" onClick={() => setAddListingOpen(false)} disabled={addListingGuard.pending}>Cancel</Button>
-                              <Button type="submit" size="sm" disabled={addListingGuard.pending} className="bg-emerald-600 text-white hover:bg-emerald-500">
+                              <Button type="submit" size="sm" disabled={addListingGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
                                 {addListingGuard.pending ? 'Adding…' : 'Add Listing'}
                               </Button>
                             </DialogFooter>
@@ -1236,7 +1240,7 @@ export default function MerchantManagement() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" size="sm" onClick={() => setEditBrandOpen(false)} disabled={editBrandGuard.pending}>Cancel</Button>
-              <Button type="submit" size="sm" disabled={editBrandGuard.pending} className="bg-emerald-600 text-white hover:bg-emerald-500">
+              <Button type="submit" size="sm" disabled={editBrandGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {editBrandGuard.pending ? 'Saving…' : 'Save Changes'}
               </Button>
             </DialogFooter>
@@ -1261,7 +1265,7 @@ export default function MerchantManagement() {
               data-testid="brand-bulk-availability"
               onClick={confirmBulkAvailability}
               disabled={bulkAvailMutation.isPending}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {bulkAvailMutation.isPending ? 'Applying…' : 'Apply to all items'}
             </Button>
@@ -1373,7 +1377,7 @@ export default function MerchantManagement() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" size="sm" onClick={() => setEditItemOpen(false)} disabled={editItemGuard.pending}>Cancel</Button>
-              <Button type="submit" size="sm" disabled={editItemGuard.pending} className="bg-emerald-600 text-white hover:bg-emerald-500">
+              <Button type="submit" size="sm" disabled={editItemGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {editItemGuard.pending ? 'Saving…' : 'Save Changes'}
               </Button>
             </DialogFooter>
@@ -1447,7 +1451,7 @@ export default function MerchantManagement() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" size="sm" onClick={() => setEditListingTarget(null)} disabled={editListingGuard.pending}>Cancel</Button>
-              <Button type="submit" size="sm" data-testid="listing-edit" disabled={editListingGuard.pending} className="bg-emerald-600 text-white hover:bg-emerald-500">
+              <Button type="submit" size="sm" data-testid="listing-edit" disabled={editListingGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {editListingGuard.pending ? 'Saving…' : 'Save Changes'}
               </Button>
             </DialogFooter>
@@ -1609,7 +1613,7 @@ function OutletsMatrix({ items, outlets, stations, canWrite }: OutletsMatrixProp
               data-testid="outlet-bulk-availability"
               onClick={confirmOutletBulk}
               disabled={outletBulkMutation.isPending}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {outletBulkMutation.isPending ? 'Applying…' : 'Apply'}
             </Button>
@@ -1772,7 +1776,7 @@ function DeployCell({ itemId, locationId, deployment, stations, canWrite, loadin
               size="sm"
               onClick={() => void handleConfirmDeploy()}
               disabled={stationGuard.pending || !pickedStation}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {stationGuard.pending ? 'Deploying…' : 'Deploy'}
             </Button>

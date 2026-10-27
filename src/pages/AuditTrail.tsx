@@ -183,7 +183,7 @@ export default function AuditTrail() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search actor, action, description…"
             value={search}
@@ -215,29 +215,29 @@ export default function AuditTrail() {
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
-          <span className="text-xs text-zinc-600">to</span>
+          <span className="text-xs text-muted-foreground">to</span>
           <label className="sr-only" htmlFor="audit-to">To</label>
           <input
             id="audit-to"
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-zinc-300 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
-          {rangeError && <span className="text-xs text-red-400">{rangeError}</span>}
+          {rangeError && <span className="text-xs text-danger-text">{rangeError}</span>}
         </div>
 
-        <span className="text-sm text-zinc-500">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
       </div>
 
       {/* Table */}
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading audit log…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading audit log…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-danger-text">{error}</p>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={ScrollText}
@@ -260,34 +260,34 @@ export default function AuditTrail() {
                 {rows.map((log) => (
                   <TableRow key={log.id} className="border-border align-top">
                     {/* Time */}
-                    <TableCell className="whitespace-nowrap text-xs tabular-nums text-zinc-500">
+                    <TableCell className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
                       {fmtTime(log.createdAt)}
                     </TableCell>
 
                     {/* Actor */}
-                    <TableCell className="text-sm text-zinc-300">
-                      {log.actorName ?? <span className="text-zinc-600">system</span>}
+                    <TableCell className="text-sm text-foreground">
+                      {log.actorName ?? <span className="text-muted-foreground">system</span>}
                     </TableCell>
 
                     {/* Action — monospace pill */}
                     <TableCell>
-                      <span className="inline-block rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-emerald-400">
+                      <span className="inline-block rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-ink-accent">
                         {log.action ?? '—'}
                       </span>
                     </TableCell>
 
                     {/* Description */}
-                    <TableCell className="max-w-xs text-sm text-zinc-400">
-                      {log.description ?? <span className="text-zinc-600">—</span>}
+                    <TableCell className="max-w-xs text-sm text-muted-foreground">
+                      {log.description ?? <span className="text-muted-foreground">—</span>}
                     </TableCell>
 
                     {/* Entity — entityType + entityId; never raw metadata */}
-                    <TableCell className="whitespace-nowrap text-xs text-zinc-500">
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {log.entityType != null ? (
                         <span>
-                          <span className="text-zinc-300">{log.entityType}</span>
+                          <span className="text-foreground">{log.entityType}</span>
                           {log.entityId != null && (
-                            <span className="ml-1 font-mono tabular-nums text-zinc-600">
+                            <span className="ml-1 font-mono tabular-nums text-muted-foreground">
                               {log.entityId.slice(0, 8)}…
                             </span>
                           )}

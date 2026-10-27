@@ -113,8 +113,8 @@ function warehousePill(label: string, ready: boolean) {
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${
         ready
-          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-          : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-ink-accent'
+          : 'border-amber-500/30 bg-amber-500/10 text-warn-text'
       }`}
     >
       {label}
@@ -234,12 +234,12 @@ export default function Outlets() {
         actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-emerald-600 text-white hover:bg-emerald-500">
+              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="h-4 w-4" />
                 Add Outlet
               </Button>
             </DialogTrigger>
-            <DialogContent className="border-border bg-card text-zinc-50">
+            <DialogContent className="border-border bg-card text-foreground">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <DialogHeader>
                   <DialogTitle>Add physical outlet</DialogTitle>
@@ -251,7 +251,7 @@ export default function Outlets() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="space-y-1.5 text-sm">
-                    <span className="text-zinc-300">Outlet code</span>
+                    <span className="text-foreground">Outlet code</span>
                     <Input
                       value={form.code}
                       onChange={(event) =>
@@ -262,7 +262,7 @@ export default function Outlets() {
                     />
                   </label>
                   <label className="space-y-1.5 text-sm">
-                    <span className="text-zinc-300">Outlet name</span>
+                    <span className="text-foreground">Outlet name</span>
                     <Input
                       value={form.name}
                       onChange={(event) =>
@@ -273,7 +273,7 @@ export default function Outlets() {
                     />
                   </label>
                   <label className="space-y-1.5 text-sm sm:col-span-2">
-                    <span className="text-zinc-300">Address</span>
+                    <span className="text-foreground">Address</span>
                     <Input
                       value={form.address}
                       onChange={(event) =>
@@ -283,7 +283,7 @@ export default function Outlets() {
                     />
                   </label>
                   <label className="space-y-1.5 text-sm">
-                    <span className="text-zinc-300">Timezone</span>
+                    <span className="text-foreground">Timezone</span>
                     <Input
                       value={form.timezone}
                       onChange={(event) =>
@@ -293,7 +293,7 @@ export default function Outlets() {
                     />
                   </label>
                   <label className="space-y-1.5 text-sm">
-                    <span className="text-zinc-300">Contact phone</span>
+                    <span className="text-foreground">Contact phone</span>
                     <Input
                       value={form.contactPhone}
                       onChange={(event) =>
@@ -303,7 +303,7 @@ export default function Outlets() {
                     />
                   </label>
                   <label className="space-y-1.5 text-sm sm:col-span-2">
-                    <span className="text-zinc-300">Contact person</span>
+                    <span className="text-foreground">Contact person</span>
                     <Input
                       value={form.contactName}
                       onChange={(event) =>
@@ -314,7 +314,7 @@ export default function Outlets() {
                   </label>
                 </div>
 
-                {error && <p className="text-sm text-red-400">{error}</p>}
+                {error && <p className="text-sm text-danger-text">{error}</p>}
 
                 <DialogFooter>
                   <Button type="submit" disabled={saving}>
@@ -336,9 +336,9 @@ export default function Outlets() {
 
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading physical outlets…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading physical outlets…</p>
         ) : outletsQuery.error && outlets.length === 0 ? (
-          <p className="p-6 text-sm text-red-400">{outletsQuery.error}</p>
+          <p className="p-6 text-sm text-danger-text">{outletsQuery.error}</p>
         ) : outlets.length === 0 ? (
           <EmptyState
             icon={Building2}
@@ -362,22 +362,22 @@ export default function Outlets() {
               {outlets.map((outlet) => (
                 <TableRow
                   key={outlet.id}
-                  className="cursor-pointer border-border transition-colors hover:bg-zinc-800/40"
+                  className="cursor-pointer border-border transition-colors hover:bg-secondary/40"
                   onClick={() => navigate(`/outlets/${outlet.id}`)}
                 >
-                  <TableCell className="font-mono text-xs text-emerald-300">{outlet.code}</TableCell>
+                  <TableCell className="font-mono text-xs text-ink-accent">{outlet.code}</TableCell>
                   <TableCell>
                     <div>
-                      <p className="font-medium text-zinc-100">{outlet.name}</p>
-                      <p className="text-xs text-zinc-500">{outlet.address || 'No address set'}</p>
+                      <p className="font-medium text-foreground">{outlet.name}</p>
+                      <p className="text-xs text-muted-foreground">{outlet.address || 'No address set'}</p>
                     </div>
                   </TableCell>
                   <TableCell>{warehousePill('MAIN', hasWarehouse(outlet, 'MAIN'))}</TableCell>
                   <TableCell>{warehousePill('KITCHEN', hasWarehouse(outlet, 'KITCHEN'))}</TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      <p className="text-zinc-300">{outlet.contactName || '—'}</p>
-                      <p className="text-xs text-zinc-500">{outlet.contactPhone || outlet.timezone}</p>
+                      <p className="text-foreground">{outlet.contactName || '—'}</p>
+                      <p className="text-xs text-muted-foreground">{outlet.contactPhone || outlet.timezone}</p>
                     </div>
                   </TableCell>
                   <TableCell>
@@ -397,15 +397,15 @@ export default function Outlets() {
                       />
                       <span
                         className={
-                          outlet.status === 'ACTIVE' ? 'text-emerald-400' : 'text-zinc-500'
+                          outlet.status === 'ACTIVE' ? 'text-ink-accent' : 'text-muted-foreground'
                         }
                       >
                         {outlet.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                       </span>
                       {outlet.status === 'ACTIVE' ? (
-                        <PowerOff className="h-3 w-3 text-zinc-600" />
+                        <PowerOff className="h-3 w-3 text-muted-foreground" />
                       ) : (
-                        <Power className="h-3 w-3 text-zinc-600" />
+                        <Power className="h-3 w-3 text-muted-foreground" />
                       )}
                     </button>
                   </TableCell>
@@ -447,7 +447,7 @@ export default function Outlets() {
         open={editTarget != null}
         onOpenChange={(open) => !open && !editGuard.pending && setEditTarget(null)}
       >
-        <DialogContent className="border-border bg-card text-zinc-50">
+        <DialogContent className="border-border bg-card text-foreground">
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Edit outlet</DialogTitle>
@@ -458,7 +458,7 @@ export default function Outlets() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Outlet code</span>
+                <span className="text-foreground">Outlet code</span>
                 <Input
                   value={editForm.code}
                   onChange={(event) =>
@@ -468,7 +468,7 @@ export default function Outlets() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Outlet name</span>
+                <span className="text-foreground">Outlet name</span>
                 <Input
                   value={editForm.name}
                   onChange={(event) =>
@@ -478,7 +478,7 @@ export default function Outlets() {
                 />
               </label>
               <label className="space-y-1.5 text-sm sm:col-span-2">
-                <span className="text-zinc-300">Address</span>
+                <span className="text-foreground">Address</span>
                 <Input
                   value={editForm.address}
                   onChange={(event) =>
@@ -488,7 +488,7 @@ export default function Outlets() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Timezone</span>
+                <span className="text-foreground">Timezone</span>
                 <Input
                   value={editForm.timezone}
                   onChange={(event) =>
@@ -498,7 +498,7 @@ export default function Outlets() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Status</span>
+                <span className="text-foreground">Status</span>
                 <Select
                   value={editForm.status}
                   onValueChange={(value) =>
@@ -518,7 +518,7 @@ export default function Outlets() {
                 </Select>
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Contact phone</span>
+                <span className="text-foreground">Contact phone</span>
                 <Input
                   value={editForm.contactPhone}
                   onChange={(event) =>
@@ -528,7 +528,7 @@ export default function Outlets() {
                 />
               </label>
               <label className="space-y-1.5 text-sm sm:col-span-2">
-                <span className="text-zinc-300">Contact person</span>
+                <span className="text-foreground">Contact person</span>
                 <Input
                   value={editForm.contactName}
                   onChange={(event) =>
@@ -539,7 +539,7 @@ export default function Outlets() {
               </label>
             </div>
 
-            {editError && <p className="text-sm text-red-400">{editError}</p>}
+            {editError && <p className="text-sm text-danger-text">{editError}</p>}
 
             <DialogFooter>
               <Button
@@ -563,7 +563,7 @@ export default function Outlets() {
         open={statusTarget != null}
         onOpenChange={(open) => !open && !statusGuard.pending && setStatusTarget(null)}
       >
-        <DialogContent className="border-border bg-card text-zinc-50 sm:max-w-md">
+        <DialogContent className="border-border bg-card text-foreground sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {statusTarget?.status === 'ACTIVE' ? 'Deactivate outlet?' : 'Activate outlet?'}
@@ -571,13 +571,13 @@ export default function Outlets() {
             <DialogDescription>
               {statusTarget?.status === 'ACTIVE' ? (
                 <>
-                  <span className="font-medium text-zinc-200">{statusTarget?.name}</span> will be
+                  <span className="font-medium text-foreground">{statusTarget?.name}</span> will be
                   marked inactive. Staff, stations, and inventory records stay intact and this can
                   be reversed at any time.
                 </>
               ) : (
                 <>
-                  <span className="font-medium text-zinc-200">{statusTarget?.name}</span> will be
+                  <span className="font-medium text-foreground">{statusTarget?.name}</span> will be
                   marked active again.
                 </>
               )}
@@ -595,7 +595,7 @@ export default function Outlets() {
               className={
                 statusTarget?.status === 'ACTIVE'
                   ? 'bg-red-600 text-white hover:bg-red-500'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
               }
               disabled={statusGuard.pending}
               onClick={() => confirmStatusToggle()}

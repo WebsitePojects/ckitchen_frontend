@@ -73,7 +73,7 @@ import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
 import DataTable from '../components/common/DataTable'
-import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_PALETTE, CHART_SINGLE, aggregatorLabel } from '../lib/theme'
+import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_CHROME, CHART_PALETTE, CHART_SINGLE, aggregatorLabel } from '../lib/theme'
 import { useApiQuery } from '../hooks/useApiQuery'
 
 // ─── API response types (snake_case — as the backend sends them) ───────────────
@@ -176,16 +176,10 @@ function fmtPct(v: number | null | undefined): string {
 
 // ─── Chart shared styles (matches Dashboard.tsx — W4a cross-page consistency) ──
 
-const CHART_GRID   = '#27272a'
-const CHART_TICK   = '#71717A'
-const TOOLTIP_STYLE: React.CSSProperties = {
-  backgroundColor: '#18181b',
-  border: '1px solid #27272a',
-  borderRadius: 8,
-  fontSize: 12,
-  color: '#F4F4F5',
-}
-const CURSOR_FILL  = 'rgba(16,185,129,0.06)'
+const CHART_GRID   = CHART_CHROME.grid
+const CHART_TICK   = CHART_CHROME.tick
+const TOOLTIP_STYLE: React.CSSProperties = CHART_CHROME.tooltip
+const CURSOR_FILL  = CHART_CHROME.cursor
 
 // ─── Hour label helper ─────────────────────────────────────────────────────────
 
@@ -292,15 +286,15 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-base font-semibold text-zinc-100">
+            <CardTitle className="text-base font-semibold text-foreground">
               Per-Brand Performance
             </CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Revenue · Orders · Avg order value — ranked top to weak
             </p>
           </div>
           {weakest && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-400 ring-1 ring-inset ring-red-500/30">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-danger-text ring-1 ring-inset ring-red-500/30">
               <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
               Scale or Cut: {weakest.name}
             </span>
@@ -312,7 +306,7 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
         {loading ? (
           <ChartSkeleton />
         ) : error ? (
-          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+          <p className="py-4 text-center text-sm text-danger-text">{error}</p>
         ) : data.length === 0 ? (
           <EmptyState
             icon={BarChart3}
@@ -358,7 +352,7 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                  <tr className="border-b border-border bg-card/60 text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-2.5 text-left">#</th>
                     <th className="px-4 py-2.5 text-left">Brand</th>
                     <th className="px-4 py-2.5 text-right">Revenue</th>
@@ -376,7 +370,7 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
                         b.is_weakest ? 'bg-red-500/5' : '',
                       ].join(' ')}
                     >
-                      <td className="px-4 py-2.5 font-bold tabular-nums text-zinc-600">
+                      <td className="px-4 py-2.5 font-bold tabular-nums text-muted-foreground">
                         {idx + 1}
                       </td>
                       <td className="px-4 py-2.5">
@@ -385,26 +379,26 @@ function BrandPerformanceSection({ from, to }: { from: string; to: string }) {
                             className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                             style={{ backgroundColor: chartData[idx]?.color ?? CHART_SINGLE }}
                           />
-                          <span className="font-medium text-zinc-200">{b.name}</span>
+                          <span className="font-medium text-foreground">{b.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtPHP(b.revenue)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtNum(b.order_count)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtPHP(b.avg_order_value)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
                         {b.is_weakest ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-400 ring-1 ring-inset ring-red-500/30">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-danger-text ring-1 ring-inset ring-red-500/30">
                             <AlertTriangle className="h-3 w-3" aria-hidden />
                             Scale or Cut
                           </span>
                         ) : idx === 0 && topBrand ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-400 ring-1 ring-inset ring-emerald-500/30">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-ink-accent ring-1 ring-inset ring-emerald-500/30">
                             <Star className="h-3 w-3" aria-hidden />
                             Top
                           </span>
@@ -446,15 +440,15 @@ function OrdersByHourSection({ date }: { date: string }) {
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <CardTitle className="text-base font-semibold text-zinc-100">
+            <CardTitle className="text-base font-semibold text-foreground">
               Orders by Hour
             </CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               Peak-load view — informs kitchen staffing
             </p>
           </div>
           {hasPeak && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/30">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-warn-text ring-1 ring-inset ring-amber-500/30">
               <CalendarDays className="h-3.5 w-3.5" aria-hidden />
               Peak: {hourLabel(peak.hour)} ({fmtNum(peak.order_count)} orders)
             </span>
@@ -466,7 +460,7 @@ function OrdersByHourSection({ date }: { date: string }) {
         {loading ? (
           <ChartSkeleton />
         ) : error ? (
-          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+          <p className="py-4 text-center text-sm text-danger-text">{error}</p>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
@@ -533,17 +527,17 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-zinc-100">
+        <CardTitle className="text-base font-semibold text-foreground">
           Aggregator Split
         </CardTitle>
-        <p className="text-xs text-zinc-500">Orders and revenue by delivery platform</p>
+        <p className="text-xs text-muted-foreground">Orders and revenue by delivery platform</p>
       </CardHeader>
 
       <CardContent>
         {loading ? (
           <ChartSkeleton />
         ) : error ? (
-          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+          <p className="py-4 text-center text-sm text-danger-text">{error}</p>
         ) : data.length === 0 ? (
           <EmptyState
             icon={BarChart3}
@@ -583,7 +577,7 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
                     iconType="circle"
                     iconSize={8}
                     formatter={(value) => (
-                      <span style={{ fontSize: 12, color: '#A1A1AA' }}>{value}</span>
+                      <span className="text-xs text-muted-foreground">{value}</span>
                     )}
                   />
                 </PieChart>
@@ -594,7 +588,7 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
             <div className="flex-1 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border text-xs uppercase tracking-wide text-zinc-500">
+                  <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="pb-2.5 text-left">Platform</th>
                     <th className="pb-2.5 text-right">Orders</th>
                     <th className="pb-2.5 text-right">Share</th>
@@ -615,26 +609,26 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
                               className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                               style={{ backgroundColor: color }}
                             />
-                            <span className="font-medium text-zinc-200">{label}</span>
+                            <span className="font-medium text-foreground">{label}</span>
                           </div>
                         </td>
-                        <td className="py-2.5 text-right tabular-nums text-zinc-300">
+                        <td className="py-2.5 text-right tabular-nums text-foreground">
                           {fmtNum(orders)}
                         </td>
-                        <td className="py-2.5 text-right tabular-nums text-zinc-500">
+                        <td className="py-2.5 text-right tabular-nums text-muted-foreground">
                           {totalOrders > 0 ? fmtPct((orders / totalOrders) * 100) : '—'}
                         </td>
-                        <td className="py-2.5 text-right tabular-nums text-zinc-300">
+                        <td className="py-2.5 text-right tabular-nums text-foreground">
                           {fmtPHP(rev)}
                         </td>
                       </tr>
                     )
                   })}
                   <tr className="font-semibold">
-                    <td className="pt-2.5 text-zinc-200">Total</td>
-                    <td className="pt-2.5 text-right tabular-nums text-zinc-200">{fmtNum(totalOrders)}</td>
-                    <td className="pt-2.5 text-right text-zinc-500">100%</td>
-                    <td className="pt-2.5 text-right tabular-nums text-zinc-200">{fmtPHP(totalRevenue)}</td>
+                    <td className="pt-2.5 text-foreground">Total</td>
+                    <td className="pt-2.5 text-right tabular-nums text-foreground">{fmtNum(totalOrders)}</td>
+                    <td className="pt-2.5 text-right text-muted-foreground">100%</td>
+                    <td className="pt-2.5 text-right tabular-nums text-foreground">{fmtPHP(totalRevenue)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -649,9 +643,9 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
 // ─── Section: Brand Margins (FR-AN-05) ────────────────────────────────────────
 
 function marginColor(marginPct: number): string {
-  if (marginPct >= 20) return 'text-emerald-400'
-  if (marginPct >= 0)  return 'text-amber-400'
-  return 'text-red-400'
+  if (marginPct >= 20) return 'text-ink-accent'
+  if (marginPct >= 0)  return 'text-warn-text'
+  return 'text-danger-text'
 }
 
 function BrandMarginsSection({ from, to }: { from: string; to: string }) {
@@ -680,10 +674,10 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-zinc-100">
+        <CardTitle className="text-base font-semibold text-foreground">
           Brand Margins
         </CardTitle>
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           Revenue minus shared-ingredient recipe cost per brand
         </p>
       </CardHeader>
@@ -692,7 +686,7 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
         {loading ? (
           <ChartSkeleton />
         ) : error ? (
-          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+          <p className="py-4 text-center text-sm text-danger-text">{error}</p>
         ) : sorted.length === 0 ? (
           <EmptyState
             icon={BarChart3}
@@ -742,7 +736,7 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
                         margin:  'Margin',
                       }
                       return (
-                        <span style={{ fontSize: 12, color: '#A1A1AA' }}>
+                        <span className="text-xs text-muted-foreground">
                           {labels[value] ?? value}
                         </span>
                       )
@@ -759,7 +753,7 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                  <tr className="border-b border-border bg-card/60 text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-2.5 text-left">Brand</th>
                     <th className="px-4 py-2.5 text-right">Revenue</th>
                     <th className="px-4 py-2.5 text-right">Recipe Cost</th>
@@ -778,19 +772,19 @@ function BrandMarginsSection({ from, to }: { from: string; to: string }) {
                             className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
                             style={{ backgroundColor: b.color }}
                           />
-                          <span className="font-medium text-zinc-200">{b.name}</span>
+                          <span className="font-medium text-foreground">{b.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtPHP(b.revenue)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-red-400/80">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-danger-text">
                         {fmtPHP(b.cost)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtPHP(b.margin)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-red-400/80">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-danger-text">
                         {fmtPHP(b.commission)}
                       </td>
                       <td className={['px-4 py-2.5 text-right tabular-nums font-semibold', marginColor(b.netPct)].join(' ')}>
@@ -856,23 +850,22 @@ function ProductTooltip({
   if (!p) return null
   return (
     <div
-      className="rounded-lg border px-3 py-2 text-xs"
-      style={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#F4F4F5' }}
+      className="rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground"
     >
-      <p className="font-semibold text-zinc-100">{p.name}</p>
-      <p className="mb-1.5 text-zinc-500">{p.brandName}</p>
+      <p className="font-semibold text-foreground">{p.name}</p>
+      <p className="mb-1.5 text-muted-foreground">{p.brandName}</p>
       <dl className="space-y-0.5">
         <div className="flex items-center justify-between gap-4">
-          <dt className="text-zinc-400">Revenue</dt>
-          <dd className="tabular-nums text-emerald-400">{fmtPHP(p.revenue)}</dd>
+          <dt className="text-muted-foreground">Revenue</dt>
+          <dd className="tabular-nums text-ink-accent">{fmtPHP(p.revenue)}</dd>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <dt className="text-zinc-400">Qty sold</dt>
-          <dd className="tabular-nums text-zinc-200">{fmtNum(p.qtySold)}</dd>
+          <dt className="text-muted-foreground">Qty sold</dt>
+          <dd className="tabular-nums text-foreground">{fmtNum(p.qtySold)}</dd>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <dt className="text-zinc-400">Orders</dt>
-          <dd className="tabular-nums text-zinc-200">{fmtNum(p.orders)}</dd>
+          <dt className="text-muted-foreground">Orders</dt>
+          <dd className="tabular-nums text-foreground">{fmtNum(p.orders)}</dd>
         </div>
       </dl>
     </div>
@@ -899,10 +892,10 @@ function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-zinc-100">
+        <CardTitle className="text-base font-semibold text-foreground">
           Product Performance
         </CardTitle>
-        <p className="mt-0.5 text-xs text-zinc-500">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Top menu items by revenue{data.length > PRODUCT_TOP_N ? ` (top ${PRODUCT_TOP_N} of ${data.length})` : ''} — across all brands
         </p>
       </CardHeader>
@@ -911,7 +904,7 @@ function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
         {loading ? (
           <ChartSkeleton />
         ) : error ? (
-          <p className="py-4 text-center text-sm text-red-400">{error}</p>
+          <p className="py-4 text-center text-sm text-danger-text">{error}</p>
         ) : topProducts.length === 0 ? (
           <EmptyState
             icon={Package}
@@ -956,7 +949,7 @@ function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="w-full min-w-[520px] text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-zinc-900/60 text-xs uppercase tracking-wide text-zinc-500">
+                  <tr className="border-b border-border bg-card/60 text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-4 py-2.5 text-left">#</th>
                     <th className="px-4 py-2.5 text-left">Product</th>
                     <th className="px-4 py-2.5 text-left">Brand</th>
@@ -968,18 +961,18 @@ function ProductPerformanceSection({ from, to }: { from: string; to: string }) {
                 <tbody>
                   {topProducts.map((p, idx) => (
                     <tr key={p.menuItemId} className="border-b border-border/50 last:border-0">
-                      <td className="px-4 py-2.5 font-bold tabular-nums text-zinc-600">
+                      <td className="px-4 py-2.5 font-bold tabular-nums text-muted-foreground">
                         {idx + 1}
                       </td>
-                      <td className="px-4 py-2.5 font-medium text-zinc-200">{p.name}</td>
-                      <td className="px-4 py-2.5 text-zinc-400">{p.brandName}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 font-medium text-foreground">{p.name}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{p.brandName}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtNum(p.qtySold)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-400">
+                      <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-ink-accent">
                         {fmtPHP(p.revenue)}
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-zinc-300">
+                      <td className="px-4 py-2.5 text-right tabular-nums text-foreground">
                         {fmtNum(p.orders)}
                       </td>
                     </tr>
@@ -1184,7 +1177,7 @@ function SalesReportSection() {
       id: 'key',
       header: salesGroupByLabel(appliedGroupBy),
       cell: ({ row }) => (
-        <span className="font-medium text-zinc-200">
+        <span className="font-medium text-foreground">
           {formatSalesRowKey(row.original.key, appliedGroupBy)}
         </span>
       ),
@@ -1212,8 +1205,8 @@ function SalesReportSection() {
   return (
     <Card className="border-border bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-zinc-100">Sales Report</CardTitle>
-        <p className="mt-0.5 text-xs text-zinc-500">
+        <CardTitle className="text-base font-semibold text-foreground">Sales Report</CardTitle>
+        <p className="mt-0.5 text-xs text-muted-foreground">
           Gross + net sales for the selected range — grouped by day, brand, outlet, or aggregator
         </p>
       </CardHeader>
@@ -1222,7 +1215,7 @@ function SalesReportSection() {
         {/* Controls row */}
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex flex-col gap-1">
-            <label htmlFor="sales-from" className="text-xs text-zinc-500">From</label>
+            <label htmlFor="sales-from" className="text-xs text-muted-foreground">From</label>
             <Input
               id="sales-from"
               type="date"
@@ -1232,7 +1225,7 @@ function SalesReportSection() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="sales-to" className="text-xs text-zinc-500">To</label>
+            <label htmlFor="sales-to" className="text-xs text-muted-foreground">To</label>
             <Input
               id="sales-to"
               type="date"
@@ -1242,7 +1235,7 @@ function SalesReportSection() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-500">Group by</label>
+            <label className="text-xs text-muted-foreground">Group by</label>
             <Select value={groupByInput} onValueChange={v => setGroupByInput(v as SalesGroupBy)}>
               <SelectTrigger className="h-9 w-32 text-xs">
                 <SelectValue />
@@ -1280,9 +1273,9 @@ function SalesReportSection() {
           </div>
         </div>
 
-        {rangeError && <p className="text-xs text-red-400">{rangeError}</p>}
+        {rangeError && <p className="text-xs text-danger-text">{rangeError}</p>}
 
-        <p className="text-xs text-zinc-600">
+        <p className="text-xs text-muted-foreground">
           Net = gross minus aggregator commission; commission rates default to 0 until configured.
         </p>
 
@@ -1339,7 +1332,7 @@ function SalesReportSection() {
           ) : null
         )}
 
-        {error && <p className="py-2 text-center text-sm text-red-400">{error}</p>}
+        {error && <p className="py-2 text-center text-sm text-danger-text">{error}</p>}
 
         <DataTable<ApiSalesRow>
           columns={columns}
@@ -1420,7 +1413,7 @@ export default function Analytics() {
 
             {/* Hourly-view date */}
             <div className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5">
-              <CalendarDays className="h-3.5 w-3.5 text-zinc-500" aria-hidden />
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
               <label className="sr-only" htmlFor="hourly-date">Hourly view date</label>
               <input
                 id="hourly-date"
@@ -1428,7 +1421,7 @@ export default function Analytics() {
                 value={date}
                 onChange={e => setDate(e.target.value)}
                 max={isoDate(new Date())}
-                className="bg-transparent text-xs text-zinc-300 focus:outline-none [color-scheme:dark]"
+                className="bg-transparent text-xs text-foreground focus:outline-none [color-scheme:dark]"
               />
             </div>
           </div>

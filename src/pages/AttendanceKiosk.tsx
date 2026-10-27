@@ -174,8 +174,8 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: K
           <ArrowLeft className="mr-2 h-5 w-5" /> Back
         </Button>
         <div className="min-w-0 text-right">
-          <div className="truncate text-xl font-semibold text-zinc-50">{employee.fullName}</div>
-          <div className="text-sm text-zinc-500">
+          <div className="truncate text-xl font-semibold text-foreground">{employee.fullName}</div>
+          <div className="text-sm text-muted-foreground">
             {employee.employeeNo} · {employee.department}
           </div>
         </div>
@@ -184,7 +184,7 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: K
       {captured ? (
         <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-black">
           <img src={captured} alt="Captured attendance selfie" className="h-full w-full object-cover" />
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-ink-accent">
             <CheckCircle2 className="h-3 w-3" /> PHOTO CAPTURED
           </span>
         </div>
@@ -206,7 +206,7 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: K
                 onClick={() => void punch('TIME_IN')}
                 disabled={timeInDisabled}
                 title={known && (clockedIn || clockedOut) ? 'Already timed in — time out next' : undefined}
-                className="h-20 bg-emerald-600 text-xl font-semibold text-white hover:bg-emerald-500 disabled:opacity-40"
+                className="h-20 bg-primary text-xl font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
               >
                 <LogIn className="mr-3 h-6 w-6" />
                 {submitting === 'TIME_IN' ? 'Submitting…' : 'TIME IN'}
@@ -216,13 +216,13 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: K
                 disabled={timeOutDisabled}
                 variant="outline"
                 title={known && (!clockedIn || clockedOut) ? 'Not timed in yet' : undefined}
-                className="h-20 border-amber-500/40 text-xl font-semibold text-amber-300 hover:bg-amber-500/10 disabled:opacity-40"
+                className="h-20 border-amber-500/40 text-xl font-semibold text-warn-text hover:bg-amber-500/10 disabled:opacity-40"
               >
                 <LogOut className="mr-3 h-6 w-6" />
                 {submitting === 'TIME_OUT' ? 'Submitting…' : 'TIME OUT'}
               </Button>
             </div>
-            {stateHint && <p className="text-center text-sm text-amber-300/80">{stateHint}</p>}
+            {stateHint && <p className="text-center text-sm text-warn-text">{stateHint}</p>}
             <Button
               variant="outline"
               size="lg"
@@ -238,11 +238,11 @@ function KioskCapture({ employee, onBack, onSuccess, onDisabled, onConflict }: K
             <Button
               onClick={capture}
               disabled={!!camError}
-              className="h-20 bg-emerald-600 text-xl font-semibold text-white hover:bg-emerald-500"
+              className="h-20 bg-primary text-xl font-semibold text-primary-foreground hover:bg-primary/90"
             >
               <Camera className="mr-3 h-6 w-6" /> Capture photo
             </Button>
-            <p className="text-center text-sm text-zinc-500">
+            <p className="text-center text-sm text-muted-foreground">
               A photo is required — face the camera, then capture before punching in or out.
             </p>
           </>
@@ -313,10 +313,10 @@ export default function AttendanceKiosk() {
   // ── Feature flag off → dedicated disabled screen ───────────────────────────
   if (flagOff) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-zinc-950 p-8 text-center text-zinc-100">
-        <MonitorOff className="h-14 w-14 text-zinc-600" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground">
+        <MonitorOff className="h-14 w-14 text-muted-foreground" />
         <h1 className="text-3xl font-bold tracking-tight">Kiosk is disabled</h1>
-        <p className="max-w-md text-base text-zinc-500">
+        <p className="max-w-md text-base text-muted-foreground">
           The public attendance kiosk has been turned off by an administrator. Staff can still
           clock in from their own account on the Attendance page.
         </p>
@@ -325,14 +325,14 @@ export default function AttendanceKiosk() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* ── Clock + date header ── */}
-      <header className="flex flex-col items-center gap-1 border-b border-zinc-800 px-6 py-6">
+      <header className="flex flex-col items-center gap-1 border-b border-border px-6 py-6">
         <div className="flex items-center gap-3 text-5xl font-bold tabular-nums tracking-tight sm:text-6xl">
-          <Clock3 className="h-10 w-10 text-emerald-400" aria-hidden />
+          <Clock3 className="h-10 w-10 text-ink-accent" aria-hidden />
           {fmtClockTime(now)}
         </div>
-        <div className="text-base text-zinc-400 sm:text-lg">{fmtDate(now)}</div>
+        <div className="text-base text-muted-foreground sm:text-lg">{fmtDate(now)}</div>
         <div className="mt-1 text-xs font-semibold uppercase tracking-widest text-emerald-500/80">
           Attendance kiosk — tap your name to clock in or out
         </div>
@@ -346,19 +346,19 @@ export default function AttendanceKiosk() {
             onClick={resetToList}
             className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center gap-4 text-center"
           >
-            <CheckCircle2 className="h-24 w-24 text-emerald-400" />
+            <CheckCircle2 className="h-24 w-24 text-ink-accent" />
             <div className="text-4xl font-bold tracking-tight sm:text-5xl">
               {greeting(step.at)}, {step.name.split(/\s+/)[0]}!
             </div>
             <div
               className={cn(
                 'text-2xl font-semibold',
-                step.type === 'TIME_IN' ? 'text-emerald-300' : 'text-amber-300',
+                step.type === 'TIME_IN' ? 'text-ink-accent' : 'text-warn-text',
               )}
             >
               {step.type === 'TIME_IN' ? 'Timed in' : 'Timed out'} at {fmtPunchTime(step.at)}
             </div>
-            <div className="mt-2 text-sm text-zinc-500">Returning to the list… tap to continue</div>
+            <div className="mt-2 text-sm text-muted-foreground">Returning to the list… tap to continue</div>
           </button>
         ) : step.kind === 'capture' ? (
           <KioskCapture
@@ -380,7 +380,7 @@ export default function AttendanceKiosk() {
           // ── Employee list ──
           <div className="mx-auto w-full max-w-5xl">
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-3.5 h-5 w-5 text-zinc-500" />
+              <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
               <Input
                 placeholder="Search your name or employee #…"
                 value={search}
@@ -399,8 +399,8 @@ export default function AttendanceKiosk() {
                     className={cn(
                       'rounded-full border px-4 py-2 text-sm font-medium transition-colors',
                       department === d
-                        ? 'border-emerald-500/60 bg-emerald-500/15 text-emerald-300'
-                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200',
+                        ? 'border-emerald-500/60 bg-emerald-500/15 text-ink-accent'
+                        : 'border-border bg-card text-muted-foreground hover:border-border hover:text-foreground',
                     )}
                   >
                     {d === 'ALL' ? 'All departments' : d}
@@ -415,8 +415,8 @@ export default function AttendanceKiosk() {
               </div>
             ) : employeesQuery.isError ? (
               <div className="flex flex-col items-center gap-3 py-16 text-center">
-                <CircleAlert className="h-8 w-8 text-red-400" />
-                <p className="text-base text-zinc-400">
+                <CircleAlert className="h-8 w-8 text-danger-text" />
+                <p className="text-base text-muted-foreground">
                   Could not load the employee list — check the connection.
                 </p>
                 <Button
@@ -429,7 +429,7 @@ export default function AttendanceKiosk() {
                 </Button>
               </div>
             ) : filtered.length === 0 ? (
-              <p className="py-16 text-center text-base text-zinc-500">
+              <p className="py-16 text-center text-base text-muted-foreground">
                 No matching employees{search ? ` for “${search}”` : ''}.
               </p>
             ) : (
@@ -439,25 +439,25 @@ export default function AttendanceKiosk() {
                     key={e.id}
                     type="button"
                     onClick={() => setStep({ kind: 'capture', employee: e })}
-                    className="flex items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-left transition-colors hover:border-emerald-500/50 hover:bg-zinc-900/60 active:bg-emerald-500/10"
+                    className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-emerald-500/50 hover:bg-card/60 active:bg-emerald-500/10"
                   >
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-lg font-semibold text-emerald-300">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-lg font-semibold text-ink-accent">
                       {initials(e.fullName)}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-lg font-semibold text-zinc-100">{e.fullName}</div>
-                      <div className="truncate text-sm text-zinc-500">
+                      <div className="truncate text-lg font-semibold text-foreground">{e.fullName}</div>
+                      <div className="truncate text-sm text-muted-foreground">
                         {e.employeeNo} · {e.department}
                       </div>
                       {/* Today's clock state chip — only when the backend
                           supplies the fields (absent → nothing / unknown). */}
                       {e.clocked_in && !e.clocked_out ? (
-                        <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300">
+                        <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-ink-accent">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                           Timed in
                         </div>
                       ) : e.clocked_out ? (
-                        <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500">
+                        <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                           <span className="h-1.5 w-1.5 rounded-full bg-zinc-600" />
                           Timed out
                         </div>

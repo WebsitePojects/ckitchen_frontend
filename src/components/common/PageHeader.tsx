@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
+import { NAV_LOOKUP } from '../layout/nav-items'
+import { useInPageTitle } from '../layout/PageHeaderContext'
 
 interface PageHeaderProps {
   title: string
@@ -10,19 +13,24 @@ interface PageHeaderProps {
 }
 
 /**
- * In-content page header — distinct from the Topbar (which shows the same
- * title globally). Use this for the bold in-page heading + action row, e.g.
- * above a KPI ribbon or a DataTable's toolbar.
+ * The page's own header and its single h1 (ledger layout): eyebrow (nav group), display
+ * title, muted lead, actions, closed by a double rule. While mounted, the Topbar shows only
+ * the breadcrumb, so the title never appears twice.
  */
 export default function PageHeader({ title, subtitle, description, actions }: PageHeaderProps) {
+  const { pathname } = useLocation()
+  const group = NAV_LOOKUP.get(pathname)?.group
+  useInPageTitle()
+
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-      <div className="min-w-0">
-        <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{title}</h2>
-        {subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}
+    <header className="rule-double flex flex-wrap items-end justify-between gap-x-6 gap-y-4 pb-5">
+      <div className="min-w-0 motion-safe:animate-fade-in-up">
+        {group && <p className="eyebrow mb-2">{group}</p>}
+        <h1 className="display-title">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-muted-foreground sm:text-[0.95rem]">{subtitle}</p>}
         {description && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
-    </div>
+    </header>
   )
 }

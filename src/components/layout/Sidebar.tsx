@@ -1,48 +1,34 @@
-import { Orbit, LogOut } from 'lucide-react'
+import { useEffect } from 'react'
+import { ChevronsLeft, ChevronsRight, Orbit } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
-import { Avatar, AvatarFallback } from '../ui/avatar'
 import { cn } from '../../lib/utils'
 import { NAV_GROUPS } from './nav-items'
 import { usePermissions } from '../../context/PermissionsContext'
 import { useNotifications } from '../../context/NotificationContext'
-import { useSignOut } from './useSignOut'
 import { PLATFORM_NAME } from '../../lib/branding'
 import { prefetchPage, prefetchPages } from '../../lib/pageLoaders'
-import { useEffect } from 'react'
-
-function initials(name: string | undefined): string {
-  if (!name) return '?'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
 
 interface SidebarProps {
-  /** Called after a nav link is clicked — used to close the mobile Sheet. */
+  /** Called after a nav link is clicked — closes the phone drawer. */
   onNavigate?: () => void
+  /** Desktop only: icon rail (72px) instead of the full sidebar. */
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
 }
 
 /**
- * Sidebar — brand mark, nav links, user footer with sign-out.
- * Rendered both in the fixed desktop rail and inside the mobile Sheet.
+ * Business navigation: wordmark, grouped links (2px accent bar on the active page), and the
+ * rail toggle. Personal things (theme, sign-out) live in the header's person menu, so the two
+ * identities never repeat each other. Rendered in the desktop column and in the phone drawer.
  */
-export default function Sidebar({ onNavigate }: SidebarProps) {
+export default function Sidebar({ onNavigate, collapsed = false, onToggleCollapsed }: SidebarProps) {
   const { user } = useAuth()
   const { canAccessPage } = usePermissions()
-  // Unseen live-update counts per route (NotificationContext, mounted in
-  // AppShell) — a page you're NOT viewing that received realtime events shows
-  // a pulsing red dot on its nav item; visiting it clears the dot.
+  // Pages you are NOT viewing that received realtime events show a dot until visited.
   const { unseen } = useNotifications()
-  const signOut = useSignOut()
 
-  function handleLogout() {
-    signOut()
-    onNavigate?.()
-  }
-
-  // After the shell is up, download the code for every page this user can open during
-  // idle time, so later navigation never waits on the network for code.
+  // Warm the code of every page this user can open during idle time.
   const accessibleKey = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.to))
     .filter((to) => user != null && canAccessPage(to))
     .join('|')
@@ -50,54 +36,56 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Brand mark */}
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border px-5">
-        <Orbit className="h-6 w-6 text-emerald-500" aria-hidden />
-        <span className="text-base font-bold tracking-tight">{PLATFORM_NAME}</span>
+      <div className={cn('flex h-16 shrink-0 items-center gap-2.5 border-b border-sidebar-border', collapsed ? 'justify-center px-0' : 'px-5')}>
+        <Orbit className="h-6 w-6 shrink-0 text-ink-accent" aria-hidden />
+        {!collapsed && <span className="font-display text-2xl leading-none tracking-tight">{PLATFORM_NAME}</span>}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav aria-label="Main" className={cn('flex-1 overflow-y-auto py-4', collapsed ? 'px-2' : 'px-3')}>
         {NAV_GROUPS.map((group) => {
-          // canAccessPage layers the persisted RBAC matrix on top of canAccess — it
-          // itself falls back to canAccess (code defaults) when the matrix hasn't
-          // loaded / failed to load / came back empty (fail-open — see
-          // context/PermissionsContext.tsx).
           const items = group.items.filter((item) => user != null && canAccessPage(item.to))
           if (items.length === 0) return null
           return (
-            <div key={group.label} className="mt-4 first:mt-0">
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {group.label}
-              </p>
-              <div className="space-y-1">
+            <div key={group.label} className="mt-5 first:mt-0">
+              {collapsed ? (
+                <div className="mx-3 mb-2 border-t border-sidebar-border" aria-hidden />
+              ) : (
+                <p className="eyebrow mb-1.5 px-3">{group.label}</p>
+              )}
+              <div className="space-y-0.5">
                 {items.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
                     to={to}
                     end={to === '/'}
                     onClick={onNavigate}
-                    // Warm the page's code on intent so the click renders immediately.
                     onMouseEnter={() => prefetchPage(to)}
                     onFocus={() => prefetchPage(to)}
                     onTouchStart={() => prefetchPage(to)}
+                    title={collapsed ? label : undefined}
+                    aria-label={collapsed ? label : undefined}
                     className={({ isActive }) =>
                       cn(
-                        'group flex items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
+                        'group relative flex min-h-10 items-center gap-3 rounded-md text-sm transition-colors duration-200',
+                        collapsed ? 'justify-center px-0' : 'px-3',
                         isActive
-                          ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                          ? 'bg-sidebar-accent font-medium text-foreground before:absolute before:inset-y-2 before:left-0 before:w-[2px] before:rounded-full before:bg-ink-accent'
+                          : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
                       )
                     }
                   >
-                    <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden />
-                    <span className="truncate">{label}</span>
-                    {(unseen[to] ?? 0) > 0 && (
-                      <span
-                        className="ml-auto h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-500"
-                        role="status"
-                        aria-label={`${label} has new updates`}
-                      />
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={cn('h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:translate-x-0.5', isActive && 'text-ink-accent')} aria-hidden />
+                        {!collapsed && <span className="truncate">{label}</span>}
+                        {(unseen[to] ?? 0) > 0 && (
+                          <span
+                            className={cn('h-2 w-2 shrink-0 animate-pulse rounded-full bg-danger-text', collapsed ? 'absolute right-2 top-2' : 'ml-auto')}
+                            role="status"
+                            aria-label={`${label} has new updates`}
+                          />
+                        )}
+                      </>
                     )}
                   </NavLink>
                 ))}
@@ -107,29 +95,21 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
         })}
       </nav>
 
-      {/* User footer */}
-      <div className="shrink-0 border-t border-sidebar-border p-4">
-        <div className="mb-3 flex items-center gap-3">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-emerald-500/15 text-sm font-semibold text-emerald-400">
-              {initials(user?.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">{user?.name ?? '—'}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {user?.role ? user.role.replace(/_/g, ' ') : '—'}
-            </p>
-          </div>
-        </div>
+      {onToggleCollapsed && (
         <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-2 rounded-lg border border-sidebar-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors duration-200 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+          type="button"
+          onClick={onToggleCollapsed}
+          className={cn(
+            'flex h-12 shrink-0 items-center gap-2 border-t border-sidebar-border text-xs text-muted-foreground transition-colors hover:text-foreground',
+            collapsed ? 'justify-center' : 'px-5',
+          )}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : undefined}
         >
-          <LogOut className="h-4 w-4" aria-hidden />
-          Sign out
+          {collapsed ? <ChevronsRight className="h-4 w-4" aria-hidden /> : <ChevronsLeft className="h-4 w-4" aria-hidden />}
+          {!collapsed && 'Collapse'}
         </button>
-      </div>
+      )}
     </div>
   )
 }

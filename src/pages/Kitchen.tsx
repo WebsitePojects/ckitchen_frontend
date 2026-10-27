@@ -125,11 +125,11 @@ const STAGE_STYLE: Record<string, StageStyle> = {
   },
   READY: {
     cardBorder: 'border-emerald-500/40',
-    btnClass:   'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white',
+    btnClass:   'bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground',
   },
   COMPLETED: {
-    cardBorder: 'border-zinc-700',
-    btnClass:   'bg-zinc-800 text-zinc-500 cursor-not-allowed',
+    cardBorder: 'border-border',
+    btnClass:   'bg-secondary text-muted-foreground cursor-not-allowed',
   },
 }
 
@@ -216,7 +216,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
   return (
     <div
       className={[
-        'group relative flex flex-col rounded-xl border bg-[#121A17] shadow-lg',
+        'group relative flex flex-col rounded-xl border bg-card shadow-lg',
         'transition-all duration-300',
         style.cardBorder,
         isOverdue
@@ -232,26 +232,26 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         <AggregatorBadge aggregator={order.aggregator} />
         {deviceRef && (
           <span
-            className="font-mono text-xs font-semibold text-zinc-100 tabular-nums"
+            className="font-mono text-xs font-semibold text-foreground tabular-nums"
             title="Order number on the aggregator device"
           >
             #{deviceRef}
           </span>
         )}
-        <span className="font-mono text-[11px] text-zinc-500 tabular-nums">
+        <span className="font-mono text-[11px] text-muted-foreground tabular-nums">
           {displayRef}
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {stale && (
             <span
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500 ring-1 ring-inset ring-zinc-700"
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground ring-1 ring-inset ring-zinc-700"
               title={`No activity for over ${STALE_HOURS}h — likely abandoned`}
             >
               Stale
             </span>
           )}
           {isOverdue && (
-            <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" aria-label="Overdue" />
+            <AlertTriangle className="h-3.5 w-3.5 text-danger-text shrink-0" aria-label="Overdue" />
           )}
           <StatusBadge status={order.status} />
         </div>
@@ -259,14 +259,14 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
 
       {/* ── Customer + timer row ── */}
       <div className="flex items-center justify-between px-3 pb-2">
-        <span className="text-sm font-semibold text-zinc-100 truncate max-w-[55%]">
+        <span className="text-sm font-semibold text-foreground truncate max-w-[55%]">
           {order.customerName ?? 'Guest'}
         </span>
         <span
           title={`Placed ${formatTime(order.placedAt)}`}
           className={[
             'shrink-0 text-sm font-bold tabular-nums font-mono',
-            isOverdue ? 'text-red-400' : 'text-zinc-400',
+            isOverdue ? 'text-danger-text' : 'text-muted-foreground',
           ].join(' ')}
         >
           {elapsed}
@@ -275,16 +275,16 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
 
       {/* ── Items for this station ── */}
       {displayItems.length > 0 && (
-        <ul className="border-t border-[#1F2A24] px-3 py-2 space-y-1">
+        <ul className="border-t border-border px-3 py-2 space-y-1">
           {displayItems.map((item, idx) => (
-            <li key={idx} className="flex gap-2 text-sm text-zinc-200">
-              <span className="w-6 shrink-0 text-right font-bold text-emerald-400 tabular-nums">
+            <li key={idx} className="flex gap-2 text-sm text-foreground">
+              <span className="w-6 shrink-0 text-right font-bold text-ink-accent tabular-nums">
                 {item.qty}×
               </span>
               <span className="flex-1 leading-snug">
                 {item.name}
                 {item.notes && (
-                  <span className="ml-1.5 text-[10px] italic text-zinc-500">
+                  <span className="ml-1.5 text-[10px] italic text-muted-foreground">
                     ({item.notes})
                   </span>
                 )}
@@ -332,13 +332,13 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
           // View-only role (M3): the backend's ORDER_STAGE_ROLES would 403 an
           // advance/cancel call for this account — show status, not a dead button.
           <div
-            className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-zinc-800/50 text-sm font-semibold text-zinc-500"
+            className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-secondary/50 text-sm font-semibold text-muted-foreground"
             title="Your role can view this board but not advance orders"
           >
             View only
           </div>
         ) : (
-          <div className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-zinc-800/50 text-sm font-semibold text-zinc-600">
+          <div className="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3.5 min-h-[52px] bg-secondary/50 text-sm font-semibold text-muted-foreground">
             <CheckCircle2 className="h-4 w-4" />
             Completed
           </div>
@@ -348,7 +348,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         {next && canAct && (
           <button
             onClick={() => setCancelOpen(true)}
-            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-red-300/80 hover:text-red-200 hover:bg-red-500/10 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+            className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-danger-text hover:text-danger-text hover:bg-red-500/10 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
           >
             <X className="h-3.5 w-3.5" />
             Cancel order
@@ -372,13 +372,13 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
             rows={3}
             autoFocus
             placeholder="e.g. customer cancelled, item unavailable, duplicate order…"
-            className="w-full rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-red-500/50"
           />
           <DialogFooter>
             <button
               onClick={() => { setCancelOpen(false); setCancelReason('') }}
               disabled={cancelling}
-              className="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-400 transition-colors duration-200 hover:text-zinc-200 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors duration-200 hover:text-foreground disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
             >
               Keep order
             </button>
@@ -634,7 +634,7 @@ export default function Kitchen() {
           actions={
             <div className="flex items-center gap-2">
               {overdueCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-400 ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-danger-text ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {overdueCount} overdue (&gt;{OVERDUE_MINS}m)
                 </span>
@@ -650,7 +650,7 @@ export default function Kitchen() {
                 {soundOn ? (
                   <Volume2 className="h-3.5 w-3.5" />
                 ) : (
-                  <VolumeX className="h-3.5 w-3.5 text-zinc-500" />
+                  <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />
                 )}
                 <span className="sr-only">
                   {soundOn ? 'Mute prep sound cues' : 'Unmute prep sound cues'}
@@ -682,8 +682,8 @@ export default function Kitchen() {
                   'transition-colors duration-150 select-none min-h-[40px]',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50',
                   isActive
-                    ? 'bg-emerald-600/20 text-emerald-400 ring-1 ring-inset ring-emerald-500/40'
-                    : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200',
+                    ? 'bg-primary/10 text-ink-accent ring-1 ring-inset ring-primary/40'
+                    : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
                 ].join(' ')}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -693,8 +693,8 @@ export default function Kitchen() {
                     'inline-flex min-w-[20px] items-center justify-center rounded-full px-1.5 py-0.5',
                     'text-[11px] font-bold tabular-nums',
                     isActive
-                      ? 'bg-emerald-500/25 text-emerald-300'
-                      : 'bg-zinc-700/70 text-zinc-400',
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground ring-1 ring-inset ring-border',
                   ].join(' ')}
                 >
                   {count}
@@ -706,19 +706,19 @@ export default function Kitchen() {
       </div>
 
       {/* ── Divider ── */}
-      <div className="shrink-0 border-t border-[#1F2A24]" />
+      <div className="shrink-0 border-t border-border" />
 
       {/* ── Body ── */}
       {loading ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-zinc-500">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-emerald-500" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-border border-t-emerald-500" />
           <p className="text-sm">Loading kitchen orders…</p>
         </div>
       ) : error ? (
         <div className="flex flex-1 flex-col items-center justify-center p-8">
           <div className="w-full max-w-md rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center">
-            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-400" />
-            <p className="text-sm font-semibold text-red-300">{error}</p>
+            <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-danger-text" />
+            <p className="text-sm font-semibold text-danger-text">{error}</p>
             <p className="mt-1 text-xs text-red-500">Make sure the backend is running on :4000</p>
           </div>
         </div>
@@ -749,25 +749,25 @@ export default function Kitchen() {
                   key={station.id}
                   data-testid="kds-station-column"
                   data-station-name={station.name}
-                  className="flex w-72 shrink-0 flex-col rounded-2xl border border-[#1F2A24] bg-[#0C1310] overflow-hidden shadow-xl"
+                  className="flex w-72 shrink-0 flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-xl"
                   aria-label={`${station.name} station`}
                 >
                   {/* Station header */}
-                  <div className="shrink-0 flex items-center justify-between border-b border-[#1F2A24] bg-[#121A17] px-4 py-3">
+                  <div className="shrink-0 flex items-center justify-between border-b border-border bg-card px-4 py-3">
                     <div className="flex items-center gap-2 min-w-0">
                       <ChefHat className="h-4 w-4 shrink-0 text-emerald-500" />
-                      <h2 className="text-sm font-bold text-zinc-100 tracking-wide truncate">
+                      <h2 className="text-sm font-bold text-foreground tracking-wide truncate">
                         {station.name}
                       </h2>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0 pl-2">
                       {colOverdue > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-400 ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-danger-text ring-1 ring-inset ring-red-500/30 animate-pulse tabular-nums">
                           <AlertTriangle className="h-2.5 w-2.5" />
                           {colOverdue}
                         </span>
                       )}
-                      <span className="rounded-full bg-zinc-700/60 px-2 py-0.5 text-[11px] font-bold text-zinc-300 tabular-nums">
+                      <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-[11px] font-bold text-foreground tabular-nums">
                         {col.length}
                       </span>
                     </div>
@@ -780,7 +780,7 @@ export default function Kitchen() {
                         icon={CheckCircle2}
                         title="No active orders"
                         description={activeStage !== 'ALL' ? `No ${activeStage.toLowerCase()} orders at this station` : undefined}
-                        className="mt-4 border-[#1F2A24] bg-transparent"
+                        className="mt-4 border-border bg-transparent"
                       />
                     ) : (
                       col.map(order => (

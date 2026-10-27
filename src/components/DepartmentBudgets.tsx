@@ -131,7 +131,7 @@ export default function DepartmentBudgets() {
     <Card className="border-border bg-card">
       <CardHeader className="space-y-1">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Wallet className="h-4 w-4 text-emerald-400" />
+          <Wallet className="h-4 w-4 text-ink-accent" />
           Department Budgets
         </CardTitle>
         <CardDescription>
@@ -140,7 +140,7 @@ export default function DepartmentBudgets() {
       </CardHeader>
       <CardContent className="space-y-3">
         {initialLoading ? (
-          <p className="py-4 text-sm text-zinc-500">Loading budgets…</p>
+          <p className="py-4 text-sm text-muted-foreground">Loading budgets…</p>
         ) : (
           departments.map((dept, i) => {
             const status = statusQueries[i]?.data
@@ -151,27 +151,27 @@ export default function DepartmentBudgets() {
             const hasBudget = budget > 0
             const pct = hasBudget ? Math.max(0, Math.min(100, (committed / budget) * 100)) : 0
 
-            let textClass = 'text-emerald-400'
+            let textClass = 'text-ink-accent'
             let barClass = 'bg-emerald-500'
             if (!hasBudget) {
-              textClass = 'text-zinc-500'
+              textClass = 'text-muted-foreground'
               barClass = 'bg-zinc-600'
             } else if (remaining < 0) {
-              textClass = 'text-red-400'
+              textClass = 'text-danger-text'
               barClass = 'bg-red-500'
             } else if (remaining / budget < 0.2) {
-              textClass = 'text-amber-400'
+              textClass = 'text-warn-text'
               barClass = 'bg-amber-500'
             }
 
             const isEditing = editing === dept
 
             return (
-              <div key={dept} className="rounded-lg border border-border/60 bg-zinc-900/40 p-3">
+              <div key={dept} className="rounded-lg border border-border/60 bg-card/40 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-100">{dept}</p>
-                    {row?.note && <p className="truncate text-xs text-zinc-500">{row.note}</p>}
+                    <p className="text-sm font-medium text-foreground">{dept}</p>
+                    {row?.note && <p className="truncate text-xs text-muted-foreground">{row.note}</p>}
                   </div>
 
                   {isEditing ? (
@@ -197,15 +197,15 @@ export default function DepartmentBudgets() {
                   ) : (
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="text-right">
-                        <p className="text-[11px] text-zinc-500">Budget</p>
-                        <p className="text-sm font-semibold tabular-nums text-zinc-100">{money(budget)}</p>
+                        <p className="text-[11px] text-muted-foreground">Budget</p>
+                        <p className="text-sm font-semibold tabular-nums text-foreground">{money(budget)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[11px] text-zinc-500">Committed</p>
-                        <p className="text-sm font-semibold tabular-nums text-zinc-300">{money(committed)}</p>
+                        <p className="text-[11px] text-muted-foreground">Committed</p>
+                        <p className="text-sm font-semibold tabular-nums text-foreground">{money(committed)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[11px] text-zinc-500">Remaining</p>
+                        <p className="text-[11px] text-muted-foreground">Remaining</p>
                         <p className={`text-sm font-semibold tabular-nums ${textClass}`}>{money(remaining)}</p>
                       </div>
                       {canEdit && (
@@ -218,11 +218,11 @@ export default function DepartmentBudgets() {
                   )}
                 </div>
 
-                <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                   <div className={`h-full rounded-full transition-all duration-300 ${barClass}`} style={{ width: `${pct}%` }} />
                 </div>
                 {!hasBudget && (
-                  <p className="mt-1 text-[11px] text-zinc-600">
+                  <p className="mt-1 text-[11px] text-muted-foreground">
                     No budget set for {periodLabel(period)}{canEdit ? ' — click Edit to set one.' : '.'}
                   </p>
                 )}

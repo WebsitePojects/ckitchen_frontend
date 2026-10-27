@@ -326,7 +326,7 @@ export default function Purchasing() {
         header: 'Request',
         accessorFn: (r) => r.prNo,
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-zinc-300">{row.original.prNo}</span>
+          <span className="font-mono text-xs text-foreground">{row.original.prNo}</span>
         ),
       },
       {
@@ -352,7 +352,7 @@ export default function Purchasing() {
             ?.lines.reduce((s, l) => s + num(l.quantity) * num(l.estUnitCost), 0) ?? 0,
         cell: ({ row }) => {
           const d = prDetails.get(row.original.id)
-          if (!d) return <span className="text-zinc-600">…</span>
+          if (!d) return <span className="text-muted-foreground">…</span>
           const t = d.lines.reduce((s, l) => s + num(l.quantity) * num(l.estUnitCost), 0)
           return <span className="tabular-nums">{peso(t)}</span>
         },
@@ -369,9 +369,9 @@ export default function Purchasing() {
         accessorFn: (r) => (r.requestedByUserId === user?.id ? 'You' : r.requestedByUserId),
         cell: ({ row }) =>
           row.original.requestedByUserId === user?.id ? (
-            <span className="text-emerald-400">You</span>
+            <span className="text-ink-accent">You</span>
           ) : (
-            <span className="font-mono text-xs text-zinc-500" title={row.original.requestedByUserId}>
+            <span className="font-mono text-xs text-muted-foreground" title={row.original.requestedByUserId}>
               {row.original.requestedByUserId.slice(0, 8)}
             </span>
           ),
@@ -381,7 +381,7 @@ export default function Purchasing() {
         header: 'Date',
         accessorFn: (r) => r.createdAt,
         cell: ({ row }) => (
-          <span className="whitespace-nowrap text-zinc-400">{fmtDate(row.original.createdAt)}</span>
+          <span className="whitespace-nowrap text-muted-foreground">{fmtDate(row.original.createdAt)}</span>
         ),
       },
       {
@@ -410,7 +410,7 @@ export default function Purchasing() {
                     size="sm"
                     onClick={() => void decidePr(pr, 'approve')}
                     disabled={busy === `approve:${pr.id}`}
-                    className="h-7 bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700"
+                    className="h-7 bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary/90"
                   >
                     <CheckCircle2 className="h-3 w-3" />
                     Approve
@@ -420,7 +420,7 @@ export default function Purchasing() {
                     variant="outline"
                     onClick={() => void decidePr(pr, 'reject')}
                     disabled={busy === `reject:${pr.id}`}
-                    className="h-7 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    className="h-7 text-xs text-danger-text hover:bg-red-500/10 hover:text-danger-text"
                   >
                     <XCircle className="h-3 w-3" />
                     Reject
@@ -433,7 +433,7 @@ export default function Purchasing() {
                   variant="outline"
                   onClick={() => void createPoFromPr(pr)}
                   disabled={busy === `po-from:${pr.id}`}
-                  className="h-7 text-xs text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                  className="h-7 text-xs text-ink-accent hover:bg-emerald-500/10 hover:text-ink-accent"
                 >
                   <FilePlus2 className="h-3 w-3" />
                   Create PO
@@ -455,7 +455,7 @@ export default function Purchasing() {
         header: 'PO',
         accessorFn: (r) => r.poNo,
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-zinc-300">{row.original.poNo}</span>
+          <span className="font-mono text-xs text-foreground">{row.original.poNo}</span>
         ),
       },
       {
@@ -465,9 +465,9 @@ export default function Purchasing() {
         cell: ({ row }) => {
           const s = supplierById.get(row.original.supplierId)
           return s ? (
-            <span className="text-zinc-200">{s.name}</span>
+            <span className="text-foreground">{s.name}</span>
           ) : (
-            <span className="text-zinc-600">—</span>
+            <span className="text-muted-foreground">—</span>
           )
         },
       },
@@ -488,7 +488,7 @@ export default function Purchasing() {
           0,
         cell: ({ row }) => {
           const d = poDetails.get(row.original.id)
-          if (!d) return <span className="text-zinc-600">…</span>
+          if (!d) return <span className="text-muted-foreground">…</span>
           const t = d.lines.reduce((s, l) => s + num(l.quantity) * num(l.unitCost), 0)
           return <span className="tabular-nums">{peso(t)}</span>
         },
@@ -504,7 +504,7 @@ export default function Purchasing() {
         header: 'Date',
         accessorFn: (r) => r.createdAt,
         cell: ({ row }) => (
-          <span className="whitespace-nowrap text-zinc-400">{fmtDate(row.original.createdAt)}</span>
+          <span className="whitespace-nowrap text-muted-foreground">{fmtDate(row.original.createdAt)}</span>
         ),
       },
       {
@@ -535,7 +535,7 @@ export default function Purchasing() {
                     setReceivePo(po)
                     setReceiveOpen(true)
                   }}
-                  className="h-7 text-xs text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                  className="h-7 text-xs text-ink-accent hover:bg-emerald-500/10 hover:text-ink-accent"
                 >
                   <PackageCheck className="h-3 w-3" />
                   Receive
@@ -557,7 +557,7 @@ export default function Purchasing() {
         header: 'Receiving report',
         accessorFn: (r) => r.rrNo,
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-zinc-300">{row.original.rrNo}</span>
+          <span className="font-mono text-xs text-foreground">{row.original.rrNo}</span>
         ),
       },
       {
@@ -568,13 +568,13 @@ export default function Purchasing() {
           const poId = row.original.poId
           if (!poId) {
             return (
-              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400 ring-1 ring-inset ring-zinc-500/30">
+              <span className="inline-flex items-center whitespace-nowrap rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground ring-1 ring-inset ring-zinc-500/30">
                 Direct
               </span>
             )
           }
           return (
-            <span className="font-mono text-xs text-zinc-400">
+            <span className="font-mono text-xs text-muted-foreground">
               {poById.get(poId)?.poNo ?? '—'}
             </span>
           )
@@ -587,9 +587,9 @@ export default function Purchasing() {
         cell: ({ row }) => {
           const name = resolveRrSupplier(row.original)
           return name === '—' ? (
-            <span className="text-zinc-600">—</span>
+            <span className="text-muted-foreground">—</span>
           ) : (
-            <span className="text-zinc-200">{name}</span>
+            <span className="text-foreground">{name}</span>
           )
         },
       },
@@ -607,7 +607,7 @@ export default function Purchasing() {
         header: 'Received',
         accessorFn: (r) => r.createdAt,
         cell: ({ row }) => (
-          <span className="whitespace-nowrap text-zinc-400">{fmtDate(row.original.createdAt)}</span>
+          <span className="whitespace-nowrap text-muted-foreground">{fmtDate(row.original.createdAt)}</span>
         ),
       },
     ],
@@ -696,7 +696,7 @@ export default function Purchasing() {
 
         {/* ── Receiving ── */}
         <TabsContent value="rr" className="mt-4 space-y-4">
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ClipboardList className="h-3.5 w-3.5" aria-hidden />
             Receiving reports post stock into the MAIN warehouse and write the stock ledger.
           </div>

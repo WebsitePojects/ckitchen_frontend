@@ -29,6 +29,7 @@ import { useSubmitGuard } from '../hooks/useSubmitGuard'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
+import { useInPageTitle } from '../components/layout/PageHeaderContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ function initials(name: string): string {
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 export default function Pos() {
+  useInPageTitle()
   const { selectedOutletId } = useOutlet()
   const { user } = useAuth()
   // Same rule as the old dialogs: only managers may push a walk-in past a stock shortfall.
@@ -372,7 +374,7 @@ export default function Pos() {
                 onClick={() => selectBrand(b.id)}
                 className={[
                   'flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
-                  active ? 'border-transparent bg-zinc-100 text-zinc-900' : 'border-border text-zinc-300 hover:bg-zinc-800/60',
+                  active ? 'border-transparent bg-zinc-100 text-zinc-900' : 'border-border text-foreground hover:bg-secondary/60',
                 ].join(' ')}
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: b.color }} aria-hidden />
@@ -407,7 +409,7 @@ export default function Pos() {
                 onClick={() => setCategory(c)}
                 className={[
                   'min-h-10 shrink-0 rounded-md px-3 text-sm transition-colors',
-                  category === c ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200',
+                  category === c ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
                 ].join(' ')}
               >
                 {c}
@@ -416,7 +418,7 @@ export default function Pos() {
           </div>
           <label className="relative 2xl:w-56">
             <span className="sr-only">Search items</span>
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" aria-hidden />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search items" className="h-10 pl-8" />
           </label>
         </div>
@@ -427,7 +429,7 @@ export default function Pos() {
             <p className="py-10 text-center text-sm text-muted-foreground">Loading menu…</p>
           ) : menu.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border py-14 text-center">
-              <p className="font-medium text-zinc-200">{brand ? `${brand.name} has no menu items yet` : 'No brand selected'}</p>
+              <p className="font-medium text-foreground">{brand ? `${brand.name} has no menu items yet` : 'No brand selected'}</p>
               <p className="mt-1 text-sm text-muted-foreground">A manager can add items under Catalog → Menu.</p>
             </div>
           ) : visibleItems.length === 0 ? (
@@ -486,11 +488,11 @@ function ChannelChip({ active, onClick, label, sub }: { active: boolean; onClick
       onClick={onClick}
       className={[
         'flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm transition-colors',
-        active ? 'border-emerald-500 bg-emerald-500/10 text-emerald-300' : 'border-border text-zinc-300 hover:bg-zinc-800/60',
+        active ? 'border-emerald-500 bg-emerald-500/10 text-ink-accent' : 'border-border text-foreground hover:bg-secondary/60',
       ].join(' ')}
     >
       <span className="font-medium">{label}</span>
-      {sub && <span className="font-mono text-xs text-zinc-500">{sub}</span>}
+      {sub && <span className="font-mono text-xs text-muted-foreground">{sub}</span>}
     </button>
   )
 }
@@ -528,14 +530,14 @@ function ItemTile({ item, color, qty, onAdd }: { item: MenuItem; color: string; 
           </span>
         )}
         {!available && (
-          <span className="absolute inset-x-0 bottom-0 bg-black/70 py-1 text-center text-xs font-semibold uppercase tracking-wide text-zinc-200">
+          <span className="absolute inset-x-0 bottom-0 bg-black/70 py-1 text-center text-xs font-semibold uppercase tracking-wide text-white">
             {item.availability === 'SOLD_OUT' ? 'Sold out' : 'Paused'}
           </span>
         )}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-2.5">
-        <span className="line-clamp-2 text-sm font-medium leading-snug text-zinc-100">{item.name}</span>
-        <span className="mt-auto text-sm tabular-nums text-zinc-400">{price}</span>
+        <span className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{item.name}</span>
+        <span className="mt-auto text-sm tabular-nums text-muted-foreground">{price}</span>
       </div>
     </button>
   )
@@ -574,7 +576,7 @@ function CartPanel(p: CartPanelProps) {
     <div className="flex min-h-0 w-full flex-1 flex-col rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="min-w-0">
-          <p className="truncate font-semibold text-zinc-100">{p.brand?.name ?? 'No brand'}</p>
+          <p className="truncate font-semibold text-foreground">{p.brand?.name ?? 'No brand'}</p>
           <p className="text-xs text-muted-foreground">{channelLabel}</p>
         </div>
         <Button variant="ghost" size="sm" onClick={p.clear} disabled={p.cart.length === 0 || p.pending}>
@@ -587,7 +589,7 @@ function CartPanel(p: CartPanelProps) {
         {!p.isWalkIn && (
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <label className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Order # on tablet <span className="text-red-400">*</span></span>
+              <span className="text-xs font-medium text-muted-foreground">Order # on tablet <span className="text-danger-text">*</span></span>
               <Input
                 ref={p.deviceInputRef}
                 value={p.deviceNo}
@@ -599,13 +601,13 @@ function CartPanel(p: CartPanelProps) {
               />
             </label>
             <label className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Time on tablet</span>
+              <span className="text-xs font-medium text-muted-foreground">Time on tablet</span>
               <Input type="time" value={p.deviceTime} onChange={(e) => p.setDeviceTime(e.target.value)} className="h-11 w-28" />
             </label>
           </div>
         )}
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-zinc-400">Customer name (optional)</span>
+          <span className="text-xs font-medium text-muted-foreground">Customer name (optional)</span>
           <Input value={p.customer} onChange={(e) => p.setCustomer(e.target.value)} className="h-10" />
         </label>
       </div>
@@ -617,8 +619,8 @@ function CartPanel(p: CartPanelProps) {
           <li key={l.key} className="px-4 py-2.5">
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-zinc-100">{l.name}</p>
-                <p className="text-xs tabular-nums text-zinc-500">{php.format(l.price)} each</p>
+                <p className="text-sm font-medium text-foreground">{l.name}</p>
+                <p className="text-xs tabular-nums text-muted-foreground">{php.format(l.price)} each</p>
               </div>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => p.changeQty(l.key, -1)} aria-label={`One less ${l.name}`}>
@@ -633,8 +635,8 @@ function CartPanel(p: CartPanelProps) {
             {p.noteFor === l.key ? (
               <NoteEditor initial={l.notes} onSave={(n) => { p.setNotes(l.key, n); p.setNoteFor(null) }} onCancel={() => p.setNoteFor(null)} />
             ) : (
-              <button onClick={() => p.setNoteFor(l.key)} className="mt-1 flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200">
-                <StickyNote className="h-3.5 w-3.5" /> {l.notes ? <span className="italic text-amber-300">{l.notes}</span> : 'Add note'}
+              <button onClick={() => p.setNoteFor(l.key)} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                <StickyNote className="h-3.5 w-3.5" /> {l.notes ? <span className="italic text-warn-text">{l.notes}</span> : 'Add note'}
               </button>
             )}
           </li>
@@ -644,7 +646,7 @@ function CartPanel(p: CartPanelProps) {
       {/* Shortfall (walk-in only) */}
       {p.shortfalls && (
         <div className="mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="alert">
-          <p className="flex items-center gap-1.5 font-medium text-amber-300"><AlertTriangle className="h-4 w-4" /> Not enough stock</p>
+          <p className="flex items-center gap-1.5 font-medium text-warn-text"><AlertTriangle className="h-4 w-4" /> Not enough stock</p>
           <ul className="mt-1 space-y-0.5 text-amber-100/90">
             {p.shortfalls.map((s) => (
               <li key={s.ingredient_id ?? s.ingredient_name}>{s.ingredient_name}: need {s.required}, have {s.available}</li>
@@ -661,8 +663,8 @@ function CartPanel(p: CartPanelProps) {
       {/* Total + send */}
       <div className="border-t border-border p-4">
         <div className="mb-3 flex items-baseline justify-between">
-          <span className="text-sm text-zinc-400">{p.itemCount} item(s)</span>
-          <span className="text-2xl font-semibold tabular-nums text-zinc-50">{php.format(p.total)}</span>
+          <span className="text-sm text-muted-foreground">{p.itemCount} item(s)</span>
+          <span className="text-2xl font-semibold tabular-nums text-foreground">{php.format(p.total)}</span>
         </div>
         <Button className="h-12 w-full text-base" onClick={p.send} disabled={!p.canSend} aria-busy={p.pending}>
           {p.pending ? 'Sending…' : 'Send to kitchen'}

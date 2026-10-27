@@ -104,7 +104,7 @@ export default function MasterData() {
               key={t.key}
               onClick={() => switchKind(t.key)}
               className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${
-                active ? 'bg-zinc-100 text-zinc-900' : 'text-zinc-400 hover:text-zinc-200'
+                active ? 'bg-zinc-100 text-zinc-900' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -121,7 +121,7 @@ export default function MasterData() {
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={`Search ${kind} by code or name…`}
             value={search}
@@ -136,14 +136,14 @@ export default function MasterData() {
             Add {singular}
           </Button>
         )}
-        <span className="text-sm text-zinc-500">{filtered.length} shown</span>
+        <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
       </div>
 
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading {kind}…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading {kind}…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-danger-text">{error}</p>
         ) : filtered.length === 0 ? (
           <EmptyState icon={kind === 'suppliers' ? Building2 : Users2} title={`No ${kind}`} description={canWrite ? `Add your first ${singular.toLowerCase()} to get started.` : 'Nothing here yet.'} />
         ) : (
@@ -161,17 +161,17 @@ export default function MasterData() {
             <TableBody>
               {filtered.map((r) => (
                 <TableRow key={r.id} className="border-border">
-                  <TableCell className="font-mono text-xs text-zinc-300">{r.code}</TableCell>
-                  <TableCell className="text-sm text-zinc-100">{r.name}</TableCell>
-                  <TableCell className="text-sm text-zinc-400">
+                  <TableCell className="font-mono text-xs text-foreground">{r.code}</TableCell>
+                  <TableCell className="text-sm text-foreground">{r.name}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
                     {r.contactName ?? r.contactPhone ?? '—'}
                     {r.contactName && r.contactPhone ? (
-                      <span className="text-zinc-600"> · {r.contactPhone}</span>
+                      <span className="text-muted-foreground"> · {r.contactPhone}</span>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-zinc-400">{r.paymentTermDays ? `${r.paymentTermDays}d` : '—'}</TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">{r.paymentTermDays ? `${r.paymentTermDays}d` : '—'}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.isActive ? 'bg-emerald-500/15 text-emerald-300' : 'bg-zinc-700 text-white'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${r.isActive ? 'bg-emerald-500/15 text-ink-accent' : 'bg-secondary text-white'}`}>
                       {r.isActive ? 'ACTIVE' : 'INACTIVE'}
                     </span>
                   </TableCell>
@@ -183,7 +183,7 @@ export default function MasterData() {
                         onClick={() => openEdit(r)}
                         aria-label={`Edit ${r.name}`}
                         title={`Edit ${singular.toLowerCase()}${kind === 'suppliers' ? ' + items supplied' : ''}`}
-                        className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                        className="h-8 w-8 text-muted-foreground hover:text-ink-accent hover:bg-emerald-500/10"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>

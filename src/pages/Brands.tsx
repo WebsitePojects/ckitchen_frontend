@@ -4,6 +4,7 @@ import { Tags, CheckCircle2, XCircle, Store, History } from 'lucide-react'
 import { get } from '../lib/api'
 import { useOutlet } from '../context/OutletContext'
 import { outletScopedPath } from '../lib/outletScope'
+import { readableTextOn } from '../lib/theme'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
@@ -59,9 +60,9 @@ export default function Brands() {
       </KpiRibbon>
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Loading brands…</p>
+        <p className="text-sm text-muted-foreground">Loading brands…</p>
       ) : error ? (
-        <p className="text-sm text-red-400">{error}</p>
+        <p className="text-sm text-danger-text">{error}</p>
       ) : brands.length === 0 ? (
         <EmptyState icon={Tags} title="No brands" description="Add a brand from Merchant Management." />
       ) : (
@@ -71,14 +72,14 @@ export default function Brands() {
               <CardContent className="p-5">
                 <div className="flex items-center gap-3">
                   <span
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white"
-                    style={{ backgroundColor: b.color }}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-bold"
+                    style={{ backgroundColor: b.color, color: readableTextOn(b.color) }}
                   >
                     {b.name.charAt(0)}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-zinc-100">{b.name}</p>
-                    <p className="text-xs text-zinc-500">{b.salesPerfId ?? 'No sales ID'}</p>
+                    <p className="truncate font-semibold text-foreground">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">{b.salesPerfId ?? 'No sales ID'}</p>
                   </div>
                 </div>
                 <div className="mt-4 flex items-center justify-between">
@@ -86,18 +87,18 @@ export default function Brands() {
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${b.isActive ? 'bg-emerald-400' : 'bg-zinc-600'}`}
                     />
-                    <span className={b.isActive ? 'text-emerald-400' : 'text-zinc-500'}>
+                    <span className={b.isActive ? 'text-ink-accent' : 'text-muted-foreground'}>
                       {b.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </span>
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: b.color }} />
                     {b.color}
                   </span>
                 </div>
                 <button
                   onClick={() => setActivityBrand(b)}
-                  className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 transition-colors duration-200 hover:bg-zinc-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground transition-colors duration-200 hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   <History className="h-3.5 w-3.5" />
                   Activity log

@@ -258,14 +258,14 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           {dataErrorMsg && (
-            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400">
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-danger-text">
               {dataErrorMsg}
             </p>
           )}
 
           {/* Brand */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Brand</label>
+            <label className="text-xs font-medium text-muted-foreground">Brand</label>
             <Select value={brandId} onValueChange={handleBrandChange} disabled={loadingBrands}>
               <SelectTrigger>
                 <SelectValue placeholder={loadingBrands ? 'Loading…' : 'Select brand…'} />
@@ -288,7 +288,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
 
           {/* Customer name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Customer Name (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Customer Name (optional)</label>
             <Input
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
@@ -298,7 +298,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
 
           {/* Item picker */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Add Item</label>
+            <label className="text-xs font-medium text-muted-foreground">Add Item</label>
             <div className="flex gap-2">
               <Select
                 value={pickedItemId}
@@ -310,7 +310,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
                 </SelectTrigger>
                 <SelectContent>
                   {menuItems.length === 0 ? (
-                    <div className="px-2 py-1.5 text-xs text-zinc-500">
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
                       {loadingMenu ? 'Loading menu…' : 'No menu items for this brand.'}
                     </div>
                   ) : (
@@ -351,11 +351,11 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
 
           {/* Line items */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Order Items</label>
+            <label className="text-xs font-medium text-muted-foreground">Order Items</label>
             {lines.length === 0 ? (
               <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed border-border py-6 text-center">
-                <ShoppingCart className="h-4 w-4 text-zinc-600" aria-hidden />
-                <p className="text-xs text-zinc-600">No items added yet.</p>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" aria-hidden />
+                <p className="text-xs text-muted-foreground">No items added yet.</p>
               </div>
             ) : (
               <ul className="divide-y divide-border rounded-md border border-border">
@@ -364,16 +364,16 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
                     key={l.menuItemId}
                     className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
                   >
-                    <span className="min-w-0 flex-1 truncate text-zinc-200">
+                    <span className="min-w-0 flex-1 truncate text-foreground">
                       {l.qty}× {l.name}
                     </span>
-                    <span className="shrink-0 tabular-nums text-zinc-400">
+                    <span className="shrink-0 tabular-nums text-muted-foreground">
                       ₱{(l.price * l.qty).toFixed(2)}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeLine(l.menuItemId)}
-                      className="shrink-0 rounded text-zinc-500 transition-colors duration-200 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                      className="shrink-0 rounded text-muted-foreground transition-colors duration-200 hover:text-danger-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                       aria-label={`Remove ${l.name}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -386,15 +386,15 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
 
           {/* Total */}
           <div className="flex items-center justify-between border-t border-border pt-3">
-            <span className="text-sm font-medium text-zinc-400">Order Total</span>
-            <span className="text-lg font-bold tabular-nums text-zinc-50">₱{total.toFixed(2)}</span>
+            <span className="text-sm font-medium text-muted-foreground">Order Total</span>
+            <span className="text-lg font-bold tabular-nums text-foreground">₱{total.toFixed(2)}</span>
           </div>
 
           {/* Insufficient-stock block (409 INSUFFICIENT_STOCK) — non-blocking:
               lists the shortfall and lets the operator override via oversell. */}
           {shortfalls && shortfalls.length > 0 && (
             <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-warn-text">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Insufficient stock for this order
               </p>
@@ -402,7 +402,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
                 {shortfalls.map((s) => (
                   <li
                     key={s.ingredient_id}
-                    className="flex items-center justify-between gap-2 text-xs text-amber-200/90"
+                    className="flex items-center justify-between gap-2 text-xs text-warn-text"
                   >
                     <span className="min-w-0 flex-1 truncate">{s.ingredient_name}</span>
                     <span className="shrink-0 tabular-nums">
@@ -411,7 +411,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
                   </li>
                 ))}
               </ul>
-              <p className="text-[11px] text-amber-400/70">
+              <p className="text-[11px] text-warn-text">
                 Proceed anyway to place the order and oversell the stock, or edit the cart.
               </p>
             </div>
@@ -442,7 +442,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
                 type="submit"
                 size="sm"
                 disabled={submitting || !brandId || lines.length === 0}
-                className="bg-emerald-600 text-white hover:bg-emerald-500"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {submitting ? 'Placing…' : 'Place Order'}
               </Button>

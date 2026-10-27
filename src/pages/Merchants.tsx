@@ -38,6 +38,7 @@ import { cn } from '../lib/utils'
 import { useAuth } from '../auth/AuthContext'
 import { useOutlet } from '../context/OutletContext'
 import { outletScopedPath } from '../lib/outletScope'
+import { readableTextOn } from '../lib/theme'
 import { Button } from '../components/ui/button'
 import {
   Dialog,
@@ -139,8 +140,8 @@ function MerchantStatus({ active }: { active: boolean }) {
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
         active
-          ? 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30'
-          : 'bg-zinc-500/15 text-zinc-400 ring-1 ring-inset ring-zinc-500/30',
+          ? 'bg-emerald-500/15 text-ink-accent ring-1 ring-inset ring-emerald-500/30'
+          : 'bg-zinc-500/15 text-muted-foreground ring-1 ring-inset ring-zinc-500/30',
       )}
     >
       {active ? 'Active' : 'Inactive'}
@@ -343,14 +344,14 @@ export default function Merchants() {
               {/* Colored avatar — first letter of brand name */}
               <div
                 aria-hidden
-                className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{ backgroundColor: r.color || '#71717A' }}
+                className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-full text-xs font-bold"
+                style={{ backgroundColor: r.color || '#71717A', color: readableTextOn(r.color || '#71717A') }}
               >
                 {r.name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <p className="text-sm font-medium leading-tight text-zinc-100">{r.name}</p>
-                <p className="mt-0.5 text-[11px] leading-tight tabular-nums text-zinc-500">
+                <p className="text-sm font-medium leading-tight text-foreground">{r.name}</p>
+                <p className="mt-0.5 text-[11px] leading-tight tabular-nums text-muted-foreground">
                   1 Brand · {r.accounts.length} Listing
                   {r.accounts.length !== 1 ? 's' : ''}
                 </p>
@@ -366,7 +367,7 @@ export default function Merchants() {
         header: 'Channel Listings',
         accessorFn: (r) => r.accounts.length,
         cell: ({ row }) => (
-          <span className="tabular-nums text-sm text-zinc-300">
+          <span className="tabular-nums text-sm text-foreground">
             {row.original.accounts.length}
           </span>
         ),
@@ -387,19 +388,19 @@ export default function Merchants() {
         enableSorting: false,
         cell: ({ row }) => {
           const cats = row.original.categories
-          if (!cats.length) return <span className="text-xs text-zinc-600">—</span>
+          if (!cats.length) return <span className="text-xs text-muted-foreground">—</span>
           return (
             <div className="flex max-w-[200px] flex-wrap gap-1">
               {cats.slice(0, 3).map((c) => (
                 <span
                   key={c}
-                  className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-300 ring-1 ring-inset ring-zinc-700"
+                  className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-foreground ring-1 ring-inset ring-zinc-700"
                 >
                   {c}
                 </span>
               ))}
               {cats.length > 3 && (
-                <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500 ring-1 ring-inset ring-zinc-700">
+                <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-inset ring-zinc-700">
                   +{cats.length - 3}
                 </span>
               )}
@@ -417,19 +418,19 @@ export default function Merchants() {
         cell: () => (
           <div className="flex max-w-[160px] flex-wrap gap-1">
             {stations.length === 0 ? (
-              <span className="text-xs text-zinc-600">—</span>
+              <span className="text-xs text-muted-foreground">—</span>
             ) : (
               <>
                 {stations.slice(0, 2).map((s) => (
                   <span
                     key={s.id}
-                    className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400 ring-1 ring-inset ring-amber-500/20"
+                    className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-warn-text ring-1 ring-inset ring-amber-500/20"
                   >
                     {s.name}
                   </span>
                 ))}
                 {stations.length > 2 && (
-                  <span className="inline-flex items-center rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-500 ring-1 ring-inset ring-zinc-700">
+                  <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-inset ring-zinc-700">
                     +{stations.length - 2}
                   </span>
                 )}
@@ -448,16 +449,16 @@ export default function Merchants() {
         cell: () => (
           <div className="flex flex-col gap-0.5">
             {printers.length === 0 ? (
-              <span className="text-xs text-zinc-600">—</span>
+              <span className="text-xs text-muted-foreground">—</span>
             ) : (
               <>
                 {printers.slice(0, 2).map((p) => (
-                  <span key={p.id} className="text-[11px] text-zinc-400">
+                  <span key={p.id} className="text-[11px] text-muted-foreground">
                     {p.name}
                   </span>
                 ))}
                 {printers.length > 2 && (
-                  <span className="text-[11px] text-zinc-600">
+                  <span className="text-[11px] text-muted-foreground">
                     +{printers.length - 2} more
                   </span>
                 )}
@@ -477,29 +478,29 @@ export default function Merchants() {
           return (
             <div className="flex min-w-[200px] items-center gap-3">
               <div className="flex flex-col">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Orders
                 </span>
-                <span className="tabular-nums text-sm font-semibold text-zinc-200">
+                <span className="tabular-nums text-sm font-semibold text-foreground">
                   {a?.order_count ?? 0}
                 </span>
               </div>
-              <div className="h-6 w-px bg-zinc-800" />
+              <div className="h-6 w-px bg-secondary" />
               <div className="flex flex-col">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Revenue
                 </span>
-                <span className="tabular-nums text-sm font-semibold text-emerald-400">
+                <span className="tabular-nums text-sm font-semibold text-ink-accent">
                   {formatCurrency(a?.revenue ?? 0)}
                 </span>
               </div>
-              <div className="h-6 w-px bg-zinc-800" />
+              <div className="h-6 w-px bg-secondary" />
               <div className="flex flex-col">
                 {/* placeholder — no per-brand prep time in analytics response */}
-                <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                   Avg Time
                 </span>
-                <span className="text-sm font-semibold text-zinc-400">—</span>
+                <span className="text-sm font-semibold text-muted-foreground">—</span>
               </div>
             </div>
           )
@@ -517,7 +518,7 @@ export default function Merchants() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-zinc-500 hover:text-zinc-200"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
               >
                 <MoreVertical className="h-4 w-4" />
                 <span className="sr-only">Row actions</span>
@@ -536,7 +537,7 @@ export default function Merchants() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                className="gap-2 text-sm text-red-400 focus:text-red-300"
+                className="gap-2 text-sm text-danger-text focus:text-danger-text"
                 onSelect={() => navigate(`/merchant-management?brand=${row.original.id}`)}
               >
                 <PowerOff className="h-3.5 w-3.5" />
@@ -569,7 +570,7 @@ export default function Merchants() {
           subtitle="Manage all merchants, brands, channel listings, kitchen stations and printer mappings"
         />
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-red-400">{error}</p>
+          <p className="text-sm font-medium text-danger-text">{error}</p>
           <p className="mt-1 text-xs text-red-500/70">
             Make sure the backend is running on :4000
           </p>
@@ -609,7 +610,7 @@ export default function Merchants() {
             </Select>
 
             {/* Date chip (presentational) */}
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-800/50 px-3 py-1.5 text-xs text-zinc-400">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/50 px-3 py-1.5 text-xs text-muted-foreground">
               <CalendarDays className="h-3.5 w-3.5" aria-hidden />
               {today}
             </span>
@@ -618,7 +619,7 @@ export default function Merchants() {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 gap-1.5 border-zinc-700 text-xs text-zinc-400 hover:text-zinc-200"
+              className="h-8 gap-1.5 border-border text-xs text-muted-foreground hover:text-foreground"
             >
               <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
               Filters
@@ -661,7 +662,7 @@ export default function Merchants() {
         {/* Search */}
         <div className="relative min-w-[240px] max-w-sm flex-1">
           <Search
-            className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
+            className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
             aria-hidden
           />
           <Input
@@ -679,7 +680,7 @@ export default function Merchants() {
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  className="h-9 gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                  className="h-9 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="h-4 w-4" />
                   Add Merchant
@@ -704,9 +705,9 @@ export default function Merchants() {
                     <div className="flex flex-col gap-1.5">
                       <label
                         htmlFor="merchant-name"
-                        className="text-sm font-medium text-zinc-300"
+                        className="text-sm font-medium text-foreground"
                       >
-                        Name <span className="text-red-400" aria-hidden>*</span>
+                        Name <span className="text-danger-text" aria-hidden>*</span>
                       </label>
                       <Input
                         id="merchant-name"
@@ -722,7 +723,7 @@ export default function Merchants() {
                     <div className="flex flex-col gap-1.5">
                       <label
                         htmlFor="merchant-color-text"
-                        className="text-sm font-medium text-zinc-300"
+                        className="text-sm font-medium text-foreground"
                       >
                         Brand color
                       </label>
@@ -731,7 +732,7 @@ export default function Merchants() {
                           type="color"
                           value={newColor}
                           onChange={(e) => setNewColor(e.target.value)}
-                          className="h-9 w-12 cursor-pointer rounded-md border border-zinc-700 bg-transparent p-0.5"
+                          className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent p-0.5"
                           aria-label="Pick brand color"
                         />
                         <Input
@@ -745,10 +746,10 @@ export default function Merchants() {
                       {/* Color preview */}
                       <div className="mt-1 flex items-center gap-2">
                         <div
-                          className="h-5 w-5 rounded-full border border-zinc-700"
+                          className="h-5 w-5 rounded-full border border-border"
                           style={{ backgroundColor: newColor || '#10B981' }}
                         />
-                        <span className="text-xs text-zinc-500">Preview</span>
+                        <span className="text-xs text-muted-foreground">Preview</span>
                       </div>
                     </div>
                   </div>
@@ -764,7 +765,7 @@ export default function Merchants() {
                     </Button>
                     <Button
                       type="submit"
-                      className="bg-emerald-600 text-white hover:bg-emerald-500"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                       disabled={submitting || !newName.trim()}
                     >
                       {submitting ? 'Creating…' : 'Create Merchant'}

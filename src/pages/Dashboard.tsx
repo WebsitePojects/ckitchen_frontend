@@ -64,7 +64,7 @@ import BrandChip from '../components/common/BrandChip'
 import EmptyState from '../components/common/EmptyState'
 import SimulatorPanel from '../components/SimulatorPanel'
 import OrdersByHourByBrandChart from '../components/charts/OrdersByHourByBrandChart'
-import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_SINGLE, type Aggregator } from '../lib/theme'
+import { AGGREGATOR_COLOR, AGGREGATOR_LABEL, CHART_CHROME, CHART_SINGLE, type Aggregator } from '../lib/theme'
 
 // ─── Public types (consumed by SimulatorPanel) ────────────────────────────────
 
@@ -254,14 +254,10 @@ function formatElapsed(isoStart: string): string {
 // ─── Chart shared styles (LOCKED W4a palette — see lib/theme.ts) ──────────────
 // Same grid/tooltip/skeleton treatment as Analytics.tsx for cross-page consistency.
 
-const CHART_GRID = '#27272a'
-const CHART_TICK = '#71717A' // zinc-500
-const CHART_TOOLTIP_STYLE = {
-  background: '#18181b',
-  border: '1px solid #27272a',
-  borderRadius: 8,
-}
-const CHART_CURSOR_FILL = 'rgba(16,185,129,0.06)'
+const CHART_GRID = CHART_CHROME.grid
+const CHART_TICK = CHART_CHROME.tick
+const CHART_TOOLTIP_STYLE = CHART_CHROME.tooltip
+const CHART_CURSOR_FILL = CHART_CHROME.cursor
 
 // ─── Filters interface ────────────────────────────────────────────────────────
 
@@ -544,7 +540,7 @@ export default function Dashboard() {
         accessorKey: 'externalRef',
         header: 'Order #',
         cell: ({ row }) => (
-          <span className="font-mono text-xs tabular-nums text-zinc-200">
+          <span className="font-mono text-xs tabular-nums text-foreground">
             {row.original.externalRef}
           </span>
         ),
@@ -554,9 +550,9 @@ export default function Dashboard() {
         header: 'Time',
         sortingFn: 'datetime',
         cell: ({ row }) => (
-          <span className="tabular-nums text-xs text-zinc-400">
+          <span className="tabular-nums text-xs text-muted-foreground">
             <span className="block">{formatTime(row.original.placedAt)}</span>
-            <span className="text-zinc-600">{formatDate(row.original.placedAt)}</span>
+            <span className="text-muted-foreground">{formatDate(row.original.placedAt)}</span>
           </span>
         ),
       },
@@ -579,7 +575,7 @@ export default function Dashboard() {
         accessorKey: 'customerName',
         header: 'Customer',
         cell: ({ row }) => (
-          <span className="text-sm text-zinc-300">
+          <span className="text-sm text-foreground">
             {row.original.customerName ?? '—'}
           </span>
         ),
@@ -591,7 +587,7 @@ export default function Dashboard() {
         cell: ({ row }) => {
           const totalQty = row.original.items.reduce((s, i) => s + i.qty, 0)
           return (
-            <span className="tabular-nums text-sm text-zinc-400">
+            <span className="tabular-nums text-sm text-muted-foreground">
               {totalQty > 0 ? totalQty : '—'}
             </span>
           )
@@ -611,10 +607,10 @@ export default function Dashboard() {
         cell: ({ row }) => {
           const { status, placedAt } = row.original
           if (status === 'COMPLETED' || status === 'CANCELLED') {
-            return <span className="text-zinc-600 text-xs">—</span>
+            return <span className="text-muted-foreground text-xs">—</span>
           }
           return (
-            <span className="tabular-nums text-xs text-zinc-400">
+            <span className="tabular-nums text-xs text-muted-foreground">
               {formatElapsed(placedAt)}
             </span>
           )
@@ -635,7 +631,7 @@ export default function Dashboard() {
           subtitle="All orders across every brand & platform, in real time"
         />
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-red-400">{error}</p>
+          <p className="text-sm font-medium text-danger-text">{error}</p>
           <p className="mt-1 text-xs text-red-500/70">
             Make sure the backend is running on :4000
           </p>
@@ -659,8 +655,8 @@ export default function Dashboard() {
             aria-label={muted ? 'Unmute order alerts' : 'Mute order alerts'}
             className={
               muted
-                ? 'border-zinc-700 text-zinc-400 hover:text-zinc-200'
-                : 'border-emerald-500/40 text-emerald-400 hover:border-emerald-500/70 hover:text-emerald-300'
+                ? 'border-border text-muted-foreground hover:text-foreground'
+                : 'border-emerald-500/40 text-ink-accent hover:border-emerald-500/70 hover:text-ink-accent'
             }
           >
             {muted
@@ -710,8 +706,8 @@ export default function Dashboard() {
             socket feed / simulator / order table below are untouched. */}
         <Card className="border-border bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-zinc-100">Orders Today</CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">Hourly order volume by brand, today</p>
+            <CardTitle className="text-base font-semibold text-foreground">Orders Today</CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">Hourly order volume by brand, today</p>
           </CardHeader>
           <CardContent>
             <OrdersByHourByBrandChart brands={brands} buckets={hourBrandData} />
@@ -721,8 +717,8 @@ export default function Dashboard() {
         {/* Aggregator split — fixed brand colors + legend + direct labels */}
         <Card className="border-border bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-zinc-100">Aggregator Split</CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">Loaded orders by platform</p>
+            <CardTitle className="text-base font-semibold text-foreground">Aggregator Split</CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">Loaded orders by platform</p>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -762,7 +758,7 @@ export default function Dashboard() {
                     iconType="circle"
                     iconSize={8}
                     formatter={(value) => (
-                      <span style={{ fontSize: 12, color: '#A1A1AA' }}>{value}</span>
+                      <span className="text-xs text-muted-foreground">{value}</span>
                     )}
                   />
                 </PieChart>
@@ -774,8 +770,8 @@ export default function Dashboard() {
         {/* Top brands by order count — single-measure bar, brand emerald */}
         <Card className="border-border bg-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold text-zinc-100">Top Brands</CardTitle>
-            <p className="mt-0.5 text-xs text-zinc-500">Orders by brand, top 6</p>
+            <CardTitle className="text-base font-semibold text-foreground">Top Brands</CardTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">Orders by brand, top 6</p>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -900,7 +896,7 @@ export default function Dashboard() {
                 variant="ghost"
                 size="sm"
                 onClick={clearFilters}
-                className="h-8 gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+                className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
                 <XCircle className="h-3.5 w-3.5" />
                 Clear
@@ -908,7 +904,7 @@ export default function Dashboard() {
             )}
 
             {/* Count */}
-            <span className="ml-auto text-xs tabular-nums text-zinc-500">
+            <span className="ml-auto text-xs tabular-nums text-muted-foreground">
               {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
               {filteredOrders.length !== orders.length ? ` of ${orders.length}` : ''}
             </span>

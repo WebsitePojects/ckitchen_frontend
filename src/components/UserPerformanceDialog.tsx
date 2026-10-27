@@ -84,13 +84,13 @@ function Stat({
   hint?: string
 }) {
   return (
-    <div className="rounded-lg border border-border bg-zinc-900/40 p-3">
-      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+    <div className="rounded-lg border border-border bg-card/40 p-3">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-zinc-600">{hint}</p>}
+      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   )
 }
@@ -141,7 +141,7 @@ export default function UserPerformanceDialog({
           <DialogTitle className="flex items-center gap-2">
             <span>Performance{target ? ` — ${target.name}` : ''}</span>
             {target && (
-              <Badge variant="outline" className="border-zinc-500/30 bg-zinc-500/15 text-zinc-300">
+              <Badge variant="outline" className="border-zinc-500/30 bg-zinc-500/15 text-foreground">
                 {target.role}
               </Badge>
             )}
@@ -151,22 +151,22 @@ export default function UserPerformanceDialog({
         {/* Date range */}
         <div className="flex flex-wrap items-end gap-3 pt-1">
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-zinc-500">From</label>
+            <label className="text-[11px] font-medium text-muted-foreground">From</label>
             <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="h-8 w-40" />
           </div>
           <div className="space-y-1">
-            <label className="text-[11px] font-medium text-zinc-500">To</label>
+            <label className="text-[11px] font-medium text-muted-foreground">To</label>
             <Input type="date" value={to} min={from} max={todayISODate()} onChange={(e) => setTo(e.target.value)} className="h-8 w-40" />
           </div>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto pt-1">
           {!rangeValid ? (
-            <p className="p-4 text-sm text-red-400">"From" must be on or before "To".</p>
+            <p className="p-4 text-sm text-danger-text">"From" must be on or before "To".</p>
           ) : isLoading ? (
-            <p className="p-4 text-sm text-zinc-500">Loading…</p>
+            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
           ) : error ? (
-            <p className="p-4 text-sm text-red-400">{errMsg(error, 'Failed to load performance.')}</p>
+            <p className="p-4 text-sm text-danger-text">{errMsg(error, 'Failed to load performance.')}</p>
           ) : !data ? null : (
             <div className="space-y-5">
               {/* KPI tiles */}
@@ -183,10 +183,10 @@ export default function UserPerformanceDialog({
               </div>
 
               {/* Outlet comparison context */}
-              <div className="rounded-lg border border-border bg-zinc-900/30 p-3">
-                <p className="text-xs font-medium text-zinc-400">Compared against outlet performance</p>
+              <div className="rounded-lg border border-border bg-card/30 p-3">
+                <p className="text-xs font-medium text-muted-foreground">Compared against outlet performance</p>
                 {data.outlet.locationIds.length === 0 ? (
-                  <p className="mt-1 text-xs text-zinc-600">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     This user has no assigned outlets — nothing to compare against. Outlet totals show 0.
                   </p>
                 ) : (
@@ -195,14 +195,14 @@ export default function UserPerformanceDialog({
                       <Badge
                         key={id}
                         variant="outline"
-                        className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                        className="border-emerald-500/30 bg-emerald-500/10 text-ink-accent"
                       >
                         {outletNameById.get(id) ?? id}
                       </Badge>
                     ))}
                   </div>
                 )}
-                <p className="mt-2 text-[11px] text-zinc-600">
+                <p className="mt-2 text-[11px] text-muted-foreground">
                   {data.outlet.orders} order{data.outlet.orders === 1 ? '' : 's'} · {money(data.outlet.revenue)} across
                   the user's outlet{data.outlet.locationIds.length === 1 ? '' : 's'} in this period (cancelled
                   excluded).
@@ -211,7 +211,7 @@ export default function UserPerformanceDialog({
 
               {/* Top actions */}
               <div>
-                <p className="mb-1.5 text-xs font-medium text-zinc-400">Top actions</p>
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">Top actions</p>
                 {topActions.length === 0 ? (
                   <EmptyState
                     icon={History}
@@ -230,11 +230,11 @@ export default function UserPerformanceDialog({
                       {topActions.map((a) => (
                         <TableRow key={a.action} className="border-border">
                           <TableCell>
-                            <span className="inline-block rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-emerald-400">
+                            <span className="inline-block rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-ink-accent">
                               {a.action}
                             </span>
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-zinc-300">{a.count}</TableCell>
+                          <TableCell className="text-right tabular-nums text-foreground">{a.count}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

@@ -167,11 +167,11 @@ export default function PhotoLightbox({
 
           {/* Top bar: counter + close */}
           <div className="pointer-events-none z-10 flex items-center justify-between p-4">
-            <span className="rounded-full bg-black/60 px-3 py-1 text-xs tabular-nums text-zinc-300">
+            <span className="rounded-full bg-black/60 px-3 py-1 text-xs tabular-nums text-white">
               {photos.length > 1 ? `${index + 1} / ${photos.length}` : ' '}
             </span>
             <DialogPrimitive.Close
-              className="pointer-events-auto rounded-full bg-black/60 p-2 text-zinc-300 transition-colors hover:bg-black/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="pointer-events-auto rounded-full bg-black/60 p-2 text-white transition-colors hover:bg-black/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
               aria-label="Close photo viewer"
             >
               <X className="h-5 w-5" />
@@ -219,7 +219,7 @@ export default function PhotoLightbox({
                   type="button"
                   onClick={() => goto(index - 1)}
                   aria-label="Previous photo"
-                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-zinc-300 transition-colors hover:bg-black/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white transition-colors hover:bg-black/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
@@ -227,7 +227,7 @@ export default function PhotoLightbox({
                   type="button"
                   onClick={() => goto(index + 1)}
                   aria-label="Next photo"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-zinc-300 transition-colors hover:bg-black/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white transition-colors hover:bg-black/80 hover:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <ChevronRight className="h-6 w-6" />
                 </button>
@@ -238,11 +238,11 @@ export default function PhotoLightbox({
           {/* Caption + zoom hint */}
           <div className="z-10 flex flex-col items-center gap-1 p-4 pb-6">
             {photo?.caption && (
-              <p className="max-w-[90vw] truncate rounded-full bg-black/60 px-4 py-1.5 text-center text-sm text-zinc-200">
+              <p className="max-w-[90vw] truncate rounded-full bg-black/60 px-4 py-1.5 text-center text-sm text-white">
                 {photo.caption}
               </p>
             )}
-            <p className="flex items-center gap-1 text-[11px] text-zinc-500">
+            <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
               {zoom > 1 ? <ZoomOut className="h-3 w-3" /> : <ZoomIn className="h-3 w-3" />}
               {zoom > 1
                 ? `${zoom.toFixed(1)}× — drag to pan, click to fit`

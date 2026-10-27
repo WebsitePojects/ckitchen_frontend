@@ -102,11 +102,11 @@ const TYPE_LABEL: Record<DiscountType, string> = {
 }
 
 const TYPE_BADGE_CLASS: Record<DiscountType, string> = {
-  PERCENT: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-  FIXED: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
-  SENIOR: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
-  PWD: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
-  VOUCHER: 'border-purple-500/40 bg-purple-500/10 text-purple-300',
+  PERCENT: 'border-emerald-500/40 bg-emerald-500/10 text-ink-accent',
+  FIXED: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  SENIOR: 'border-amber-500/40 bg-amber-500/10 text-warn-text',
+  PWD: 'border-amber-500/40 bg-amber-500/10 text-warn-text',
+  VOUCHER: 'border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-300',
 }
 
 function money(n: number | string): string {
@@ -258,16 +258,16 @@ export default function MenuItemDiscountsDialog({
 
         <div className="space-y-4">
           {errorMsg && (
-            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400">
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-danger-text">
               {errorMsg}
             </p>
           )}
 
           {/* Existing discounts */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Item Discounts</label>
+            <label className="text-xs font-medium text-muted-foreground">Item Discounts</label>
             {isLoading ? (
-              <p className="py-4 text-center text-sm text-zinc-500">Loading…</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">Loading…</p>
             ) : discounts.length === 0 ? (
               <EmptyState
                 icon={Tag}
@@ -284,17 +284,17 @@ export default function MenuItemDiscountsDialog({
                   >
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate font-medium text-zinc-200">{d.name}</span>
+                        <span className="truncate font-medium text-foreground">{d.name}</span>
                         <Badge variant="outline" className={TYPE_BADGE_CLASS[d.type]}>
                           {TYPE_LABEL[d.type]}
                         </Badge>
                         {!d.active && (
-                          <Badge variant="outline" className="border-zinc-600/50 bg-zinc-800/60 text-zinc-400">
+                          <Badge variant="outline" className="border-input/50 bg-secondary/60 text-muted-foreground">
                             Inactive
                           </Badge>
                         )}
                       </div>
-                      <p className="tabular-nums text-xs text-zinc-500">{formatValue(d)}</p>
+                      <p className="tabular-nums text-xs text-muted-foreground">{formatValue(d)}</p>
                     </div>
                     <Switch
                       checked={d.active}
@@ -308,7 +308,7 @@ export default function MenuItemDiscountsDialog({
                       size="sm"
                       disabled={!canWrite || pendingId === d.id}
                       onClick={() => void handleDelete(d)}
-                      className="h-7 w-7 p-0 text-zinc-500 hover:text-red-400"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-danger-text"
                       aria-label="Delete discount"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -322,7 +322,7 @@ export default function MenuItemDiscountsDialog({
           {/* Add promo form — writers only */}
           {canWrite && (
             <form onSubmit={(e) => void handleAddPromo(e)} className="space-y-3 border-t border-border pt-3">
-              <label className="text-xs font-medium text-zinc-400">Add Promo</label>
+              <label className="text-xs font-medium text-muted-foreground">Add Promo</label>
 
               <div className="space-y-1.5">
                 <Input
@@ -334,7 +334,7 @@ export default function MenuItemDiscountsDialog({
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">Type</label>
+                  <label className="text-xs font-medium text-muted-foreground">Type</label>
                   <Select value={addType} onValueChange={(v) => setAddType(v as 'PERCENT' | 'FIXED')}>
                     <SelectTrigger>
                       <SelectValue />
@@ -349,7 +349,7 @@ export default function MenuItemDiscountsDialog({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Value {addType === 'PERCENT' ? '(%)' : '(₱)'}
                   </label>
                   <Input
@@ -371,7 +371,7 @@ export default function MenuItemDiscountsDialog({
                   type="submit"
                   size="sm"
                   disabled={addSubmitting}
-                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                  className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {addSubmitting ? 'Adding…' : 'Add Promo'}

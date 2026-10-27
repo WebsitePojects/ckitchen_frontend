@@ -1,4 +1,5 @@
 import { cn } from '../../lib/utils'
+import { readableTextOn } from '../../lib/theme'
 
 interface BrandLike {
   name: string
@@ -16,10 +17,10 @@ export default function BrandChip({ brand, className }: BrandChipProps) {
   return (
     <span
       className={cn(
-        'inline-flex max-w-[12rem] items-center truncate whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold text-white',
+        'inline-flex max-w-[12rem] items-center truncate whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
         className,
       )}
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: color, color: readableTextOn(color) }}
       title={brand?.name ?? 'Unknown Brand'}
     >
       {brand?.name ?? 'Unknown Brand'}

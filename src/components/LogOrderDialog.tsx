@@ -387,14 +387,14 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           {dataErrorMsg && (
-            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400">
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-danger-text">
               {dataErrorMsg}
             </p>
           )}
 
           {/* Brand */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Brand</label>
+            <label className="text-xs font-medium text-muted-foreground">Brand</label>
             <Select value={brandId} onValueChange={handleBrandChange} disabled={loadingBrands}>
               <SelectTrigger>
                 <SelectValue placeholder={loadingBrands ? 'Loading…' : 'Select brand…'} />
@@ -417,7 +417,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Aggregator / channel */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Channel</label>
+            <label className="text-xs font-medium text-muted-foreground">Channel</label>
             <Select
               value={channelValue}
               onValueChange={(v) => { setChannelValue(v); setChannelTouched(true); setShortfalls(null) }}
@@ -442,7 +442,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Device order # — REQUIRED, becomes external_ref */}
           <div className="space-y-1.5">
-            <label htmlFor="log-order-device-no" className="text-xs font-medium text-zinc-400">Device order #</label>
+            <label htmlFor="log-order-device-no" className="text-xs font-medium text-muted-foreground">Device order #</label>
             <Input
               id="log-order-device-no"
               required
@@ -450,7 +450,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
               onChange={(e) => setDeviceOrderNo(e.target.value)}
               placeholder="Order number shown on the aggregator device/tablet"
             />
-            <p className="text-[11px] text-zinc-600">
+            <p className="text-[11px] text-muted-foreground">
               Required. Copy it exactly from the tablet: logging the same number twice opens the
               existing order instead of creating a duplicate.
             </p>
@@ -458,7 +458,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Time on the device — optional, so a late entry keeps its real order time */}
           <div className="space-y-1.5">
-            <label htmlFor="log-order-device-time" className="text-xs font-medium text-zinc-400">
+            <label htmlFor="log-order-device-time" className="text-xs font-medium text-muted-foreground">
               Time on device (optional)
             </label>
             <Input
@@ -468,7 +468,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
               onChange={(e) => setDeviceTime(e.target.value)}
               className="w-36"
             />
-            <p className="text-[11px] text-zinc-600">
+            <p className="text-[11px] text-muted-foreground">
               Leave blank if you are logging it now. Fill it in when entering an order late, so
               timers and reports use the real order time.
             </p>
@@ -476,7 +476,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Customer name */}
           <div className="space-y-1.5">
-            <label htmlFor="log-order-customer" className="text-xs font-medium text-zinc-400">Customer Name (optional)</label>
+            <label htmlFor="log-order-customer" className="text-xs font-medium text-muted-foreground">Customer Name (optional)</label>
             <Input
               id="log-order-customer"
               value={customerName}
@@ -487,7 +487,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Item picker */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Add Item</label>
+            <label className="text-xs font-medium text-muted-foreground">Add Item</label>
             <div className="flex gap-2">
               <Select
                 value={pickedItemId}
@@ -499,7 +499,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                 </SelectTrigger>
                 <SelectContent>
                   {menuItems.length === 0 ? (
-                    <div className="px-2 py-1.5 text-xs text-zinc-500">
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
                       {loadingMenu ? 'Loading menu…' : 'No menu items for this brand.'}
                     </div>
                   ) : (
@@ -546,11 +546,11 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Line items — qty steppers, remove */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Order Items</label>
+            <label className="text-xs font-medium text-muted-foreground">Order Items</label>
             {lines.length === 0 ? (
               <div className="flex flex-col items-center gap-1.5 rounded-md border border-dashed border-border py-6 text-center">
-                <ShoppingCart className="h-4 w-4 text-zinc-600" aria-hidden />
-                <p className="text-xs text-zinc-600">No items added yet.</p>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" aria-hidden />
+                <p className="text-xs text-muted-foreground">No items added yet.</p>
               </div>
             ) : (
               <ul className="divide-y divide-border rounded-md border border-border">
@@ -560,9 +560,9 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                     className="flex items-center gap-2 px-3 py-2 text-sm"
                   >
                     <div className="min-w-0 flex-1">
-                      <span className="block truncate text-zinc-200">{l.name}</span>
+                      <span className="block truncate text-foreground">{l.name}</span>
                       {l.notes && (
-                        <span className="block truncate text-[10px] italic text-zinc-500">
+                        <span className="block truncate text-[10px] italic text-muted-foreground">
                           {l.notes}
                         </span>
                       )}
@@ -578,7 +578,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
-                      <span className="w-5 text-center tabular-nums text-zinc-200">{l.qty}</span>
+                      <span className="w-5 text-center tabular-nums text-foreground">{l.qty}</span>
                       <Button
                         type="button"
                         variant="outline"
@@ -590,13 +590,13 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                    <span className="w-16 shrink-0 text-right tabular-nums text-zinc-400">
+                    <span className="w-16 shrink-0 text-right tabular-nums text-muted-foreground">
                       ₱{(l.price * l.qty).toFixed(2)}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeLine(idx)}
-                      className="shrink-0 rounded text-zinc-500 transition-colors duration-200 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                      className="shrink-0 rounded text-muted-foreground transition-colors duration-200 hover:text-danger-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                       aria-label={`Remove ${l.name}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -609,15 +609,15 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
 
           {/* Total */}
           <div className="flex items-center justify-between border-t border-border pt-3">
-            <span className="text-sm font-medium text-zinc-400">Order Total</span>
-            <span className="text-lg font-bold tabular-nums text-zinc-50">₱{total.toFixed(2)}</span>
+            <span className="text-sm font-medium text-muted-foreground">Order Total</span>
+            <span className="text-lg font-bold tabular-nums text-foreground">₱{total.toFixed(2)}</span>
           </div>
 
           {/* Insufficient-stock block (409 INSUFFICIENT_STOCK, Walk-in/Other
               channel only per S4). Oversell override is manager-only. */}
           {shortfalls && shortfalls.length > 0 && (
             <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-warn-text">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 Insufficient stock for this order
               </p>
@@ -625,7 +625,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                 {shortfalls.map((s) => (
                   <li
                     key={s.ingredient_id}
-                    className="flex items-center justify-between gap-2 text-xs text-amber-200/90"
+                    className="flex items-center justify-between gap-2 text-xs text-warn-text"
                   >
                     <span className="min-w-0 flex-1 truncate">{s.ingredient_name}</span>
                     <span className="shrink-0 tabular-nums">
@@ -634,7 +634,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                   </li>
                 ))}
               </ul>
-              <p className="text-[11px] text-amber-400/70">
+              <p className="text-[11px] text-warn-text">
                 {canOversell
                   ? 'Proceed anyway to log the order and oversell the stock, or edit the cart.'
                   : 'Ask an outlet or brand manager to log this with an oversell override, or edit the cart.'}
@@ -669,7 +669,7 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                 type="submit"
                 size="sm"
                 disabled={submitting || !canSubmit}
-                className="bg-emerald-600 text-white hover:bg-emerald-500"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {submitting ? 'Logging…' : 'Log Order'}
               </Button>

@@ -294,7 +294,7 @@ export default function BrandActivityLog({ brand, open, onOpenChange }: BrandAct
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-semibold text-zinc-200">
+          <span className="text-sm font-semibold text-foreground">
             {MONTH_FMT.format(new Date(cursor.year, cursor.month, 1))}
           </span>
           <Button
@@ -311,20 +311,20 @@ export default function BrandActivityLog({ brand, open, onOpenChange }: BrandAct
 
         {/* Month totals — only when there were orders this month. */}
         {!isLoading && !error && totals.orders > 0 && (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-ink-accent">
             <TrendingUp className="h-4 w-4 shrink-0" />
             <span className="font-semibold tabular-nums">{totals.orders.toLocaleString()}</span>
-            <span className="text-emerald-400/80">orders</span>
+            <span className="text-ink-accent">orders</span>
             <span className="text-emerald-500/50">·</span>
             <span className="font-semibold tabular-nums">{fmtPHP(totals.revenue)}</span>
-            <span className="text-emerald-400/80">this month</span>
+            <span className="text-ink-accent">this month</span>
           </div>
         )}
 
         {isLoading ? (
-          <p className="py-6 text-center text-sm text-zinc-500">Loading activity…</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Loading activity…</p>
         ) : error ? (
-          <p className="py-6 text-center text-sm text-red-400">Failed to load activity log.</p>
+          <p className="py-6 text-center text-sm text-danger-text">Failed to load activity log.</p>
         ) : isEmpty ? (
           <EmptyState
             icon={History}
@@ -338,23 +338,23 @@ export default function BrandActivityLog({ brand, open, onOpenChange }: BrandAct
               <Card key={g.key} className="border-border bg-card">
                 <CardContent className="p-3">
                   <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {g.label}
                     </p>
-                    {g.summary && <p className="text-xs text-zinc-500">{g.summary}</p>}
+                    {g.summary && <p className="text-xs text-muted-foreground">{g.summary}</p>}
                   </div>
 
                   {/* Order roll-up for the day (the "simulated runs"). */}
                   {g.orders > 0 && (
                     <div className="mb-2 flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5 text-sm">
-                      <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-                      <span className="font-semibold tabular-nums text-emerald-300">
+                      <TrendingUp className="h-3.5 w-3.5 shrink-0 text-ink-accent" />
+                      <span className="font-semibold tabular-nums text-ink-accent">
                         {g.orders.toLocaleString()}
                       </span>
-                      <span className="text-emerald-400/70">
+                      <span className="text-ink-accent">
                         {g.orders === 1 ? 'order' : 'orders'}
                       </span>
-                      <span className="ml-auto font-semibold tabular-nums text-emerald-300">
+                      <span className="ml-auto font-semibold tabular-nums text-ink-accent">
                         {fmtPHP(g.revenue)}
                       </span>
                     </div>
@@ -369,14 +369,14 @@ export default function BrandActivityLog({ brand, open, onOpenChange }: BrandAct
                             variant="outline"
                             className={
                               e.status === 'ACTIVE'
-                                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
-                                : 'border-zinc-600/50 bg-zinc-800/60 text-zinc-400'
+                                ? 'border-emerald-500/40 bg-emerald-500/10 text-ink-accent'
+                                : 'border-input/50 bg-secondary/60 text-muted-foreground'
                             }
                           >
                             {e.status === 'ACTIVE' ? 'Active' : 'Inactive'}
                           </Badge>
-                          <span className="text-zinc-300">{timeLabel(e.changedAt)}</span>
-                          {e.note && <span className="text-zinc-500">— {e.note}</span>}
+                          <span className="text-foreground">{timeLabel(e.changedAt)}</span>
+                          {e.note && <span className="text-muted-foreground">— {e.note}</span>}
                         </li>
                       ))}
                     </ul>

@@ -265,7 +265,7 @@ export default function Attendance() {
 
       {/* Gate-redirect hint: RequireAttendance sent them here mid-navigation. */}
       {!isOwner && gateFrom && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-ink-accent">
           <LogIn className="h-4 w-4 shrink-0" />
           Clock in to continue to the app.
         </div>
@@ -285,7 +285,7 @@ export default function Attendance() {
             {isOwner ? (
               <>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search your name or employee #…"
                     value={search}
@@ -303,7 +303,7 @@ export default function Attendance() {
                   <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                   <SelectContent>
                     {filtered.length === 0 ? (
-                      <div className="px-2 py-1.5 text-sm text-zinc-500">No matches</div>
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">No matches</div>
                     ) : (
                       filtered.map((e) => (
                         <SelectItem key={e.id} value={e.id}>
@@ -315,13 +315,13 @@ export default function Attendance() {
                 </Select>
               </>
             ) : selfQuery.isPending ? (
-              <div className="rounded-lg border border-border bg-background/40 p-4 text-sm text-zinc-500">
+              <div className="rounded-lg border border-border bg-background/40 p-4 text-sm text-muted-foreground">
                 Loading your employee record…
               </div>
             ) : selfQuery.isError ? (
               // Distinct from the "no employee linked" empty-state below — a
               // fetch failure must not read as "you have no profile".
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-danger-text">
                 <span>Could not load your employee record — check the connection.</span>
                 <Button size="sm" variant="outline" onClick={() => void selfQuery.refetch()}>
                   Retry
@@ -338,7 +338,7 @@ export default function Attendance() {
                       className="h-12 w-12 shrink-0 rounded-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-sm font-semibold text-emerald-300">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-sm font-semibold text-ink-accent">
                       {selfEmployee.fullName
                         .split(/\s+/)
                         .map((p) => p[0])
@@ -348,22 +348,22 @@ export default function Attendance() {
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-zinc-100">
+                    <div className="truncate text-sm font-semibold text-foreground">
                       {selfEmployee.fullName}
                     </div>
-                    <div className="text-xs text-zinc-500">
+                    <div className="text-xs text-muted-foreground">
                       {selfEmployee.employeeNo} · {selfEmployee.department}
                     </div>
                   </div>
-                  <BadgeCheck className="ml-auto h-5 w-5 shrink-0 text-emerald-400" />
+                  <BadgeCheck className="ml-auto h-5 w-5 shrink-0 text-ink-accent" />
                 </div>
-                <p className="mt-2 text-xs text-zinc-500">
+                <p className="mt-2 text-xs text-muted-foreground">
                   This is you — attendance is recorded for your own account only.
                 </p>
               </div>
             ) : (
               // No linked employee — page still renders, punching unavailable.
-              <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-300">
+              <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-warn-text">
                 <UserX className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
                   No employee profile is linked to your account — ask an admin to link one on the
@@ -378,7 +378,7 @@ export default function Attendance() {
                 disabled={timeInDisabled}
                 className={camError
                   ? 'bg-amber-600 text-white hover:bg-amber-500'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-500'}
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'}
               >
                 <LogIn className="mr-2 h-4 w-4" />
                 {submitting === 'TIME_IN' ? 'Submitting…' : camError ? 'Time In (no photo)' : 'Time In'}
@@ -387,30 +387,30 @@ export default function Attendance() {
                 onClick={() => punch('TIME_OUT', { noPhoto: !!camError })}
                 disabled={timeOutDisabled}
                 variant="outline"
-                className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                className="border-amber-500/40 text-warn-text hover:bg-amber-500/10"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 {submitting === 'TIME_OUT' ? 'Submitting…' : camError ? 'Time Out (no photo)' : 'Time Out'}
               </Button>
             </div>
             {!isOwner && selfToday?.clocked_in && !selfToday.clocked_out && (
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-muted-foreground">
                 You are clocked in for today — Time In is disabled until tomorrow.
               </p>
             )}
             {camError && (
-              <p className="text-xs text-amber-400/80">
+              <p className="text-xs text-warn-text">
                 Camera unavailable — punches will be recorded without a photo and flagged for review.
               </p>
             )}
 
             {msg?.ok && (
-              <p className="flex items-center gap-2 text-sm text-emerald-400">
+              <p className="flex items-center gap-2 text-sm text-ink-accent">
                 <CheckCircle2 className="h-4 w-4" /> {msg.ok}
               </p>
             )}
             {msg?.err && (
-              <p className="flex items-center gap-2 text-sm text-red-400">
+              <p className="flex items-center gap-2 text-sm text-danger-text">
                 <CircleAlert className="h-4 w-4" /> {msg.err}
               </p>
             )}
@@ -419,18 +419,18 @@ export default function Attendance() {
 
         {/* ── Recent punches for the employee in scope ── */}
         <Card className="border-border bg-card p-5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-200">
-            <UserCheck className="h-4 w-4 text-zinc-400" />
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
             {effectiveName ? `${effectiveName} — recent punches` : 'Recent punches'}
           </div>
           {!effectiveEmployeeId ? (
-            <p className="py-8 text-center text-sm text-zinc-500">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               {isOwner
                 ? 'Select an employee to see their latest punches.'
                 : 'Your recent punches will show here once an employee profile is linked.'}
             </p>
           ) : punches.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-500">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               No punches yet{effectiveName ? ` for ${effectiveName}` : ''}.
             </p>
           ) : (
@@ -442,7 +442,7 @@ export default function Attendance() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          p.type === 'TIME_IN' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'
+                          p.type === 'TIME_IN' ? 'bg-emerald-500/15 text-ink-accent' : 'bg-amber-500/15 text-warn-text'
                         }`}
                       >
                         {p.type}
@@ -450,18 +450,18 @@ export default function Attendance() {
                       {p.status === 'FORFEITED' && (
                         <span
                           title="Timed in but never timed out within 24 hours; no time credited. HR can correct manually."
-                          className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300"
+                          className="inline-flex items-center rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-warn-text"
                         >
                           FORFEITED — no time-out
                         </span>
                       )}
                       {p.status === 'OPEN' && (
-                        <span className="inline-flex items-center rounded-full bg-zinc-700/40 px-2 py-0.5 text-[10px] font-semibold text-zinc-400">
+                        <span className="inline-flex items-center rounded-full bg-secondary/40 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                           OPEN
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-xs tabular-nums text-zinc-400">{fmtTime(p.capturedAt)}</div>
+                    <div className="mt-0.5 text-xs tabular-nums text-muted-foreground">{fmtTime(p.capturedAt)}</div>
                   </div>
                 </li>
               ))}

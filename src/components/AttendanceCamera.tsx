@@ -101,10 +101,11 @@ export function AttendanceCameraView({
       )}
     >
       <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+      {/* The frame is always black (it is a video surface), so overlay text uses fixed light colours, not theme tokens. */}
       {camError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4 text-center">
-          <Camera className="h-8 w-8 text-zinc-500" />
-          <p className="text-sm text-zinc-400">{errorHint ?? camError}</p>
+          <Camera className="h-8 w-8 text-zinc-400" />
+          <p className="text-sm text-zinc-300">{errorHint ?? camError}</p>
           <Button size="sm" variant="outline" onClick={onRetry}>
             <RefreshCw className="mr-2 h-4 w-4" /> Retry camera
           </Button>

@@ -273,9 +273,9 @@ function formatTime(iso: string): string {
 // ─── ITO status badge ─────────────────────────────────────────────────────────
 
 const ITO_STATUS_CLASSES: Record<ItoStatus, string> = {
-  REQUESTED: 'bg-amber-500/15 text-amber-400 ring-1 ring-inset ring-amber-500/30',
-  CONFIRMED: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30',
-  CANCELLED: 'bg-zinc-500/15 text-zinc-400 ring-1 ring-inset ring-zinc-500/30',
+  REQUESTED: 'bg-amber-500/15 text-warn-text ring-1 ring-inset ring-amber-500/30',
+  CONFIRMED: 'bg-emerald-500/15 text-ink-accent ring-1 ring-inset ring-emerald-500/30',
+  CANCELLED: 'bg-zinc-500/15 text-muted-foreground ring-1 ring-inset ring-zinc-500/30',
 }
 
 function ItoStatusBadge({ status }: { status: ItoStatus }) {
@@ -332,13 +332,13 @@ function StockTable({
         </CardTitle>
         <div className="flex items-center gap-2">
           {lowCount > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-400 ring-1 ring-inset ring-red-500/30 tabular-nums">
+            <span className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-danger-text ring-1 ring-inset ring-red-500/30 tabular-nums">
               <AlertTriangle className="h-3 w-3" aria-hidden />
               {lowCount} low
             </span>
           )}
           {!loading && (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-medium text-zinc-400 tabular-nums">
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums">
               {rows.length} items
             </span>
           )}
@@ -348,14 +348,14 @@ function StockTable({
       <CardContent className="p-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
-            <p className="text-xs text-zinc-500">Loading stock…</p>
+            <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-border border-t-emerald-500" />
+            <p className="text-xs text-muted-foreground">Loading stock…</p>
           </div>
         ) : error ? (
           <div className="p-6 text-center">
-            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-red-400" aria-hidden />
-            <p className="text-sm font-medium text-red-400">{error}</p>
-            <p className="mt-1 text-xs text-zinc-500">Check backend connection.</p>
+            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-danger-text" aria-hidden />
+            <p className="text-sm font-medium text-danger-text">{error}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Check backend connection.</p>
           </div>
         ) : rows.length === 0 ? (
           <EmptyState
@@ -372,26 +372,26 @@ function StockTable({
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Ingredient
                 </TableHead>
-                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   On&nbsp;Hand
                 </TableHead>
-                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Available
                 </TableHead>
-                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Threshold
                 </TableHead>
-                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Days&nbsp;Left
                 </TableHead>
-                <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Status
                 </TableHead>
                 {showActions && (
-                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 )}
@@ -414,44 +414,44 @@ function StockTable({
                         ? 'bg-red-500/5 hover:bg-red-500/10'
                         : showRisk
                           ? 'bg-amber-500/5 hover:bg-amber-500/10'
-                          : 'hover:bg-zinc-800/30',
+                          : 'hover:bg-secondary/30',
                     ].join(' ')}
                   >
                     <TableCell className="px-4 py-2.5">
                       <span
-                        className={`font-medium text-sm ${isAlert ? 'text-red-300' : showRisk ? 'text-amber-200' : 'text-foreground'}`}
+                        className={`font-medium text-sm ${isAlert ? 'text-danger-text' : showRisk ? 'text-warn-text' : 'text-foreground'}`}
                       >
                         {row.ingredient.name}
                       </span>
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
                       <span
-                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : 'text-zinc-200'}`}
+                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-danger-text' : 'text-foreground'}`}
                       >
                         {formatQty(row.quantity, row.ingredient.unit)}
                       </span>
                       {reserved > 0 && (
-                        <span className="mt-0.5 block font-mono tabular-nums text-[10px] text-amber-400/80">
+                        <span className="mt-0.5 block font-mono tabular-nums text-[10px] text-warn-text">
                           {formatQty(reserved, row.ingredient.unit)} reserved
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
                       <span
-                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-red-400' : showRisk ? 'text-amber-400' : 'text-muted-foreground'}`}
+                        className={`font-mono tabular-nums text-sm font-semibold ${isAlert ? 'text-danger-text' : showRisk ? 'text-warn-text' : 'text-muted-foreground'}`}
                       >
                         {formatQty(available, row.ingredient.unit)}
                       </span>
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
-                      <span className="font-mono tabular-nums text-xs text-zinc-500">
+                      <span className="font-mono tabular-nums text-xs text-muted-foreground">
                         {row.ingredient.lowStockThreshold} {row.ingredient.unit}
                       </span>
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-right">
                       {daysLeft === null ? (
                         <span
-                          className="font-mono text-sm text-zinc-600"
+                          className="font-mono text-sm text-muted-foreground"
                           title="No consumption in the last 7 days"
                         >
                           —
@@ -461,9 +461,9 @@ function StockTable({
                           className={[
                             'font-mono tabular-nums text-sm font-semibold',
                             daysLeft <= 1
-                              ? 'text-red-400'
+                              ? 'text-danger-text'
                               : daysLeft <= 3
-                                ? 'text-amber-400'
+                                ? 'text-warn-text'
                                 : 'text-muted-foreground',
                           ].join(' ')}
                         >
@@ -471,24 +471,24 @@ function StockTable({
                         </span>
                       )}
                       {dailyConsumption > 0 && (
-                        <span className="mt-0.5 block font-mono tabular-nums text-[10px] text-zinc-500">
+                        <span className="mt-0.5 block font-mono tabular-nums text-[10px] text-muted-foreground">
                           ≈{fmtDays(dailyConsumption)} {row.ingredient.unit}/day
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="px-4 py-2.5 text-center">
                       {isAlert ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400 ring-1 ring-inset ring-red-500/30">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-danger-text ring-1 ring-inset ring-red-500/30">
                           <AlertTriangle className="h-3 w-3" aria-hidden />
                           Low
                         </span>
                       ) : showRisk ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-inset ring-amber-500/30">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-warn-text ring-1 ring-inset ring-amber-500/30">
                           <AlertTriangle className="h-3 w-3" aria-hidden />
                           At risk
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-inset ring-emerald-500/30">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-ink-accent ring-1 ring-inset ring-emerald-500/30">
                           <CheckCircle2 className="h-3 w-3" aria-hidden />
                           OK
                         </span>
@@ -504,7 +504,7 @@ function StockTable({
                               onClick={() => onEditIngredient(row)}
                               aria-label={`Edit ingredient ${row.ingredient.name}`}
                               title="Edit ingredient (name, unit, cost, threshold, suppliers)"
-                              className="h-7 w-7 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                              className="h-7 w-7 text-muted-foreground hover:text-ink-accent hover:bg-emerald-500/10"
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
@@ -516,7 +516,7 @@ function StockTable({
                               onClick={() => onAdjust(row)}
                               aria-label={`Adjust stock for ${row.ingredient.name}`}
                               title="Adjust stock (write-off / add)"
-                              className="h-7 w-7 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                              className="h-7 w-7 text-muted-foreground hover:text-ink-accent hover:bg-emerald-500/10"
                             >
                               <SlidersHorizontal className="h-3.5 w-3.5" />
                             </Button>
@@ -622,7 +622,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
           <div key={idx} className="flex gap-2 items-end">
             <div className="flex-1 min-w-0">
               {idx === 0 && (
-                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                   Ingredient
                 </label>
               )}
@@ -630,15 +630,15 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                 value={item.ingredientId || '_none'}
                 onValueChange={v => setField(idx, 'ingredientId', v === '_none' ? '' : v)}
               >
-                <SelectTrigger className="bg-background border-border text-zinc-200 text-sm h-9">
+                <SelectTrigger className="bg-background border-border text-foreground text-sm h-9">
                   <SelectValue placeholder="Select ingredient…" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-border">
-                  <SelectItem value="_none" className="text-zinc-400">
+                  <SelectItem value="_none" className="text-muted-foreground">
                     Select ingredient…
                   </SelectItem>
                   {ingredients.map(ing => (
-                    <SelectItem key={ing.id} value={ing.id} className="text-zinc-200">
+                    <SelectItem key={ing.id} value={ing.id} className="text-foreground">
                       {ing.name} ({ing.unit})
                     </SelectItem>
                   ))}
@@ -647,7 +647,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
             </div>
             <div className="w-28">
               {idx === 0 && (
-                <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                   Quantity
                 </label>
               )}
@@ -659,7 +659,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                 onChange={e => setField(idx, 'quantity', e.target.value)}
                 required
                 placeholder="0"
-                className="bg-background border-border text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
             </div>
             {items.length > 1 && (
@@ -669,7 +669,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                 size="icon"
                 onClick={() => removeRow(idx)}
                 aria-label="Remove row"
-                className="h-9 w-9 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+                className="h-9 w-9 flex-none text-muted-foreground hover:text-danger-text hover:bg-red-500/10"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -684,7 +684,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
           variant="outline"
           size="sm"
           onClick={addRow}
-          className="border-border text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+          className="border-border text-muted-foreground hover:text-foreground hover:bg-secondary/50"
         >
           <Plus className="h-3.5 w-3.5 mr-1" />
           Add row
@@ -693,7 +693,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
           type="submit"
           disabled={submitting}
           size="sm"
-          className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+          className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
         >
           {submitting ? 'Requesting…' : 'Request Transfer'}
         </Button>
@@ -727,8 +727,8 @@ function ItoList({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-10">
-        <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
-        <p className="text-xs text-zinc-500">Loading ITOs…</p>
+        <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-border border-t-emerald-500" />
+        <p className="text-xs text-muted-foreground">Loading ITOs…</p>
       </div>
     )
   }
@@ -736,7 +736,7 @@ function ItoList({
   if (error) {
     return (
       <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center">
-        <p className="text-sm font-medium text-red-400">{error}</p>
+        <p className="text-sm font-medium text-danger-text">{error}</p>
       </div>
     )
   }
@@ -765,14 +765,14 @@ function ItoList({
                 ? 'border-amber-500/30 bg-amber-500/5'
                 : ito.status === 'CONFIRMED'
                   ? 'border-emerald-500/30 bg-emerald-500/5'
-                  : 'border-border bg-zinc-800/30',
+                  : 'border-border bg-secondary/30',
             ].join(' ')}
           >
             {/* ITO header */}
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="font-mono text-[10px] text-zinc-500">{ito.id.slice(0, 8)}…</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{ito.id.slice(0, 8)}…</span>
               <ItoStatusBadge status={ito.status} />
-              <span className="ml-auto text-[11px] text-zinc-500">
+              <span className="ml-auto text-[11px] text-muted-foreground">
                 {formatTime(ito.createdAt)}
               </span>
             </div>
@@ -785,7 +785,7 @@ function ItoList({
                   return (
                     <li key={it.id} className="flex items-center gap-2 text-sm text-foreground">
                       <span className="font-medium">{ing?.name ?? it.ingredientId}</span>
-                      <span className="ml-auto font-mono tabular-nums text-xs text-zinc-500">
+                      <span className="ml-auto font-mono tabular-nums text-xs text-muted-foreground">
                         {formatQty(it.quantity, ing?.unit ?? '')}
                       </span>
                     </li>
@@ -793,7 +793,7 @@ function ItoList({
                 })}
               </ul>
             ) : (
-              <p className="mb-2 text-[11px] italic text-zinc-600">
+              <p className="mb-2 text-[11px] italic text-muted-foreground">
                 Item detail unavailable from the list view.
               </p>
             )}
@@ -804,7 +804,7 @@ function ItoList({
                 size="sm"
                 onClick={() => onConfirm(ito.id)}
                 disabled={isConfirming}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" aria-hidden />
                 {isConfirming ? 'Confirming…' : 'Confirm Transfer'}
@@ -812,7 +812,7 @@ function ItoList({
             )}
 
             {ito.status === 'CONFIRMED' && ito.confirmedAt && (
-              <p className="text-[11px] text-emerald-400 mt-1">
+              <p className="text-[11px] text-ink-accent mt-1">
                 Confirmed {formatTime(ito.confirmedAt)}
               </p>
             )}
@@ -826,9 +826,9 @@ function ItoList({
 // ─── Adjustments panel ──────────────────────────────────────────────────────
 
 const ADJ_STATUS_CLASSES: Record<AdjustmentStatus, string> = {
-  PENDING: 'bg-amber-500/15 text-amber-400 ring-1 ring-inset ring-amber-500/30',
-  APPROVED: 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30',
-  REJECTED: 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/30',
+  PENDING: 'bg-amber-500/15 text-warn-text ring-1 ring-inset ring-amber-500/30',
+  APPROVED: 'bg-emerald-500/15 text-ink-accent ring-1 ring-inset ring-emerald-500/30',
+  REJECTED: 'bg-red-500/15 text-danger-text ring-1 ring-inset ring-red-500/30',
 }
 
 function AdjStatusBadge({ status }: { status: AdjustmentStatus }) {
@@ -896,7 +896,7 @@ function AdjustmentsPanel({
           Stock Adjustments
         </CardTitle>
         {pendingCount > 0 && (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400 ring-1 ring-inset ring-amber-500/30 tabular-nums">
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-warn-text ring-1 ring-inset ring-amber-500/30 tabular-nums">
             {pendingCount} pending
           </span>
         )}
@@ -905,13 +905,13 @@ function AdjustmentsPanel({
       <CardContent className="p-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-10">
-            <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-zinc-700 border-t-emerald-500" />
-            <p className="text-xs text-zinc-500">Loading adjustments…</p>
+            <div className="mb-3 h-6 w-6 animate-spin rounded-full border-2 border-border border-t-emerald-500" />
+            <p className="text-xs text-muted-foreground">Loading adjustments…</p>
           </div>
         ) : error ? (
           <div className="p-6 text-center">
-            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-red-400" aria-hidden />
-            <p className="text-sm font-medium text-red-400">{error}</p>
+            <AlertTriangle className="mx-auto mb-2 h-6 w-6 text-danger-text" aria-hidden />
+            <p className="text-sm font-medium text-danger-text">{error}</p>
           </div>
         ) : adjustments.length === 0 ? (
           <EmptyState
@@ -925,25 +925,25 @@ function AdjustmentsPanel({
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Item
                   </TableHead>
-                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Change
                   </TableHead>
-                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Reason
                   </TableHead>
-                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Requested by
                   </TableHead>
-                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Date
                   </TableHead>
-                  <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Status
                   </TableHead>
-                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  <TableHead className="h-8 px-4 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <span className="sr-only">Decision</span>
                   </TableHead>
                 </TableRow>
@@ -961,33 +961,33 @@ function AdjustmentsPanel({
                   const requester = adj.requested_by_name ?? adj.requestedBy ?? '—'
                   const isDeciding = deciding.has(adj.id)
                   return (
-                    <TableRow key={adj.id} className="border-border hover:bg-zinc-800/30">
+                    <TableRow key={adj.id} className="border-border hover:bg-secondary/30">
                       <TableCell className="px-4 py-2.5">
                         <span className="font-medium text-sm text-foreground">{name}</span>
                         {adj.note && (
-                          <span className="mt-0.5 block text-[11px] italic text-zinc-500 truncate max-w-[16rem]">
+                          <span className="mt-0.5 block text-[11px] italic text-muted-foreground truncate max-w-[16rem]">
                             {adj.note}
                           </span>
                         )}
                       </TableCell>
                       <TableCell className="px-4 py-2.5 text-right">
                         <span
-                          className={`font-mono tabular-nums text-sm font-semibold ${isOut ? 'text-red-400' : 'text-emerald-400'}`}
+                          className={`font-mono tabular-nums text-sm font-semibold ${isOut ? 'text-danger-text' : 'text-ink-accent'}`}
                         >
                           {isOut ? '−' : '+'}
                           {qtyLabel} {unit}
                         </span>
-                        <span className="mt-0.5 block text-[10px] uppercase tracking-wide text-zinc-600">
+                        <span className="mt-0.5 block text-[10px] uppercase tracking-wide text-muted-foreground">
                           {isOut ? 'Write-off' : 'Add'}
                         </span>
                       </TableCell>
                       <TableCell className="px-4 py-2.5 text-sm text-muted-foreground">
                         {formatReason(adj.reason)}
                       </TableCell>
-                      <TableCell className="px-4 py-2.5 text-sm text-zinc-400 truncate max-w-[10rem]">
+                      <TableCell className="px-4 py-2.5 text-sm text-muted-foreground truncate max-w-[10rem]">
                         {requester}
                       </TableCell>
-                      <TableCell className="px-4 py-2.5 text-xs text-zinc-500 whitespace-nowrap">
+                      <TableCell className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                         {formatTime(adj.createdAt)}
                       </TableCell>
                       <TableCell className="px-4 py-2.5 text-center">
@@ -1000,7 +1000,7 @@ function AdjustmentsPanel({
                               size="sm"
                               onClick={() => openDecision(adj.id, 'approve')}
                               disabled={isDeciding}
-                              className="h-7 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-2.5 disabled:opacity-60"
+                              className="h-7 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-2.5 disabled:opacity-60"
                             >
                               <Check className="h-3.5 w-3.5 mr-1" />
                               Approve
@@ -1010,14 +1010,14 @@ function AdjustmentsPanel({
                               variant="outline"
                               onClick={() => openDecision(adj.id, 'reject')}
                               disabled={isDeciding}
-                              className="h-7 border-red-500/40 text-red-300 hover:text-red-200 hover:bg-red-500/10 px-2.5 disabled:opacity-60"
+                              className="h-7 border-red-500/40 text-danger-text hover:text-danger-text hover:bg-red-500/10 px-2.5 disabled:opacity-60"
                             >
                               <X className="h-3.5 w-3.5 mr-1" />
                               Reject
                             </Button>
                           </div>
                         ) : adj.status !== 'PENDING' && (adj.decided_by_name || adj.decidedBy) ? (
-                          <span className="text-[11px] text-zinc-500">
+                          <span className="text-[11px] text-muted-foreground">
                             by {adj.decided_by_name ?? adj.decidedBy}
                           </span>
                         ) : null}
@@ -1038,7 +1038,7 @@ function AdjustmentsPanel({
             <DialogTitle className="text-foreground">
               {decision?.action === 'approve' ? 'Approve adjustment' : 'Reject adjustment'}
             </DialogTitle>
-            <DialogDescription className="text-zinc-500">
+            <DialogDescription className="text-muted-foreground">
               {decision?.action === 'approve'
                 ? 'Approving posts the stock movement. Add an optional note for the audit log.'
                 : 'Rejecting discards the request. Add an optional reason for the audit log.'}
@@ -1050,7 +1050,7 @@ function AdjustmentsPanel({
             maxLength={500}
             rows={2}
             placeholder="Optional note…"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
           />
           <div className="flex gap-2 pt-1">
             <Button
@@ -1058,7 +1058,7 @@ function AdjustmentsPanel({
               variant="outline"
               size="sm"
               onClick={() => setDecision(null)}
-              className="border-border text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              className="border-border text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             >
               Cancel
             </Button>
@@ -1068,7 +1068,7 @@ function AdjustmentsPanel({
               onClick={confirmDecision}
               className={
                 decision?.action === 'approve'
-                  ? 'ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold'
+                  ? 'ml-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold'
                   : 'ml-auto bg-red-600 hover:bg-red-500 text-white font-semibold'
               }
             >
@@ -1452,7 +1452,7 @@ export default function Inventory() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowRequestIto(true)}
-                className="border-amber-500/40 text-amber-400 hover:border-amber-500/70 hover:text-amber-300 hover:bg-amber-500/10"
+                className="border-amber-500/40 text-warn-text hover:border-amber-500/70 hover:text-warn-text hover:bg-amber-500/10"
               >
                 <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" />
                 Request Transfer
@@ -1462,7 +1462,7 @@ export default function Inventory() {
               <Button
                 size="sm"
                 onClick={() => setShowReceive(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
               >
                 <Package className="h-3.5 w-3.5 mr-1.5" />
                 Receive into MAIN
@@ -1473,7 +1473,7 @@ export default function Inventory() {
               size="icon"
               onClick={refreshAll}
               title="Refresh all"
-              className="h-8 w-8 text-zinc-500 hover:text-zinc-200"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span className="sr-only">Refresh</span>
@@ -1547,7 +1547,7 @@ export default function Inventory() {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="inline-block h-3 w-3 rounded-sm bg-red-500/15 border border-red-500/30" />
               Below threshold — repurchase or ITO required
@@ -1556,7 +1556,7 @@ export default function Inventory() {
               <span className="inline-block h-3 w-3 rounded-sm bg-emerald-500/15 border border-emerald-500/30" />
               Stock OK
             </span>
-            <span className="ml-auto text-[11px] italic text-zinc-600">
+            <span className="ml-auto text-[11px] italic text-muted-foreground">
               Real-time via stock.updated
             </span>
           </div>
@@ -1569,11 +1569,11 @@ export default function Inventory() {
           {kitchenAlerts.length > 0 && (
             <Card className="border-red-500/30 bg-red-500/5">
               <CardHeader className="px-4 py-3 border-b border-red-500/20 flex-row items-center gap-2 space-y-0">
-                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" aria-hidden />
-                <CardTitle className="text-sm font-semibold text-red-400">
+                <AlertTriangle className="h-4 w-4 text-danger-text shrink-0" aria-hidden />
+                <CardTitle className="text-sm font-semibold text-danger-text">
                   Kitchen Stock Alerts
                 </CardTitle>
-                <span className="ml-auto rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400 tabular-nums">
+                <span className="ml-auto rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-danger-text tabular-nums">
                   {kitchenAlerts.length}
                 </span>
               </CardHeader>
@@ -1584,15 +1584,15 @@ export default function Inventory() {
                     className="flex items-center justify-between rounded-lg bg-red-500/10 px-3 py-2 border border-red-500/20"
                   >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-red-300 truncate">
+                      <p className="text-sm font-medium text-danger-text truncate">
                         {row.ingredient.name}
                       </p>
-                      <p className="text-[11px] text-red-400/70 tabular-nums">
+                      <p className="text-[11px] text-danger-text tabular-nums">
                         {formatQty(row.quantity, row.ingredient.unit)} / threshold:{' '}
                         {row.ingredient.lowStockThreshold}
                       </p>
                     </div>
-                    <AlertTriangle className="ml-2 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+                    <AlertTriangle className="ml-2 h-4 w-4 shrink-0 text-danger-text" aria-hidden />
                   </div>
                 ))}
               </CardContent>
@@ -1607,7 +1607,7 @@ export default function Inventory() {
                 Transfer Orders (ITO)
               </CardTitle>
               {pendingItos > 0 && (
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-400 ring-1 ring-inset ring-amber-500/30 tabular-nums">
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-warn-text ring-1 ring-inset ring-amber-500/30 tabular-nums">
                   {pendingItos} pending
                 </span>
               )}
@@ -1615,17 +1615,17 @@ export default function Inventory() {
             <CardContent className="p-3">
               {/* Role hint */}
               {!canConfirmIto && !canRequestIto && (
-                <p className="mb-3 text-xs text-zinc-500 italic">
+                <p className="mb-3 text-xs text-muted-foreground italic">
                   View only — your role cannot request or confirm ITOs.
                 </p>
               )}
               {canRequestIto && !canConfirmIto && (
-                <p className="mb-3 text-xs text-zinc-500 italic">
+                <p className="mb-3 text-xs text-muted-foreground italic">
                   You can request ITOs. Warehouse personnel confirm them.
                 </p>
               )}
               {canConfirmIto && (
-                <p className="mb-3 text-xs text-zinc-500 italic">
+                <p className="mb-3 text-xs text-muted-foreground italic">
                   Confirming an ITO atomically moves stock MAIN → KITCHEN.
                 </p>
               )}
@@ -1687,7 +1687,7 @@ export default function Inventory() {
             <DialogTitle className="text-foreground">
               Request Transfer — MAIN to KITCHEN
             </DialogTitle>
-            <DialogDescription className="text-zinc-500">
+            <DialogDescription className="text-muted-foreground">
               Create an Internal Transfer Order (FR-IV-03). Warehouse staff will confirm.
             </DialogDescription>
           </DialogHeader>

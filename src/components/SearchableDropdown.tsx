@@ -119,22 +119,22 @@ export default function SearchableDropdown({
         }}
         aria-expanded={open}
         className={cn(
-          'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 text-sm text-zinc-300 transition-colors duration-150',
+          'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 text-sm text-foreground transition-colors duration-150',
           'hover:bg-background/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50',
         )}
       >
         <span className="flex min-w-0 items-center gap-2 truncate">
-          <Plus className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden />
+          <Plus className="h-3.5 w-3.5 shrink-0 text-ink-accent" aria-hidden />
           <span className="truncate">{busy ? 'Working…' : placeholder}</span>
         </span>
-        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
       {open && (
         <div className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-lg border border-border bg-card shadow-xl">
           <div className="relative border-b border-border p-2">
             <Search
-              className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500"
+              className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
               aria-hidden
             />
             <input
@@ -142,12 +142,12 @@ export default function SearchableDropdown({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={searchPlaceholder}
-              className="h-8 w-full rounded-md border border-border bg-background/60 pl-8 pr-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+              className="h-8 w-full rounded-md border border-border bg-background/60 pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
             />
           </div>
           <div className="overflow-y-auto py-1" style={{ maxHeight }}>
             {visible.length === 0 ? (
-              <p className="px-3 py-3 text-center text-xs text-zinc-500">{emptyText}</p>
+              <p className="px-3 py-3 text-center text-xs text-muted-foreground">{emptyText}</p>
             ) : (
               visible.map((o) => (
                 <button
@@ -157,8 +157,8 @@ export default function SearchableDropdown({
                   onClick={() => pick(o.id)}
                   title={o.hint ? `${o.label} - ${o.hint}` : o.label}
                   className={cn(
-                    'flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm text-zinc-200 transition-colors duration-150',
-                    'hover:bg-zinc-800/60 disabled:cursor-not-allowed disabled:opacity-40',
+                    'flex w-full min-w-0 items-center gap-2 px-3 py-2 text-left text-sm text-foreground transition-colors duration-150',
+                    'hover:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-40',
                   )}
                 >
                   {o.color !== undefined && (
@@ -170,7 +170,7 @@ export default function SearchableDropdown({
                   )}
                   <span className="min-w-0 flex-1 truncate">{o.label}</span>
                   {o.hint && (
-                    <span className="max-w-[45%] shrink truncate text-right text-[11px] text-zinc-500">
+                    <span className="max-w-[45%] shrink truncate text-right text-[11px] text-muted-foreground">
                       {o.hint}
                     </span>
                   )}

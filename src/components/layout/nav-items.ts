@@ -45,7 +45,7 @@ export interface NavGroup {
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Overview',
+    label: 'Operate',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard },
       { to: '/pos', label: 'New Order', icon: ShoppingBag },
@@ -65,15 +65,10 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Inventory',
+    label: 'Stock',
     items: [
       { to: '/inventory', label: 'Inventory', icon: Boxes },
       { to: '/stock-ledger', label: 'Stock Ledger', icon: ListOrdered },
-    ],
-  },
-  {
-    label: 'Purchasing',
-    items: [
       { to: '/purchasing', label: 'Purchasing', icon: ShoppingCart },
       { to: '/master-data', label: 'Master Data', icon: Handshake },
     ],
@@ -94,10 +89,18 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'System',
+    label: 'Setup',
     items: [
       { to: '/outlets', label: 'Outlets', icon: Building2 },
       { to: '/settings', label: 'Settings', icon: Settings },
     ],
   },
 ]
+
+/** Route -> where it sits in the nav, for the header breadcrumb ("Stock / Inventory"). */
+export const NAV_LOOKUP: ReadonlyMap<string, { group: string; label: string }> = new Map(
+  NAV_GROUPS.flatMap((g) => g.items.map((i) => [i.to, { group: g.label, label: i.label }] as const)),
+)
+
+/** Phone tab bar slots, in priority order; the first four the user can open are shown. */
+export const TAB_BAR_PRIORITY = ['/pos', '/orders', '/kitchen', '/inventory', '/', '/menu', '/attendance', '/reports'] as const

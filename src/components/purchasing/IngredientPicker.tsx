@@ -94,18 +94,18 @@ export default function IngredientPicker({
         onClick={() => pick(i.id)}
         className={cn(
           'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors duration-150',
-          i.id === value ? 'bg-emerald-500/10 text-emerald-300' : 'text-zinc-200 hover:bg-zinc-800/60',
+          i.id === value ? 'bg-emerald-500/10 text-ink-accent' : 'text-foreground hover:bg-secondary/60',
         )}
       >
         <span className="min-w-0 flex-1 truncate">
-          {i.name} <span className="text-[11px] text-zinc-500">({i.unit})</span>
+          {i.name} <span className="text-[11px] text-muted-foreground">({i.unit})</span>
         </span>
         {badge && (
-          <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-400 ring-1 ring-inset ring-emerald-500/30">
+          <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-ink-accent ring-1 ring-inset ring-emerald-500/30">
             supplier item
           </span>
         )}
-        {i.id === value && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden />}
+        {i.id === value && <Check className="h-3.5 w-3.5 shrink-0 text-ink-accent" aria-hidden />}
       </button>
     )
   }
@@ -119,44 +119,44 @@ export default function IngredientPicker({
         aria-haspopup="listbox"
         aria-expanded={open}
         className={cn(
-          'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-[#1F2A24] bg-[#0A0F0D] px-3 text-sm transition-colors duration-150',
+          'flex h-9 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm transition-colors duration-150',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50',
-          selected ? 'text-zinc-200' : 'text-zinc-600',
+          selected ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
         <span className="min-w-0 truncate">
           {selected ? (
             <>
               {selected.name}{' '}
-              <span className="text-[11px] text-zinc-500">({selected.unit})</span>
+              <span className="text-[11px] text-muted-foreground">({selected.unit})</span>
             </>
           ) : (
             placeholder
           )}
         </span>
-        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden />
+        <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-lg border border-[#1F2A24] bg-[#121A17] shadow-xl">
-          <div className="relative border-b border-[#1F2A24] p-2">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" aria-hidden />
+        <div className="absolute left-0 right-0 z-50 mt-1 overflow-hidden rounded-lg border border-border bg-card shadow-xl">
+          <div className="relative border-b border-border p-2">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <input
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search ingredients…"
-              className="h-8 w-full rounded-md border border-[#1F2A24] bg-[#0A0F0D] pl-8 pr-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+              className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
             />
           </div>
           <div role="listbox" className="max-h-56 overflow-y-auto py-1">
             {affiliated.length === 0 && others.length === 0 ? (
-              <p className="px-3 py-3 text-center text-xs text-zinc-500">No matching ingredients.</p>
+              <p className="px-3 py-3 text-center text-xs text-muted-foreground">No matching ingredients.</p>
             ) : (
               <>
                 {affiliated.map((i) => renderRow(i, true))}
                 {affiliated.length > 0 && others.length > 0 && (
-                  <div className="mx-3 my-1 border-t border-[#1F2A24]" role="separator" />
+                  <div className="mx-3 my-1 border-t border-border" role="separator" />
                 )}
                 {others.map((i) => renderRow(i, false))}
               </>

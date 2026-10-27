@@ -118,9 +118,9 @@ export default function ChannelListings() {
 
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading channel listings…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading channel listings…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-danger-text">{error}</p>
         ) : listings.length === 0 ? (
           <EmptyState
             icon={Link2}
@@ -146,7 +146,7 @@ export default function ChannelListings() {
                   <TableCell>
                     <AggregatorBadge aggregator={listing.aggregator} />
                   </TableCell>
-                  <TableCell className="font-mono text-xs text-zinc-400">
+                  <TableCell className="font-mono text-xs text-muted-foreground">
                     {listing.merchantId}
                   </TableCell>
                   <TableCell>
@@ -156,7 +156,7 @@ export default function ChannelListings() {
                           listing.active ? 'bg-emerald-400' : 'bg-zinc-600'
                         }`}
                       />
-                      <span className={listing.active ? 'text-emerald-400' : 'text-zinc-500'}>
+                      <span className={listing.active ? 'text-ink-accent' : 'text-muted-foreground'}>
                         {listing.active ? 'Active' : 'Inactive'}
                       </span>
                     </span>

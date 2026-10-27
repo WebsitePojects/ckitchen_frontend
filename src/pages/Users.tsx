@@ -161,22 +161,22 @@ const ROLE_LABEL: Record<string, string> = {
 
 const ROLE_CLASS: Record<string, string> = {
   // v1
-  SUPER_ADMIN: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  BRAND_MANAGER: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  KITCHEN_STAFF: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  WAREHOUSE: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  SUPPLIER_COORDINATOR: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  ACCOUNTANT: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
-  RIDER: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
+  SUPER_ADMIN: 'bg-emerald-500/15 text-ink-accent border-emerald-500/30',
+  BRAND_MANAGER: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
+  KITCHEN_STAFF: 'bg-amber-500/15 text-warn-text border-amber-500/30',
+  WAREHOUSE: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/30',
+  SUPPLIER_COORDINATOR: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
+  ACCOUNTANT: 'bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30',
+  RIDER: 'bg-zinc-500/15 text-foreground border-zinc-500/30',
   // v2
-  OWNER: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  OUTLET_MANAGER: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30',
-  KITCHEN_CREW: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  WAREHOUSE_MAIN: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  WAREHOUSE_OUTLET: 'bg-purple-500/15 text-purple-400 border-purple-500/30',
-  PURCHASING: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  HR: 'bg-pink-500/15 text-pink-400 border-pink-500/30',
-  ACCOUNTING: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
+  OWNER: 'bg-emerald-500/15 text-ink-accent border-emerald-500/30',
+  OUTLET_MANAGER: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-400 border-indigo-500/30',
+  KITCHEN_CREW: 'bg-amber-500/15 text-warn-text border-amber-500/30',
+  WAREHOUSE_MAIN: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/30',
+  WAREHOUSE_OUTLET: 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30',
+  PURCHASING: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
+  HR: 'bg-pink-500/15 text-pink-700 dark:text-pink-400 border-pink-500/30',
+  ACCOUNTING: 'bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30',
 }
 
 const SECURITY_CONTROLS = [
@@ -286,7 +286,7 @@ function OutletMultiSelect({
             onSelect={(e) => e.preventDefault()}
             onCheckedChange={() => toggle(o.id)}
           >
-            {o.name} <span className="ml-1 text-xs text-zinc-500">({o.code})</span>
+            {o.name} <span className="ml-1 text-xs text-muted-foreground">({o.code})</span>
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>
@@ -381,15 +381,15 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Name</label>
+            <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} disabled={submitting} placeholder="e.g. Juan dela Cruz" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Email</label>
+            <label className="text-xs font-medium text-muted-foreground">Email</label>
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={submitting} placeholder="name@company.com" />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Role</label>
+            <label className="text-xs font-medium text-muted-foreground">Role</label>
             <Select value={role} onValueChange={setRole} disabled={submitting}>
               <SelectTrigger>
                 <SelectValue />
@@ -404,7 +404,7 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">
+            <label className="text-xs font-medium text-muted-foreground">
               Password{clerkEnabled ? ' (optional)' : ''}
             </label>
             <Input
@@ -416,16 +416,16 @@ function CreateUserDialog({ outlets, onCreated }: { outlets: OutletSummary[]; on
               autoComplete="new-password"
             />
             {clerkEnabled && (
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-muted-foreground">
                 They'll get an email invitation. Only set a password for IT break-glass accounts.
               </p>
             )}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Outlet access</label>
+            <label className="text-xs font-medium text-muted-foreground">Outlet access</label>
             <OutletMultiSelect outlets={outlets} selected={outletIds} onChange={setOutletIds} disabled={submitting} />
           </div>
-          {formError && <p className="text-xs text-red-400">{formError}</p>}
+          {formError && <p className="text-xs text-danger-text">{formError}</p>}
           <DialogFooter>
             <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
               {submitting ? 'Creating…' : 'Create User'}
@@ -500,15 +500,15 @@ function EditUserDialog({
         {target && (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Name</label>
+              <label className="text-xs font-medium text-muted-foreground">Name</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} disabled={submitting} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Email</label>
+              <label className="text-xs font-medium text-muted-foreground">Email</label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={submitting} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Role</label>
+              <label className="text-xs font-medium text-muted-foreground">Role</label>
               <Select value={role} onValueChange={setRole} disabled={submitting}>
                 <SelectTrigger>
                   <SelectValue />
@@ -522,7 +522,7 @@ function EditUserDialog({
                 </SelectContent>
               </Select>
             </div>
-            {formError && <p className="text-xs text-red-400">{formError}</p>}
+            {formError && <p className="text-xs text-danger-text">{formError}</p>}
             <DialogFooter>
               <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
                 {submitting ? 'Saving…' : 'Save Changes'}
@@ -587,12 +587,12 @@ function ResetPasswordDialog({
         </DialogHeader>
         {target && (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-            <p className="text-xs text-zinc-500">
-              Setting a new password for <span className="text-zinc-300">{target.email}</span> immediately signs
+            <p className="text-xs text-muted-foreground">
+              Setting a new password for <span className="text-foreground">{target.email}</span> immediately signs
               them out of all active sessions.
             </p>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">New password</label>
+              <label className="text-xs font-medium text-muted-foreground">New password</label>
               <Input
                 type="password"
                 value={password}
@@ -602,7 +602,7 @@ function ResetPasswordDialog({
                 autoComplete="new-password"
               />
             </div>
-            {formError && <p className="text-xs text-red-400">{formError}</p>}
+            {formError && <p className="text-xs text-danger-text">{formError}</p>}
             <DialogFooter>
               <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
                 {submitting ? 'Resetting…' : 'Reset Password'}
@@ -666,20 +666,20 @@ function OutletAccessDialog({
         </DialogHeader>
         {target && (
           <div className="space-y-4 pt-2">
-            <p className="text-xs text-zinc-500">
-              Outlets <span className="text-zinc-300">{target.name}</span> may act in.
+            <p className="text-xs text-muted-foreground">
+              Outlets <span className="text-foreground">{target.name}</span> may act in.
             </p>
             <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-              {outlets.length === 0 && <p className="px-1 py-2 text-xs text-zinc-500">No outlets configured.</p>}
+              {outlets.length === 0 && <p className="px-1 py-2 text-xs text-muted-foreground">No outlets configured.</p>}
               {outlets.map((o) => {
                 const checked = selected.includes(o.id)
                 return (
                   <label
                     key={o.id}
-                    className="flex cursor-pointer items-center justify-between gap-3 rounded px-2 py-1.5 hover:bg-zinc-900/40"
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded px-2 py-1.5 hover:bg-card/40"
                   >
-                    <span className="text-sm text-zinc-200">
-                      {o.name} <span className="text-xs text-zinc-500">({o.code})</span>
+                    <span className="text-sm text-foreground">
+                      {o.name} <span className="text-xs text-muted-foreground">({o.code})</span>
                     </span>
                     <Switch
                       checked={checked}
@@ -692,7 +692,7 @@ function OutletAccessDialog({
                 )
               })}
             </div>
-            {formError && <p className="text-xs text-red-400">{formError}</p>}
+            {formError && <p className="text-xs text-danger-text">{formError}</p>}
             <DialogFooter>
               <Button onClick={handleSave} disabled={submitting} className="w-full sm:w-auto">
                 {submitting ? 'Saving…' : 'Save Access'}
@@ -730,9 +730,9 @@ function ActivityDialog({
         </DialogHeader>
         <div className="max-h-96 overflow-y-auto">
           {isLoading ? (
-            <p className="p-4 text-sm text-zinc-500">Loading…</p>
+            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
           ) : error ? (
-            <p className="p-4 text-sm text-red-400">{errMsg(error, 'Failed to load activity.')}</p>
+            <p className="p-4 text-sm text-danger-text">{errMsg(error, 'Failed to load activity.')}</p>
           ) : rows.length === 0 ? (
             <EmptyState icon={History} title="No activity yet" description="This user hasn't performed any audited actions." />
           ) : (
@@ -747,15 +747,15 @@ function ActivityDialog({
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.id} className="border-border align-top">
-                    <TableCell className="whitespace-nowrap text-xs tabular-nums text-zinc-500">
+                    <TableCell className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
                       {fmtActivityTime(r.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <span className="inline-block rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-emerald-400">
+                      <span className="inline-block rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-ink-accent">
                         {r.action}
                       </span>
                     </TableCell>
-                    <TableCell className="text-sm text-zinc-400">{r.description ?? '—'}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.description ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -835,13 +835,13 @@ function PermissionsMatrix() {
   return (
     <Card className="border-border bg-card">
       <CardHeader>
-        <CardTitle className="text-base text-zinc-100">Permissions Matrix</CardTitle>
+        <CardTitle className="text-base text-foreground">Permissions Matrix</CardTitle>
       </CardHeader>
       <CardContent className="overflow-x-auto px-0">
         {isLoading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading permissions…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading permissions…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{errMsg(error, 'Failed to load the permissions matrix.')}</p>
+          <p className="p-6 text-sm text-danger-text">{errMsg(error, 'Failed to load the permissions matrix.')}</p>
         ) : !data ? null : (
           <Table>
             <TableHeader>
@@ -857,9 +857,9 @@ function PermissionsMatrix() {
             <TableBody>
               {data.pages.map((p) => (
                 <TableRow key={p} className="border-border">
-                  <TableCell className="font-medium text-zinc-200">
+                  <TableCell className="font-medium text-foreground">
                     {pageLabel(p)}
-                    <span className="block font-mono text-[10px] text-zinc-600">{p}</span>
+                    <span className="block font-mono text-[10px] text-muted-foreground">{p}</span>
                   </TableCell>
                   {data.roles.map((r) => {
                     const locked = r === 'OWNER' && OWNER_PROTECTED_PAGES.includes(p)
@@ -883,7 +883,7 @@ function PermissionsMatrix() {
         )}
       </CardContent>
       {data && data.entries.length === 0 && (
-        <p className="px-6 pb-4 text-xs text-zinc-600">
+        <p className="px-6 pb-4 text-xs text-muted-foreground">
           No permissions have been saved yet — every switch below defaults to off (except OWNER's locked admin
           pages) until you toggle and save one.
         </p>
@@ -1016,13 +1016,13 @@ export default function Users() {
         <TabsContent value="users" className="mt-4">
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-base text-zinc-100">Team</CardTitle>
+              <CardTitle className="text-base text-foreground">Team</CardTitle>
             </CardHeader>
             <CardContent className="px-0">
               {isLoading ? (
-                <p className="p-6 text-sm text-zinc-500">Loading users…</p>
+                <p className="p-6 text-sm text-muted-foreground">Loading users…</p>
               ) : error ? (
-                <p className="p-6 text-sm text-red-400">{errMsg(error, 'Failed to load users.')}</p>
+                <p className="p-6 text-sm text-danger-text">{errMsg(error, 'Failed to load users.')}</p>
               ) : users.length === 0 ? (
                 <EmptyState icon={UsersIcon} title="No users yet" description="Create the first account with New User." />
               ) : (
@@ -1046,32 +1046,32 @@ export default function Users() {
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="h-8 w-8">
-                                <AvatarFallback className="bg-emerald-500/15 text-xs font-semibold text-emerald-400">
+                                <AvatarFallback className="bg-emerald-500/15 text-xs font-semibold text-ink-accent">
                                   {initials(u.name)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-zinc-100">
+                              <span className="font-medium text-foreground">
                                 {u.name}
-                                {isYou && <span className="ml-2 text-xs text-emerald-400">(you)</span>}
+                                {isYou && <span className="ml-2 text-xs text-ink-accent">(you)</span>}
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-zinc-400">{u.email}</TableCell>
+                          <TableCell className="text-muted-foreground">{u.email}</TableCell>
                           <TableCell>
                             <Badge
                               variant="outline"
-                              className={ROLE_CLASS[u.role] ?? 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30'}
+                              className={ROLE_CLASS[u.role] ?? 'bg-zinc-500/15 text-foreground border-zinc-500/30'}
                             >
                               {ROLE_LABEL[u.role] ?? u.role}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <span className={cn('inline-flex items-center gap-1.5 text-sm', active ? 'text-emerald-400' : 'text-red-400')}>
+                            <span className={cn('inline-flex items-center gap-1.5 text-sm', active ? 'text-ink-accent' : 'text-danger-text')}>
                               <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-emerald-400' : 'bg-red-400')} />
                               {active ? 'Active' : 'Blocked'}
                             </span>
                           </TableCell>
-                          <TableCell className="text-zinc-500">{fmtLastLogin(u.lastLoginAt)}</TableCell>
+                          <TableCell className="text-muted-foreground">{fmtLastLogin(u.lastLoginAt)}</TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -1103,7 +1103,7 @@ export default function Users() {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => handleToggleBlock(u)}
-                                  className={active ? 'text-red-400 focus:text-red-400' : 'text-emerald-400 focus:text-emerald-400'}
+                                  className={active ? 'text-danger-text focus:text-danger-text' : 'text-ink-accent focus:text-ink-accent'}
                                 >
                                   {active ? (
                                     <>
@@ -1137,7 +1137,7 @@ export default function Users() {
         <TabsContent value="security" className="mt-4">
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+              <CardTitle className="flex items-center gap-2 text-base text-foreground">
                 <Lock className="h-4 w-4 text-emerald-500" /> Security Controls
               </CardTitle>
             </CardHeader>
@@ -1147,13 +1147,13 @@ export default function Users() {
                 return (
                   <div
                     key={c.id}
-                    className="flex items-center justify-between gap-4 rounded-lg border border-transparent px-2 py-3 hover:border-border hover:bg-zinc-900/40"
+                    className="flex items-center justify-between gap-4 rounded-lg border border-transparent px-2 py-3 hover:border-border hover:bg-card/40"
                   >
                     <div className="flex items-start gap-3">
-                      <Icon className="mt-0.5 h-5 w-5 text-zinc-400" />
+                      <Icon className="mt-0.5 h-5 w-5 text-muted-foreground" />
                       <div>
-                        <p className="text-sm font-medium text-zinc-100">{c.label}</p>
-                        <p className="text-xs text-zinc-500">{c.desc}</p>
+                        <p className="text-sm font-medium text-foreground">{c.label}</p>
+                        <p className="text-xs text-muted-foreground">{c.desc}</p>
                       </div>
                     </div>
                     <Switch
@@ -1163,7 +1163,7 @@ export default function Users() {
                   </div>
                 )
               })}
-              <p className="px-2 pt-2 text-xs text-zinc-600">
+              <p className="px-2 pt-2 text-xs text-muted-foreground">
                 Security controls are presentational in the prototype.
               </p>
             </CardContent>

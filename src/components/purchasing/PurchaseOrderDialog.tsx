@@ -81,7 +81,7 @@ interface PurchaseOrderDialogProps {
 }
 
 const INPUT_CLS =
-  'bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9'
+  'bg-background border-border text-foreground placeholder:text-muted-foreground h-9'
 
 export default function PurchaseOrderDialog({
   open,
@@ -220,17 +220,17 @@ export default function PurchaseOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-xl">
+      <DialogContent className="bg-card border-border text-foreground max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50">New purchase order</DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogTitle className="text-foreground">New purchase order</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             Pick the supplier first — its affiliated items are surfaced at the
             top of the ingredient picker.
           </DialogDescription>
         </DialogHeader>
 
         {prefill && (
-          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-ink-accent">
             <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Raising this PO from approved request{' '}
             <span className="font-mono font-semibold">{prefill.prNo}</span>
@@ -239,22 +239,22 @@ export default function PurchaseOrderDialog({
 
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Supplier *</label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Supplier *</label>
             <Select value={supplierId || '_none'} onValueChange={(v) => setSupplierId(v === '_none' ? '' : v)}>
-              <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+              <SelectTrigger className="bg-background border-border text-foreground text-sm h-9">
                 <SelectValue placeholder="Select supplier…" />
               </SelectTrigger>
-              <SelectContent className="bg-[#121A17] border-[#1F2A24]">
-                <SelectItem value="_none" className="text-zinc-400">Select supplier…</SelectItem>
+              <SelectContent className="bg-card border-border">
+                <SelectItem value="_none" className="text-muted-foreground">Select supplier…</SelectItem>
                 {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id} className="text-zinc-200">
+                  <SelectItem key={s.id} value={s.id} className="text-foreground">
                     {s.code} — {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {suppliers.length === 0 && (
-              <p className="mt-1 text-[11px] text-amber-400/90">
+              <p className="mt-1 text-[11px] text-warn-text">
                 No active suppliers — add one in Master Data → Suppliers first.
               </p>
             )}
@@ -263,8 +263,8 @@ export default function PurchaseOrderDialog({
           {/* Line items */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className="block text-xs font-medium text-zinc-400">Line items *</label>
-              <span className="text-[11px] text-zinc-500">total {peso(total)}</span>
+              <label className="block text-xs font-medium text-muted-foreground">Line items *</label>
+              <span className="text-[11px] text-muted-foreground">total {peso(total)}</span>
             </div>
             <div className="space-y-2">
               {lines.map((l) => {
@@ -312,7 +312,7 @@ export default function PurchaseOrderDialog({
                       onClick={() => removeLine(l.key)}
                       disabled={lines.length === 1}
                       aria-label="Remove line"
-                      className="h-9 w-9 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+                      className="h-9 w-9 flex-none text-muted-foreground hover:text-danger-text hover:bg-red-500/10 disabled:opacity-40"
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -325,7 +325,7 @@ export default function PurchaseOrderDialog({
               variant="ghost"
               size="sm"
               onClick={() => setLines((ls) => [...ls, blankLine()])}
-              className="mt-2 h-8 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+              className="mt-2 h-8 text-ink-accent hover:text-ink-accent hover:bg-emerald-500/10"
             >
               <Plus className="h-3.5 w-3.5" />
               Add line
@@ -333,7 +333,7 @@ export default function PurchaseOrderDialog({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">Notes</label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Notes</label>
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -350,7 +350,7 @@ export default function PurchaseOrderDialog({
             <Button
               type="submit"
               disabled={saving || suppliers.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
             >
               {saving ? 'Creating…' : 'Create PO'}
             </Button>

@@ -161,14 +161,14 @@ const AVAIL_LABEL: Record<Availability, string> = {
 // ---------------------------------------------------------------------------
 
 const DEPT_CLASS: Record<string, string> = {
-  KITCHEN: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  WAREHOUSE: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  PURCHASING: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  SALES: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  PRODUCTION: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  QA: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
-  ACCOUNTING: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
-  ADMIN: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  KITCHEN: 'bg-amber-500/15 text-warn-text border-amber-500/30',
+  WAREHOUSE: 'bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/30',
+  PURCHASING: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
+  SALES: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
+  PRODUCTION: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30',
+  QA: 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30',
+  ACCOUNTING: 'bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30',
+  ADMIN: 'bg-emerald-500/15 text-ink-accent border-emerald-500/30',
 }
 
 function initials(name: string): string {
@@ -199,7 +199,7 @@ function isScope403(e: unknown): boolean {
 }
 
 function DeptBadge({ department }: { department: string }) {
-  const cls = DEPT_CLASS[department] ?? 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30'
+  const cls = DEPT_CLASS[department] ?? 'bg-zinc-500/15 text-muted-foreground border-zinc-500/30'
   return (
     <Badge variant="outline" className={cn('font-medium', cls)}>
       {department.charAt(0) + department.slice(1).toLowerCase()}
@@ -210,7 +210,7 @@ function DeptBadge({ department }: { department: string }) {
 /** All 7 day chips, working days lit — same visual as EmployeeProfile's header. */
 function ScheduleChips({ days }: { days?: string[] | null }) {
   const workDays = sanitizeWorkDays(days)
-  if (workDays.length === 0) return <span className="text-xs text-zinc-600">—</span>
+  if (workDays.length === 0) return <span className="text-xs text-muted-foreground">—</span>
   return (
     <div className="flex gap-1">
       {WORK_DAYS.map((d) => (
@@ -218,7 +218,7 @@ function ScheduleChips({ days }: { days?: string[] | null }) {
           key={d}
           className={cn(
             'rounded px-1 py-0.5 text-[9px] font-semibold uppercase',
-            workDays.includes(d) ? 'bg-emerald-500/15 text-emerald-300' : 'bg-zinc-800/60 text-zinc-600',
+            workDays.includes(d) ? 'bg-emerald-500/15 text-ink-accent' : 'bg-secondary/60 text-muted-foreground',
           )}
         >
           {DAY_LABEL[d]}
@@ -239,12 +239,12 @@ function CountTile({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-background/40 px-4 py-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-400">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-ink-accent">
         <Icon className="h-4 w-4" />
       </span>
       <div>
-        <p className="text-lg font-bold tabular-nums text-zinc-100 leading-none">{value}</p>
-        <p className="mt-1 text-[11px] uppercase tracking-wide text-zinc-500">{label}</p>
+        <p className="text-lg font-bold tabular-nums text-foreground leading-none">{value}</p>
+        <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
       </div>
     </div>
   )
@@ -263,9 +263,9 @@ function SectionHeader({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
-      <Icon className="h-4 w-4 text-zinc-400" />
-      <h3 className="text-sm font-semibold text-zinc-200">{title}</h3>
-      {count != null && <span className="text-xs text-zinc-500">({count})</span>}
+      <Icon className="h-4 w-4 text-muted-foreground" />
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {count != null && <span className="text-xs text-muted-foreground">({count})</span>}
       {action && <div className="ml-auto w-64 max-w-full">{action}</div>}
     </div>
   )
@@ -616,7 +616,7 @@ export default function OutletProfile() {
     return (
       <PageContainer>
         <Breadcrumb name="Loading…" />
-        <p className="text-sm text-zinc-500">Loading outlet…</p>
+        <p className="text-sm text-muted-foreground">Loading outlet…</p>
       </PageContainer>
     )
   }
@@ -649,31 +649,31 @@ export default function OutletProfile() {
       {/* ── Header card ──────────────────────────────────────────────────── */}
       <Card className="border-border bg-card p-5">
         <div className="flex flex-wrap items-start gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-300 ring-2 ring-emerald-500/30">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-ink-accent ring-2 ring-emerald-500/30">
             <Building2 className="h-7 w-7" />
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-zinc-50">{outlet.name}</h2>
-              <span className="font-mono text-xs text-emerald-300">{outlet.code}</span>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">{outlet.name}</h2>
+              <span className="font-mono text-xs text-ink-accent">{outlet.code}</span>
               <OutletStatusPill status={outlet.status} />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-zinc-400">
+            <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-zinc-500" />
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
                 {outlet.address || 'No address set'}
               </span>
               <span className="flex items-center gap-1.5">
-                <UserIcon className="h-3.5 w-3.5 text-zinc-500" />
+                <UserIcon className="h-3.5 w-3.5 text-muted-foreground" />
                 {outlet.contactName || '—'}
               </span>
               <span className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 text-zinc-500" />
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                 {outlet.contactPhone || '—'}
               </span>
               <span className="flex items-center gap-1.5">
-                <CalendarDays className="h-3.5 w-3.5 text-zinc-500" />
+                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                 {outlet.timezone}
               </span>
             </div>
@@ -705,14 +705,14 @@ export default function OutletProfile() {
         <Card className="border-border bg-card">
           <SectionHeader icon={Boxes} title="Outlet-wide menu availability" />
           <div className="flex flex-wrap items-center gap-3 p-5">
-            <p className="mr-auto max-w-md text-sm text-zinc-400">
+            <p className="mr-auto max-w-md text-sm text-muted-foreground">
               Bulk-set availability for every menu item currently deployed at this outlet, across
               all brands.
             </p>
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+              className="gap-1.5 border-emerald-500/30 text-ink-accent hover:bg-emerald-500/10"
               onClick={() => setBulkAvailTarget('AVAILABLE')}
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -721,7 +721,7 @@ export default function OutletProfile() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+              className="gap-1.5 border-amber-500/30 text-warn-text hover:bg-amber-500/10"
               onClick={() => setBulkAvailTarget('PAUSED')}
             >
               <PauseCircle className="h-3.5 w-3.5" />
@@ -730,7 +730,7 @@ export default function OutletProfile() {
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-red-500/30 text-red-300 hover:bg-red-500/10"
+              className="gap-1.5 border-red-500/30 text-danger-text hover:bg-red-500/10"
               onClick={() => setBulkAvailTarget('SOLD_OUT')}
             >
               <XCircle className="h-3.5 w-3.5" />
@@ -763,10 +763,10 @@ export default function OutletProfile() {
           }
         />
         {brandsQuery.isPending ? (
-          <p className="p-6 text-sm text-zinc-500">Loading brands…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading brands…</p>
         ) : brandsQuery.isError ? (
           <div className="p-5">
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-300">
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-warn-text">
               Brand deployments aren't available yet —{' '}
               {errMsg(brandsQuery.error, 'the server may not support this endpoint on this deploy.')}
             </p>
@@ -801,24 +801,24 @@ export default function OutletProfile() {
                         className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-black/20"
                         style={{ backgroundColor: b.color ?? '#71717A' }}
                       />
-                      <span className="font-medium text-zinc-100">{b.name}</span>
+                      <span className="font-medium text-foreground">{b.name}</span>
                     </span>
                   </TableCell>
                   <TableCell>
                     {b.home ? (
                       <Badge
                         variant="outline"
-                        className="gap-1 border-zinc-500/30 bg-zinc-500/10 text-zinc-300"
+                        className="gap-1 border-zinc-500/30 bg-zinc-500/10 text-foreground"
                       >
                         <Home className="h-3 w-3" /> Home
                       </Badge>
                     ) : (
-                      <span className="text-xs text-zinc-500">Deployed</span>
+                      <span className="text-xs text-muted-foreground">Deployed</span>
                     )}
                   </TableCell>
                   <TableCell>
                     {b.home ? (
-                      <span className="text-xs text-zinc-500">—</span>
+                      <span className="text-xs text-muted-foreground">—</span>
                     ) : (
                       <span className="flex items-center gap-1.5 text-xs">
                         <span
@@ -827,24 +827,24 @@ export default function OutletProfile() {
                             b.isActive ? 'bg-emerald-400' : 'bg-zinc-600',
                           )}
                         />
-                        <span className={b.isActive ? 'text-emerald-400' : 'text-zinc-500'}>
+                        <span className={b.isActive ? 'text-ink-accent' : 'text-muted-foreground'}>
                           {b.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-zinc-400">
+                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                     {b.home ? '—' : fmtDate(b.deployedAt)}
                   </TableCell>
                   {isOwner && (
                     <TableCell className="text-right">
                       {b.home ? (
-                        <span className="text-[11px] text-zinc-600">Home outlet</span>
+                        <span className="text-[11px] text-muted-foreground">Home outlet</span>
                       ) : (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          className="text-danger-text hover:bg-red-500/10 hover:text-danger-text"
                           onClick={() => setRemoveTarget(b)}
                           disabled={removeBrand.isPending}
                         >
@@ -884,10 +884,10 @@ export default function OutletProfile() {
           }
         />
         {assignedEmployeesQuery.isPending ? (
-          <p className="p-6 text-sm text-zinc-500">Loading employees…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading employees…</p>
         ) : assignedEmployeesQuery.isError ? (
           <div className="p-5">
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-300">
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-warn-text">
               Assigned employees aren't available yet —{' '}
               {errMsg(
                 assignedEmployeesQuery.error,
@@ -919,7 +919,7 @@ export default function OutletProfile() {
               {assignedEmployees.map((e) => (
                 <TableRow
                   key={e.id}
-                  className="cursor-pointer border-border transition-colors hover:bg-zinc-800/40"
+                  className="cursor-pointer border-border transition-colors hover:bg-secondary/40"
                   onClick={() => navigate(`/employees/${e.id}`)}
                 >
                   <TableCell>
@@ -931,13 +931,13 @@ export default function OutletProfile() {
                           className="h-9 w-9 rounded-full object-cover ring-1 ring-emerald-500/30"
                         />
                       ) : (
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-ink-accent ring-1 ring-emerald-500/30">
                           {initials(e.fullName)}
                         </span>
                       )}
                       <div className="min-w-0">
-                        <p className="truncate font-medium text-zinc-100">{e.fullName}</p>
-                        <p className="font-mono text-[11px] text-zinc-500">{e.employeeNo}</p>
+                        <p className="truncate font-medium text-foreground">{e.fullName}</p>
+                        <p className="font-mono text-[11px] text-muted-foreground">{e.employeeNo}</p>
                       </div>
                     </div>
                   </TableCell>
@@ -952,7 +952,7 @@ export default function OutletProfile() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-zinc-400 hover:bg-zinc-700/40 hover:text-zinc-200"
+                        className="text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
                         disabled={unassignEmployee.isPending}
                         onClick={(ev) => {
                           ev.stopPropagation()
@@ -995,15 +995,15 @@ export default function OutletProfile() {
             }
           />
           {stationsQuery.isPending ? (
-            <p className="p-5 text-sm text-zinc-500">Loading…</p>
+            <p className="p-5 text-sm text-muted-foreground">Loading…</p>
           ) : stations.length === 0 ? (
-            <p className="p-5 text-sm text-zinc-500">No kitchen stations at this outlet.</p>
+            <p className="p-5 text-sm text-muted-foreground">No kitchen stations at this outlet.</p>
           ) : (
             <ul className="divide-y divide-border">
               {stations.map((s) => (
                 <li key={s.id} className="flex items-center justify-between px-5 py-3">
-                  <span className="text-sm text-zinc-200">{s.name}</span>
-                  <span className="text-[11px] text-zinc-500">
+                  <span className="text-sm text-foreground">{s.name}</span>
+                  <span className="text-[11px] text-muted-foreground">
                     {s.defaultPrinter?.name ?? 'No printer'}
                   </span>
                 </li>
@@ -1026,7 +1026,7 @@ export default function OutletProfile() {
               warehouse={outlet.warehouses.find((w) => w.type === 'KITCHEN')}
             />
           </div>
-          <p className="px-5 pb-5 text-[11px] text-zinc-600">
+          <p className="px-5 pb-5 text-[11px] text-muted-foreground">
             Two-tier inventory — Main Warehouse and in-house Kitchen. Stock and ITO transfers are
             managed in Inventory.
           </p>
@@ -1036,7 +1036,7 @@ export default function OutletProfile() {
         <Card className="border-border bg-card">
           <SectionHeader icon={Link2} title="Channel Listings" />
           <div className="flex flex-col gap-2 p-5">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               Foodpanda / GrabFood listings belong to a brand, not a physical outlet.
             </p>
             <div className="mt-1 flex flex-wrap gap-2">
@@ -1072,14 +1072,14 @@ export default function OutletProfile() {
         open={removeTarget != null}
         onOpenChange={(o) => !o && !removeBrand.isPending && setRemoveTarget(null)}
       >
-        <DialogContent className="border-border bg-card text-zinc-50 sm:max-w-md">
+        <DialogContent className="border-border bg-card text-foreground sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Remove brand from this outlet?</DialogTitle>
             <DialogDescription>
               {removeTarget ? (
                 <>
-                  <span className="font-medium text-zinc-200">{removeTarget.name}</span> will be
-                  deactivated at <span className="font-medium text-zinc-200">{outlet.name}</span>.
+                  <span className="font-medium text-foreground">{removeTarget.name}</span> will be
+                  deactivated at <span className="font-medium text-foreground">{outlet.name}</span>.
                   Its deployment history is kept and it can be re-deployed later.
                 </>
               ) : null}
@@ -1108,7 +1108,7 @@ export default function OutletProfile() {
         open={editOpen}
         onOpenChange={(o) => !o && !editOutlet.isPending && setEditOpen(false)}
       >
-        <DialogContent className="border-border bg-card text-zinc-50">
+        <DialogContent className="border-border bg-card text-foreground">
           <form onSubmit={handleEditSubmit} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Edit outlet details</DialogTitle>
@@ -1117,7 +1117,7 @@ export default function OutletProfile() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Outlet code</span>
+                <span className="text-foreground">Outlet code</span>
                 <Input
                   value={editForm.code}
                   onChange={(event) =>
@@ -1127,7 +1127,7 @@ export default function OutletProfile() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Outlet name</span>
+                <span className="text-foreground">Outlet name</span>
                 <Input
                   value={editForm.name}
                   onChange={(event) =>
@@ -1137,7 +1137,7 @@ export default function OutletProfile() {
                 />
               </label>
               <label className="space-y-1.5 text-sm sm:col-span-2">
-                <span className="text-zinc-300">Address</span>
+                <span className="text-foreground">Address</span>
                 <Input
                   value={editForm.address}
                   onChange={(event) =>
@@ -1147,7 +1147,7 @@ export default function OutletProfile() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Timezone</span>
+                <span className="text-foreground">Timezone</span>
                 <Input
                   value={editForm.timezone}
                   onChange={(event) =>
@@ -1157,7 +1157,7 @@ export default function OutletProfile() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Status</span>
+                <span className="text-foreground">Status</span>
                 <Select
                   value={editForm.status}
                   onValueChange={(value) =>
@@ -1177,7 +1177,7 @@ export default function OutletProfile() {
                 </Select>
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Contact phone</span>
+                <span className="text-foreground">Contact phone</span>
                 <Input
                   value={editForm.contactPhone}
                   onChange={(event) =>
@@ -1187,7 +1187,7 @@ export default function OutletProfile() {
                 />
               </label>
               <label className="space-y-1.5 text-sm sm:col-span-2">
-                <span className="text-zinc-300">Contact person</span>
+                <span className="text-foreground">Contact person</span>
                 <Input
                   value={editForm.contactName}
                   onChange={(event) =>
@@ -1220,14 +1220,14 @@ export default function OutletProfile() {
         open={bulkAvailTarget != null}
         onOpenChange={(o) => !o && !bulkAvailability.isPending && setBulkAvailTarget(null)}
       >
-        <DialogContent className="border-border bg-card text-zinc-50 sm:max-w-md">
+        <DialogContent className="border-border bg-card text-foreground sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {bulkAvailTarget ? `Set every item to ${AVAIL_LABEL[bulkAvailTarget]}?` : 'Confirm'}
             </DialogTitle>
             <DialogDescription>
               This affects every menu item currently deployed at{' '}
-              <span className="font-medium text-zinc-200">{outlet.name}</span> — across every
+              <span className="font-medium text-foreground">{outlet.name}</span> — across every
               brand at this outlet, not just one.
             </DialogDescription>
           </DialogHeader>
@@ -1240,7 +1240,7 @@ export default function OutletProfile() {
               Cancel
             </Button>
             <Button
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={bulkAvailability.isPending}
               onClick={confirmBulkAvailability}
             >
@@ -1255,19 +1255,19 @@ export default function OutletProfile() {
         open={addStationOpen}
         onOpenChange={(o) => !o && !addStation.isPending && setAddStationOpen(false)}
       >
-        <DialogContent className="border-border bg-card text-zinc-50">
+        <DialogContent className="border-border bg-card text-foreground">
           <form onSubmit={handleAddStationSubmit} className="space-y-4">
             <DialogHeader>
               <DialogTitle>Add station</DialogTitle>
               <DialogDescription>
                 Create a new kitchen station at{' '}
-                <span className="font-medium text-zinc-200">{outlet.name}</span>.
+                <span className="font-medium text-foreground">{outlet.name}</span>.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3">
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Station name</span>
+                <span className="text-foreground">Station name</span>
                 <Input
                   value={addStationName}
                   onChange={(event) => setAddStationName(event.target.value)}
@@ -1277,7 +1277,7 @@ export default function OutletProfile() {
                 />
               </label>
               <label className="space-y-1.5 text-sm">
-                <span className="text-zinc-300">Default printer (optional)</span>
+                <span className="text-foreground">Default printer (optional)</span>
                 <Select value={addStationPrinterId || '_none'} onValueChange={setAddStationPrinterId}>
                   <SelectTrigger>
                     <SelectValue
@@ -1323,11 +1323,11 @@ export default function OutletProfile() {
 function Breadcrumb({ name }: { name: string }) {
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
-      <Link to="/outlets" className="text-zinc-400 transition-colors hover:text-zinc-200">
+      <Link to="/outlets" className="text-muted-foreground transition-colors hover:text-foreground">
         Outlets
       </Link>
-      <Crumb className="h-3.5 w-3.5 text-zinc-600" />
-      <span className="font-medium text-zinc-100">{name}</span>
+      <Crumb className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="font-medium text-foreground">{name}</span>
     </nav>
   )
 }
@@ -1337,7 +1337,7 @@ function OutletStatusPill({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
   return (
     <span className="flex items-center gap-1.5 text-xs">
       <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-emerald-400' : 'bg-zinc-600')} />
-      <span className={active ? 'text-emerald-400' : 'text-zinc-500'}>
+      <span className={active ? 'text-ink-accent' : 'text-muted-foreground'}>
         {active ? 'Active' : 'Inactive'}
       </span>
     </span>
@@ -1357,13 +1357,13 @@ function WarehousePill({ label, warehouse }: { label: string; warehouse?: Outlet
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
         ready
-          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-          : 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-ink-accent'
+          : 'border-amber-500/30 bg-amber-500/10 text-warn-text',
       )}
     >
       {ready ? label : `${label} — not provisioned`}
       {ready && (
-        <span className="font-mono text-[10px] text-emerald-400/70">
+        <span className="font-mono text-[10px] text-ink-accent">
           #{warehouse.id.slice(0, 6)}
         </span>
       )}

@@ -129,12 +129,12 @@ export default function AdjustmentDialog({
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!submitting) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-md">
+      <DialogContent className="bg-card border-border text-foreground max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50">
+          <DialogTitle className="text-foreground">
             Adjust stock — {ingredient?.name ?? ''}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogDescription className="text-muted-foreground">
             {warehouseLabel ? `${warehouseLabel} warehouse · ` : ''}
             Write-offs (expiry, spoilage, negligence) and corrections. Submitted
             for approval — stock moves only once approved.
@@ -144,7 +144,7 @@ export default function AdjustmentDialog({
         <form onSubmit={e => void handleSubmit(e)} className="space-y-4">
           {/* Direction toggle */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
               Direction
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -155,8 +155,8 @@ export default function AdjustmentDialog({
                 className={[
                   'flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors',
                   direction === 'OUT'
-                    ? 'border-red-500/50 bg-red-500/15 text-red-300'
-                    : 'border-[#1F2A24] bg-[#0A0F0D] text-zinc-400 hover:text-zinc-200',
+                    ? 'border-red-500/50 bg-red-500/15 text-danger-text'
+                    : 'border-border bg-background text-muted-foreground hover:text-foreground',
                 ].join(' ')}
               >
                 <ArrowDownCircle className="h-4 w-4" aria-hidden />
@@ -169,8 +169,8 @@ export default function AdjustmentDialog({
                 className={[
                   'flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors',
                   direction === 'IN'
-                    ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                    : 'border-[#1F2A24] bg-[#0A0F0D] text-zinc-400 hover:text-zinc-200',
+                    ? 'border-emerald-500/50 bg-emerald-500/15 text-ink-accent'
+                    : 'border-border bg-background text-muted-foreground hover:text-foreground',
                 ].join(' ')}
               >
                 <ArrowUpCircle className="h-4 w-4" aria-hidden />
@@ -181,7 +181,7 @@ export default function AdjustmentDialog({
 
           {/* Quantity */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
               Quantity
             </label>
             <div className="flex items-center gap-2">
@@ -194,9 +194,9 @@ export default function AdjustmentDialog({
                 required
                 autoFocus
                 placeholder="0"
-                className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
-              <span className="shrink-0 text-sm text-zinc-500 min-w-[3rem]">
+              <span className="shrink-0 text-sm text-muted-foreground min-w-[3rem]">
                 {ingredient?.unit ?? ''}
               </span>
             </div>
@@ -204,16 +204,16 @@ export default function AdjustmentDialog({
 
           {/* Reason */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
               Reason
             </label>
             <Select value={reason} onValueChange={v => setReason(v as AdjustmentReason)}>
-              <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+              <SelectTrigger className="bg-background border-border text-foreground text-sm h-9">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-[#121A17] border-[#1F2A24]">
+              <SelectContent className="bg-card border-border">
                 {REASONS.map(r => (
-                  <SelectItem key={r.value} value={r.value} className="text-zinc-200">
+                  <SelectItem key={r.value} value={r.value} className="text-foreground">
                     {r.label}
                   </SelectItem>
                 ))}
@@ -223,8 +223,8 @@ export default function AdjustmentDialog({
 
           {/* Note */}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-400">
-              Note <span className="text-zinc-600">(optional)</span>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              Note <span className="text-muted-foreground">(optional)</span>
             </label>
             <textarea
               value={note}
@@ -232,7 +232,7 @@ export default function AdjustmentDialog({
               maxLength={500}
               rows={2}
               placeholder="e.g. batch expired 07/07, dropped tray…"
-              className="w-full rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
             />
           </div>
 
@@ -243,7 +243,7 @@ export default function AdjustmentDialog({
               size="sm"
               onClick={() => onOpenChange(false)}
               disabled={submitting}
-              className="border-[#1F2A24] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+              className="border-border text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             >
               Cancel
             </Button>
@@ -251,7 +251,7 @@ export default function AdjustmentDialog({
               type="submit"
               disabled={submitting}
               size="sm"
-              className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+              className="ml-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
             >
               {submitting ? 'Submitting…' : 'Submit for approval'}
             </Button>

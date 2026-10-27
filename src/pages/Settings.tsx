@@ -42,12 +42,12 @@ function ToggleRow({
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-transparent px-2 py-3 hover:border-border hover:bg-zinc-900/40">
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-transparent px-2 py-3 hover:border-border hover:bg-card/40">
       <div className="flex items-start gap-3">
-        <Icon className="mt-0.5 h-5 w-5 text-zinc-400" />
+        <Icon className="mt-0.5 h-5 w-5 text-muted-foreground" />
         <div>
-          <p className="text-sm font-medium text-zinc-100">{label}</p>
-          <p className="text-xs text-zinc-500">{desc}</p>
+          <p className="text-sm font-medium text-foreground">{label}</p>
+          <p className="text-xs text-muted-foreground">{desc}</p>
         </div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
@@ -77,14 +77,14 @@ function AccessControlCard() {
   return (
     <Card className="border-border bg-card lg:col-span-2">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
           <ShieldCheck className="h-4 w-4 text-emerald-500" /> Access Control
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {isOwner ? (
           <>
-            <p className="text-zinc-400">
+            <p className="text-muted-foreground">
               Manage which roles can reach which pages, plus per-user accounts, outlet access, password resets,
               and account status, from Users &amp; Roles.
             </p>
@@ -97,22 +97,22 @@ function AccessControlCard() {
           </>
         ) : (
           <>
-            <p className="text-zinc-400">
-              Your role (<span className="text-zinc-200">{user?.role ? user.role.replace(/_/g, ' ') : '—'}</span>)
+            <p className="text-muted-foreground">
+              Your role (<span className="text-foreground">{user?.role ? user.role.replace(/_/g, ' ') : '—'}</span>)
               can access:
             </p>
             <div className="flex flex-wrap gap-1.5">
               {accessiblePages.length === 0 ? (
-                <span className="text-xs text-zinc-600">No pages configured for this role.</span>
+                <span className="text-xs text-muted-foreground">No pages configured for this role.</span>
               ) : (
                 accessiblePages.map((p) => (
-                  <Badge key={p.to} variant="outline" className="border-zinc-700 text-zinc-300">
+                  <Badge key={p.to} variant="outline" className="border-border text-foreground">
                     {p.label}
                   </Badge>
                 ))
               )}
             </div>
-            <p className="pt-1 text-xs text-zinc-600">
+            <p className="pt-1 text-xs text-muted-foreground">
               Page access is enforced server-side. Contact an OWNER to request a change.
             </p>
           </>
@@ -164,8 +164,8 @@ function ModulesCard() {
   return (
     <Card className="border-border bg-card lg:col-span-2">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
-          <Boxes className="h-4 w-4 text-emerald-400" aria-hidden /> Modules
+        <CardTitle className="flex items-center gap-2 text-base text-foreground">
+          <Boxes className="h-4 w-4 text-ink-accent" aria-hidden /> Modules
         </CardTitle>
         <p className="text-sm text-muted-foreground">
           Turn off what this business doesn't use. Its pages disappear for everyone and come back when you turn it on.
@@ -174,11 +174,11 @@ function ModulesCard() {
       </CardHeader>
       <CardContent className="divide-y divide-border">
         {isPending && <p className="py-3 text-sm text-muted-foreground">Loading modules…</p>}
-        {error && <p className="py-3 text-sm text-red-400">Could not load modules.</p>}
+        {error && <p className="py-3 text-sm text-danger-text">Could not load modules.</p>}
         {modules.map((m) => (
           <div key={m.key} className="flex items-center justify-between gap-4 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-zinc-100">{m.label}</p>
+              <p className="text-sm font-medium text-foreground">{m.label}</p>
               <p className="text-xs text-muted-foreground">{m.description}</p>
             </div>
             <Switch
@@ -219,7 +219,7 @@ export default function Settings() {
         {/* General */}
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
               <SlidersHorizontal className="h-4 w-4 text-emerald-500" /> General
             </CardTitle>
           </CardHeader>
@@ -233,7 +233,7 @@ export default function Settings() {
               <div className="flex-1">
                 <Field label="Overdue prep threshold (min)" defaultValue="15" />
               </div>
-              <Clock className="mb-2.5 h-4 w-4 text-zinc-500" />
+              <Clock className="mb-2.5 h-4 w-4 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
@@ -241,7 +241,7 @@ export default function Settings() {
         {/* Notifications */}
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
               <Bell className="h-4 w-4 text-emerald-500" /> Notifications
             </CardTitle>
           </CardHeader>
@@ -255,15 +255,15 @@ export default function Settings() {
         {/* Aggregator integration */}
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
               <Plug className="h-4 w-4 text-emerald-500" /> Aggregator Integration
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <Row label="foodpanda" value={<Badge variant="outline" className="border-zinc-600 text-zinc-400">Simulator</Badge>} />
-            <Row label="GrabFood" value={<Badge variant="outline" className="border-zinc-600 text-zinc-400">Simulator</Badge>} />
-            <Row label="Middleware (Deliverect / UrbanPiper)" value={<Badge variant="outline" className="border-amber-500/40 text-amber-400">Not connected</Badge>} />
-            <p className="pt-1 text-xs text-zinc-600">
+            <Row label="foodpanda" value={<Badge variant="outline" className="border-input text-muted-foreground">Simulator</Badge>} />
+            <Row label="GrabFood" value={<Badge variant="outline" className="border-input text-muted-foreground">Simulator</Badge>} />
+            <Row label="Middleware (Deliverect / UrbanPiper)" value={<Badge variant="outline" className="border-amber-500/40 text-warn-text">Not connected</Badge>} />
+            <p className="pt-1 text-xs text-muted-foreground">
               Live order feed is a later phase — middleware-first behind the normalized adapter.
             </p>
           </CardContent>
@@ -272,14 +272,14 @@ export default function Settings() {
         {/* Print agent */}
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
               <Printer className="h-4 w-4 text-emerald-500" /> Print Agent
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
             <ToggleRow icon={Printer} label="Auto-reprint on failure" desc="Retry a failed ticket automatically." checked={t.autoReprint} onChange={set('autoReprint')} />
-            <Row label="Agent token" value={<span className="font-mono text-xs text-zinc-500">••••••••••••</span>} />
-            <p className="pt-1 text-xs text-zinc-600">
+            <Row label="Agent token" value={<span className="font-mono text-xs text-muted-foreground">••••••••••••</span>} />
+            <p className="pt-1 text-xs text-muted-foreground">
               Physical printing is handled by the desktop Print Agent (mock in the prototype). The web app never prints.
             </p>
           </CardContent>
@@ -288,7 +288,7 @@ export default function Settings() {
         {/* About */}
         <Card className="border-border bg-card lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-zinc-100">
+            <CardTitle className="flex items-center gap-2 text-base text-foreground">
               <Info className="h-4 w-4 text-emerald-500" /> About
             </CardTitle>
           </CardHeader>
@@ -301,7 +301,7 @@ export default function Settings() {
         </Card>
       </div>
 
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-muted-foreground">
         General, notification, integration, and print-agent settings are presentational in the prototype. Access
         Control above is live — role-based page permissions are enforced server-side.
       </p>
@@ -312,7 +312,7 @@ export default function Settings() {
 function Field({ label, defaultValue }: { label: string; defaultValue: string }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</label>
       <Input defaultValue={defaultValue} />
     </div>
   )
@@ -321,8 +321,8 @@ function Field({ label, defaultValue }: { label: string; defaultValue: string })
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-zinc-400">{label}</span>
-      <span className="text-zinc-200">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground">{value}</span>
     </div>
   )
 }

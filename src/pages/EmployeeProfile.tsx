@@ -244,28 +244,28 @@ function errMsg(e: unknown, fallback: string): string {
 const DAY_CELL_CLASS: Record<DayStatus, string> = {
   PRESENT: 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20',
   ABSENT: 'border-red-500/40 bg-red-500/10 hover:bg-red-500/20',
-  REST: 'border-border bg-zinc-800/40 hover:bg-zinc-800/70',
+  REST: 'border-border bg-secondary/40 hover:bg-secondary/70',
   FORFEITED: 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20',
   OPEN: 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20',
   FUTURE: 'border-border/60 bg-transparent',
 }
 
 const DAY_NUM_CLASS: Record<DayStatus, string> = {
-  PRESENT: 'text-emerald-300',
-  ABSENT: 'text-red-300',
-  REST: 'text-zinc-500',
-  FORFEITED: 'text-amber-300',
-  OPEN: 'text-amber-300',
-  FUTURE: 'text-zinc-600',
+  PRESENT: 'text-ink-accent',
+  ABSENT: 'text-danger-text',
+  REST: 'text-muted-foreground',
+  FORFEITED: 'text-warn-text',
+  OPEN: 'text-warn-text',
+  FUTURE: 'text-muted-foreground',
 }
 
 const DAY_BADGE_CLASS: Record<DayStatus, string> = {
-  PRESENT: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  ABSENT: 'bg-red-500/15 text-red-300 border-red-500/30',
-  REST: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
-  FORFEITED: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  OPEN: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  FUTURE: 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20',
+  PRESENT: 'bg-emerald-500/15 text-ink-accent border-emerald-500/30',
+  ABSENT: 'bg-red-500/15 text-danger-text border-red-500/30',
+  REST: 'bg-zinc-500/15 text-foreground border-zinc-500/30',
+  FORFEITED: 'bg-amber-500/15 text-warn-text border-amber-500/30',
+  OPEN: 'bg-amber-500/15 text-warn-text border-amber-500/30',
+  FUTURE: 'bg-zinc-500/10 text-muted-foreground border-zinc-500/20',
 }
 
 const DAY_STATUS_LABEL: Record<DayStatus, string> = {
@@ -293,10 +293,10 @@ function DayStatusPill({ status }: { status: DayStatus }) {
 type Tone = 'emerald' | 'red' | 'amber' | 'zinc'
 
 const TONE_VALUE: Record<Tone, string> = {
-  emerald: 'text-emerald-300',
-  red: 'text-red-300',
-  amber: 'text-amber-300',
-  zinc: 'text-zinc-100',
+  emerald: 'text-ink-accent',
+  red: 'text-danger-text',
+  amber: 'text-warn-text',
+  zinc: 'text-foreground',
 }
 
 function StatTile({
@@ -312,9 +312,9 @@ function StatTile({
 }) {
   return (
     <Card className="border-border bg-card p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className={cn('mt-1.5 text-2xl font-bold tabular-nums', TONE_VALUE[tone])}>{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-zinc-600">{hint}</p>}
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </Card>
   )
 }
@@ -419,11 +419,11 @@ function CreateLoginDialog({
           <DialogTitle>Create Login</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-          <p className="text-xs text-zinc-500">
-            Create an ORION login for <span className="text-zinc-300">{employeeName}</span>.
+          <p className="text-xs text-muted-foreground">
+            Create an ORION login for <span className="text-foreground">{employeeName}</span>.
           </p>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Email</label>
+            <label className="text-xs font-medium text-muted-foreground">Email</label>
             <Input
               type="email"
               placeholder="name@company.com"
@@ -435,10 +435,10 @@ function CreateLoginDialog({
               disabled={submitting}
               autoComplete="off"
             />
-            {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+            {emailError && <p className="text-xs text-danger-text">{emailError}</p>}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Password</label>
+            <label className="text-xs font-medium text-muted-foreground">Password</label>
             <div className="relative">
               <Input
                 type={showPassword ? 'text' : 'password'}
@@ -452,7 +452,7 @@ function CreateLoginDialog({
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
@@ -461,7 +461,7 @@ function CreateLoginDialog({
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Role</label>
+            <label className="text-xs font-medium text-muted-foreground">Role</label>
             <Select value={role} onValueChange={setRole} disabled={submitting}>
               <SelectTrigger>
                 <SelectValue placeholder="Select role" />
@@ -475,7 +475,7 @@ function CreateLoginDialog({
               </SelectContent>
             </Select>
           </div>
-          {formError && <p className="text-xs text-red-400">{formError}</p>}
+          {formError && <p className="text-xs text-danger-text">{formError}</p>}
           <DialogFooter>
             <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
               {submitting ? 'Creating…' : 'Create Login'}
@@ -608,7 +608,7 @@ export default function EmployeeProfile() {
     return (
       <PageContainer>
         <Breadcrumb name="Loading…" />
-        <p className="text-sm text-zinc-500">Loading employee profile…</p>
+        <p className="text-sm text-muted-foreground">Loading employee profile…</p>
       </PageContainer>
     )
   }
@@ -706,17 +706,17 @@ export default function EmployeeProfile() {
               />
             </button>
           ) : (
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xl font-semibold text-emerald-300 ring-2 ring-emerald-500/30">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xl font-semibold text-ink-accent ring-2 ring-emerald-500/30">
               {initials(employee.fullName)}
             </div>
           )}
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-zinc-50">{employee.fullName}</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-foreground">{employee.fullName}</h2>
               <StatusBadge status={employee.status} />
               {employee.userId ? (
-                <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-ink-accent">
                   <KeyRound className="h-3 w-3" />
                   {employee.userEmail ? `Login linked — ${employee.userEmail}` : 'Login linked'}
                 </Badge>
@@ -724,23 +724,23 @@ export default function EmployeeProfile() {
                 <button
                   type="button"
                   onClick={() => setLoginDialogOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-zinc-500/30 bg-zinc-500/10 px-2.5 py-0.5 text-xs font-semibold text-zinc-400 transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="inline-flex items-center gap-1 rounded-md border border-zinc-500/30 bg-zinc-500/10 px-2.5 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-ink-accent focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
                   <KeyRound className="h-3 w-3" /> Create login
                 </button>
               ) : (
-                <Badge variant="outline" className="gap-1 border-zinc-500/30 bg-zinc-500/10 text-zinc-400">
+                <Badge variant="outline" className="gap-1 border-zinc-500/30 bg-zinc-500/10 text-muted-foreground">
                   No login account
                 </Badge>
               )}
             </div>
-            <p className="mt-1 text-sm text-zinc-400">
-              <span className="font-mono text-xs text-zinc-500">{employee.employeeNo}</span>
+            <p className="mt-1 text-sm text-muted-foreground">
+              <span className="font-mono text-xs text-muted-foreground">{employee.employeeNo}</span>
               {' · '}
               {employee.department.charAt(0) + employee.department.slice(1).toLowerCase()}
               {employee.position ? ` · ${employee.position}` : ''}
               {outletName && (
-                <span className="ml-2 inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-300">
+                <span className="ml-2 inline-flex items-center rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-700 dark:text-violet-300">
                   {outletName}
                 </span>
               )}
@@ -749,9 +749,9 @@ export default function EmployeeProfile() {
             <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
               {/* Schedule chips — all 7 days, working days lit */}
               <div className="flex items-center gap-1.5">
-                <CalendarDays className="h-3.5 w-3.5 text-zinc-500" />
+                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                 {workDays.length === 0 ? (
-                  <span className="text-sm text-zinc-500">Schedule: —</span>
+                  <span className="text-sm text-muted-foreground">Schedule: —</span>
                 ) : (
                   <div className="flex gap-1">
                     {WORK_DAYS.map((d) => (
@@ -760,8 +760,8 @@ export default function EmployeeProfile() {
                         className={cn(
                           'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
                           workDays.includes(d)
-                            ? 'bg-emerald-500/15 text-emerald-300'
-                            : 'bg-zinc-800/60 text-zinc-600',
+                            ? 'bg-emerald-500/15 text-ink-accent'
+                            : 'bg-secondary/60 text-muted-foreground',
                         )}
                       >
                         {DAY_LABEL[d]}
@@ -770,11 +770,11 @@ export default function EmployeeProfile() {
                   </div>
                 )}
                 {workDays.length > 0 && (
-                  <span className="ml-1 text-xs text-zinc-500">({formatWorkDays(workDays)})</span>
+                  <span className="ml-1 text-xs text-muted-foreground">({formatWorkDays(workDays)})</span>
                 )}
               </div>
-              <span className="flex items-center gap-1.5 text-sm text-zinc-400">
-                <BadgeCheck className="h-3.5 w-3.5 text-zinc-500" />
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <BadgeCheck className="h-3.5 w-3.5 text-muted-foreground" />
                 {employee.hiredAt ? `Hired ${fmtDate(employee.hiredAt)}` : 'Hire date not set'}
               </span>
             </div>
@@ -791,7 +791,7 @@ export default function EmployeeProfile() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="w-36 text-center text-sm font-medium tabular-nums text-zinc-200">
+            <span className="w-36 text-center text-sm font-medium tabular-nums text-foreground">
               {monthLabel(month)}
             </span>
             <Button
@@ -810,13 +810,13 @@ export default function EmployeeProfile() {
 
       {/* ── Month summary + calendar ─────────────────────────────────────── */}
       {profileQuery.isError ? (
-        <Card className="border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-300">
+        <Card className="border-amber-500/30 bg-amber-500/5 p-4 text-sm text-warn-text">
           Monthly attendance summary isn't available —{' '}
           {errMsg(profileQuery.error, 'the server may not support employee profiles yet.')} Punch
           history below still reflects live data.
         </Card>
       ) : !stats && profileQuery.isPending ? (
-        <p className="text-sm text-zinc-500">Loading month summary…</p>
+        <p className="text-sm text-muted-foreground">Loading month summary…</p>
       ) : stats ? (
         <>
           {/* Stats row */}
@@ -854,7 +854,7 @@ export default function EmployeeProfile() {
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                 <div
                   key={d}
-                  className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-500"
+                  className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
                 >
                   {d}
                 </div>
@@ -883,23 +883,23 @@ export default function EmployeeProfile() {
                       {dayNum}
                     </span>
                     {day.time_in && (
-                      <span className="text-[10px] tabular-nums text-zinc-400">
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
                         in {fmtClock(day.time_in.at)}
                       </span>
                     )}
                     {day.time_out && (
-                      <span className="text-[10px] tabular-nums text-zinc-400">
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
                         out {fmtClock(day.time_out.at)}
                       </span>
                     )}
                     {!day.time_in && day.status === 'REST' && (
-                      <span className="text-[10px] text-zinc-600">rest</span>
+                      <span className="text-[10px] text-muted-foreground">rest</span>
                     )}
                     {day.status === 'ABSENT' && (
-                      <span className="text-[10px] text-red-400/80">absent</span>
+                      <span className="text-[10px] text-danger-text">absent</span>
                     )}
                     {(day.status === 'FORFEITED' || day.status === 'OPEN') && (
-                      <span className="text-[10px] text-amber-400/80">
+                      <span className="text-[10px] text-warn-text">
                         {day.status === 'OPEN' ? 'open' : 'forfeited'}
                       </span>
                     )}
@@ -919,7 +919,7 @@ export default function EmployeeProfile() {
                   ['FUTURE', 'Upcoming'],
                 ] as Array<[DayStatus, string]>
               ).map(([s, label]) => (
-                <span key={s} className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                <span key={s} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span className={cn('h-2.5 w-2.5 rounded-sm border', DAY_CELL_CLASS[s])} />
                   {label}
                 </span>
@@ -932,16 +932,16 @@ export default function EmployeeProfile() {
       {/* ── Punch history ────────────────────────────────────────────────── */}
       <Card className="border-border bg-card">
         <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-          <History className="h-4 w-4 text-zinc-400" />
-          <h3 className="text-sm font-semibold text-zinc-200">Punch history</h3>
-          <span className="ml-auto text-xs text-zinc-500">
+          <History className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Punch history</h3>
+          <span className="ml-auto text-xs text-muted-foreground">
             {punches.length} record{punches.length === 1 ? '' : 's'}
           </span>
         </div>
         {punchesQuery.isPending ? (
-          <p className="p-6 text-sm text-zinc-500">Loading punches…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading punches…</p>
         ) : punchesQuery.isError ? (
-          <p className="p-6 text-sm text-red-400">
+          <p className="p-6 text-sm text-danger-text">
             {errMsg(punchesQuery.error, 'Failed to load punch history.')}
           </p>
         ) : punches.length === 0 ? (
@@ -966,7 +966,7 @@ export default function EmployeeProfile() {
               <TableBody>
                 {punches.map((p) => (
                   <TableRow key={p.id} className="border-border">
-                    <TableCell className="whitespace-nowrap text-sm text-zinc-300">
+                    <TableCell className="whitespace-nowrap text-sm text-foreground">
                       {new Date(p.capturedAt).toLocaleDateString([], {
                         month: 'short',
                         day: 'numeric',
@@ -978,14 +978,14 @@ export default function EmployeeProfile() {
                         className={cn(
                           'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
                           p.type === 'TIME_IN'
-                            ? 'bg-emerald-500/15 text-emerald-300'
-                            : 'bg-amber-500/15 text-amber-300',
+                            ? 'bg-emerald-500/15 text-ink-accent'
+                            : 'bg-amber-500/15 text-warn-text',
                         )}
                       >
                         {p.type === 'TIME_IN' ? 'TIME IN' : 'TIME OUT'}
                       </span>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
+                    <TableCell className="whitespace-nowrap text-sm tabular-nums text-foreground">
                       {fmtClock(p.capturedAt)}
                     </TableCell>
                     <TableCell>
@@ -1004,10 +1004,10 @@ export default function EmployeeProfile() {
                     </TableCell>
                     {punchesHaveStatus && (
                       <TableCell>
-                        {p.status ? <StatusBadge status={p.status} /> : <span className="text-zinc-600">—</span>}
+                        {p.status ? <StatusBadge status={p.status} /> : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                     )}
-                    <TableCell className="max-w-[16rem] truncate text-xs text-zinc-500">
+                    <TableCell className="max-w-[16rem] truncate text-xs text-muted-foreground">
                       {p.note ?? '—'}
                     </TableCell>
                   </TableRow>
@@ -1027,7 +1027,7 @@ export default function EmployeeProfile() {
               </div>
             )}
             {punchLimit >= PUNCH_MAX && punches.length >= PUNCH_MAX && (
-              <p className="border-t border-border p-3 text-center text-xs text-zinc-600">
+              <p className="border-t border-border p-3 text-center text-xs text-muted-foreground">
                 Showing the latest {PUNCH_MAX} punches (server limit).
               </p>
             )}
@@ -1039,23 +1039,23 @@ export default function EmployeeProfile() {
       {isOwner && (
         <Card className="border-border bg-card">
           <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-            <BarChart3 className="h-4 w-4 text-zinc-400" />
-            <h3 className="text-sm font-semibold text-zinc-200">Performance &amp; activity</h3>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">Performance &amp; activity</h3>
             {linkedUserId && (
-              <span className="ml-auto text-xs text-zinc-500">{monthLabel(month)}</span>
+              <span className="ml-auto text-xs text-muted-foreground">{monthLabel(month)}</span>
             )}
           </div>
           <div className="p-5">
             {!linkedUserId ? (
-              <p className="flex items-center gap-2 text-sm text-zinc-500">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <UserX className="h-4 w-4 shrink-0" />
                 No login account linked — attendance stats above are the full picture for this
                 employee.
               </p>
             ) : perfQuery.isPending ? (
-              <p className="text-sm text-zinc-500">Loading performance…</p>
+              <p className="text-sm text-muted-foreground">Loading performance…</p>
             ) : perfQuery.isError ? (
-              <p className="text-sm text-red-400">
+              <p className="text-sm text-danger-text">
                 {errMsg(perfQuery.error, 'Failed to load performance.')}
               </p>
             ) : perfQuery.data ? (
@@ -1069,15 +1069,15 @@ export default function EmployeeProfile() {
 
                 {perfQuery.data.activity.byAction.length > 0 && (
                   <div>
-                    <p className="mb-1.5 text-xs font-medium text-zinc-400">Top actions</p>
+                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">Top actions</p>
                     <div className="flex flex-wrap gap-1.5">
                       {perfQuery.data.activity.byAction.slice(0, 6).map((a) => (
                         <span
                           key={a.action}
-                          className="inline-flex items-center gap-1.5 rounded bg-zinc-800 px-2 py-1 font-mono text-[11px] text-emerald-400"
+                          className="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 font-mono text-[11px] text-ink-accent"
                         >
                           {a.action}
-                          <span className="text-zinc-500">×{a.count}</span>
+                          <span className="text-muted-foreground">×{a.count}</span>
                         </span>
                       ))}
                     </div>
@@ -1085,16 +1085,16 @@ export default function EmployeeProfile() {
                 )}
 
                 <div>
-                  <p className="mb-1.5 text-xs font-medium text-zinc-400">Recent activity</p>
+                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">Recent activity</p>
                   {activityQuery.isPending ? (
-                    <p className="text-sm text-zinc-500">Loading…</p>
+                    <p className="text-sm text-muted-foreground">Loading…</p>
                   ) : (activityQuery.data ?? []).length === 0 ? (
-                    <p className="text-xs text-zinc-600">No audited actions yet.</p>
+                    <p className="text-xs text-muted-foreground">No audited actions yet.</p>
                   ) : (
                     <ul className="space-y-1.5">
                       {(activityQuery.data ?? []).slice(0, 8).map((r) => (
                         <li key={r.id} className="flex items-baseline gap-3 text-sm">
-                          <span className="shrink-0 text-xs tabular-nums text-zinc-500">
+                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                             {new Date(r.createdAt).toLocaleString([], {
                               month: 'short',
                               day: 'numeric',
@@ -1102,10 +1102,10 @@ export default function EmployeeProfile() {
                               minute: '2-digit',
                             })}
                           </span>
-                          <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-emerald-400">
+                          <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-ink-accent">
                             {r.action}
                           </span>
-                          <span className="truncate text-xs text-zinc-500">{r.description ?? ''}</span>
+                          <span className="truncate text-xs text-muted-foreground">{r.description ?? ''}</span>
                         </li>
                       ))}
                     </ul>
@@ -1130,7 +1130,7 @@ export default function EmployeeProfile() {
               </DialogHeader>
               <div className="space-y-4 pt-1">
                 {!selectedDay.scheduled && (
-                  <p className="text-xs text-zinc-500">Not a scheduled working day.</p>
+                  <p className="text-xs text-muted-foreground">Not a scheduled working day.</p>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   {(
@@ -1140,12 +1140,12 @@ export default function EmployeeProfile() {
                     ] as Array<['in' | 'out', string, ProfilePunch | null]>
                   ).map(([which, label, punch]) => (
                     <div key={which} className="rounded-lg border border-border bg-background/40 p-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                         {label}
                       </p>
                       {punch ? (
                         <>
-                          <p className="mt-1 text-lg font-semibold tabular-nums text-zinc-100">
+                          <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
                             {fmtClock(punch.at)}
                           </p>
                           {punch.photo_url ? (
@@ -1162,18 +1162,18 @@ export default function EmployeeProfile() {
                               />
                             </button>
                           ) : (
-                            <p className="mt-2 text-xs text-zinc-600">No photo</p>
+                            <p className="mt-2 text-xs text-muted-foreground">No photo</p>
                           )}
                         </>
                       ) : (
-                        <p className="mt-1 text-sm text-zinc-600">—</p>
+                        <p className="mt-1 text-sm text-muted-foreground">—</p>
                       )}
                     </div>
                   ))}
                 </div>
                 <div className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-3 py-2">
-                  <span className="text-xs text-zinc-500">Worked time</span>
-                  <span className="text-sm font-semibold tabular-nums text-zinc-100">
+                  <span className="text-xs text-muted-foreground">Worked time</span>
+                  <span className="text-sm font-semibold tabular-nums text-foreground">
                     {fmtWorked(selectedDay.worked_minutes)}
                   </span>
                 </div>
@@ -1213,11 +1213,11 @@ export default function EmployeeProfile() {
 function Breadcrumb({ name }: { name: string }) {
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
-      <Link to="/employees" className="text-zinc-400 transition-colors hover:text-zinc-200">
+      <Link to="/employees" className="text-muted-foreground transition-colors hover:text-foreground">
         Employees
       </Link>
-      <Crumb className="h-3.5 w-3.5 text-zinc-600" />
-      <span className="font-medium text-zinc-100">{name}</span>
+      <Crumb className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="font-medium text-foreground">{name}</span>
     </nav>
   )
 }
@@ -1234,13 +1234,13 @@ function MiniStat({
   hint?: string
 }) {
   return (
-    <div className="rounded-lg border border-border bg-zinc-900/40 p-3">
-      <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+    <div className="rounded-lg border border-border bg-card/40 p-3">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className="h-3.5 w-3.5" />
         {label}
       </div>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-zinc-600">{hint}</p>}
+      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   )
 }

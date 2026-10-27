@@ -8,6 +8,8 @@ import { ErrorDialogProvider } from '../../context/ErrorDialogContext'
 import { NotificationProvider } from '../../context/NotificationContext'
 import { PageHeaderProvider } from './PageHeaderContext'
 import Sidebar from './Sidebar'
+import MobileTabBar from './MobileTabBar'
+import { OrionBackdrop } from '../brand/OrionArt'
 import Topbar from './Topbar'
 import PageFallback from './PageFallback'
 
@@ -27,6 +29,23 @@ import PageFallback from './PageFallback'
  */
 export default function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  // Desktop rail preference is per device; storage may be blocked (private mode), so guard it.
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('orion-sidebar') === 'rail'
+    } catch {
+      return false
+    }
+  })
+  const toggleRail = () =>
+    setRailCollapsed((prev) => {
+      try {
+        localStorage.setItem('orion-sidebar', prev ? 'full' : 'rail')
+      } catch {
+        // Preference just won't persist.
+      }
+      return !prev
+    })
   // Optimistic default — flips to 'disconnected' only once the socket
   // actually reports a drop (see onSocketStatusChange in lib/socket.ts).
   const [socketStatus, setSocketStatus] = useState<'connected' | 'disconnected'>('connected')
@@ -74,17 +93,20 @@ export default function AppShell() {
     <PageHeaderProvider>
       <ErrorDialogProvider>
         <NotificationProvider>
-          <div className="flex h-screen overflow-hidden bg-background text-foreground">
-            {/* Desktop fixed sidebar */}
-            <div className="hidden w-64 shrink-0 border-r border-sidebar-border lg:block">
-              <Sidebar />
+          <OrionBackdrop />
+          <div className="relative flex h-dvh overflow-hidden text-foreground">
+            {/* Desktop sidebar: full (256px) or icon rail (72px) */}
+            <div
+              className={`hidden shrink-0 border-r border-sidebar-border transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.22,1,0.36,1)] lg:block ${railCollapsed ? 'w-[72px]' : 'w-64'}`}
+            >
+              <Sidebar collapsed={railCollapsed} onToggleCollapsed={toggleRail} />
             </div>
 
             {/* Main column */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
               <Topbar mobileNavOpen={mobileNavOpen} onMobileNavChange={setMobileNavOpen} />
               {socketStatus === 'disconnected' && (
-                <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-amber-500/30 bg-amber-500/15 px-3 py-1.5 text-xs font-medium text-amber-400 ring-1 ring-inset ring-amber-500/30">
+                <div role="status" className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border bg-card px-3 py-1.5 text-xs font-medium text-warn-text">
                   <WifiOff className="h-3.5 w-3.5" aria-hidden />
                   Reconnecting… realtime updates paused
                 </div>
@@ -95,6 +117,7 @@ export default function AppShell() {
                   <Outlet />
                 </Suspense>
               </main>
+              <MobileTabBar />
             </div>
           </div>
           {/* No `theme` prop — Toaster (ui/sonner.tsx) reads the live theme via

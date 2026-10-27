@@ -175,11 +175,11 @@ const AVAIL_LABEL: Record<Availability, string> = {
 function availBadgeClass(av: Availability): string {
   switch (av) {
     case 'AVAILABLE':
-      return 'bg-emerald-500/15 text-emerald-400 ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/25'
+      return 'bg-emerald-500/15 text-ink-accent ring-1 ring-inset ring-emerald-500/30 hover:bg-emerald-500/25'
     case 'PAUSED':
-      return 'bg-amber-500/15 text-amber-400 ring-1 ring-inset ring-amber-500/30 hover:bg-amber-500/25'
+      return 'bg-amber-500/15 text-warn-text ring-1 ring-inset ring-amber-500/30 hover:bg-amber-500/25'
     case 'SOLD_OUT':
-      return 'bg-red-500/15 text-red-400 ring-1 ring-inset ring-red-500/30 hover:bg-red-500/25'
+      return 'bg-red-500/15 text-danger-text ring-1 ring-inset ring-red-500/30 hover:bg-red-500/25'
   }
 }
 
@@ -752,7 +752,7 @@ export default function Menu() {
               className="h-9 w-9 rounded-md object-cover ring-1 ring-border"
             />
           ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-zinc-800 text-zinc-600">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-secondary text-muted-foreground">
               <UtensilsCrossed className="h-4 w-4" />
             </div>
           ),
@@ -765,11 +765,11 @@ export default function Menu() {
           return (
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-medium text-zinc-100">{row.original.name}</span>
+                <span className="font-medium text-foreground">{row.original.name}</span>
                 {promoCount > 0 && (
                   <span
                     title={`${promoCount} active discount${promoCount === 1 ? '' : 's'}`}
-                    className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-emerald-400 ring-1 ring-inset ring-emerald-500/30"
+                    className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-accent ring-1 ring-inset ring-emerald-500/30"
                   >
                     <Tag className="h-2.5 w-2.5" aria-hidden />
                     {promoCount}
@@ -777,7 +777,7 @@ export default function Menu() {
                 )}
               </div>
               {row.original.remarks && (
-                <span className="block truncate text-[11px] text-zinc-500" title={row.original.remarks}>
+                <span className="block truncate text-[11px] text-muted-foreground" title={row.original.remarks}>
                   {row.original.remarks}
                 </span>
               )}
@@ -790,7 +790,7 @@ export default function Menu() {
         header: 'Product No.',
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="font-mono text-xs text-zinc-400">{row.original.itemNo ?? '—'}</span>
+          <span className="font-mono text-xs text-muted-foreground">{row.original.itemNo ?? '—'}</span>
         ),
       },
       {
@@ -798,7 +798,7 @@ export default function Menu() {
         header: 'Station',
         enableSorting: false,
         cell: ({ row }) => (
-          <span className="text-sm text-zinc-400">
+          <span className="text-sm text-muted-foreground">
             {stationMap.get(row.original.stationId) ?? '—'}
           </span>
         ),
@@ -807,7 +807,7 @@ export default function Menu() {
         accessorKey: 'prepTimeMin',
         header: 'Prep (min)',
         cell: ({ row }) => (
-          <span className="tabular-nums text-sm text-zinc-400">
+          <span className="tabular-nums text-sm text-muted-foreground">
             {row.original.prepTimeMin ?? '—'}
           </span>
         ),
@@ -816,7 +816,7 @@ export default function Menu() {
         accessorKey: 'price',
         header: 'Price',
         cell: ({ row }) => (
-          <span className="tabular-nums text-sm font-medium text-zinc-200">
+          <span className="tabular-nums text-sm font-medium text-foreground">
             ₱{Number(row.original.price).toFixed(2)}
           </span>
         ),
@@ -860,7 +860,7 @@ export default function Menu() {
                   onCheckedChange={() => toggleChannel(row.original.id, 'foodpanda')}
                   className="data-[state=checked]:bg-[#E2136E]"
                 />
-                <span className="text-[10px] text-zinc-400">foodpanda</span>
+                <span className="text-[10px] text-muted-foreground">foodpanda</span>
               </label>
               <label className="flex flex-col items-center gap-0.5" title="Show this item on GrabFood">
                 <Switch
@@ -868,7 +868,7 @@ export default function Menu() {
                   onCheckedChange={() => toggleChannel(row.original.id, 'grabfood')}
                   className="data-[state=checked]:bg-[#00B14F]"
                 />
-                <span className="text-[10px] text-zinc-400">GrabFood</span>
+                <span className="text-[10px] text-muted-foreground">GrabFood</span>
               </label>
               <label
                 className="flex flex-col items-center gap-0.5"
@@ -879,7 +879,7 @@ export default function Menu() {
                   onCheckedChange={() => toggleChannel(row.original.id, 'direct')}
                   className="data-[state=checked]:bg-emerald-600"
                 />
-                <span className="text-[10px] text-zinc-400">Direct</span>
+                <span className="text-[10px] text-muted-foreground">Direct</span>
               </label>
             </div>
           )
@@ -895,7 +895,7 @@ export default function Menu() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 w-7 p-0 text-zinc-500 hover:text-zinc-200"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                 aria-label="Row actions"
               >
                 <MoreVertical className="h-3.5 w-3.5" />
@@ -926,7 +926,7 @@ export default function Menu() {
                 Discounts / Promo
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="gap-2 text-xs text-red-400 focus:text-red-300"
+                className="gap-2 text-xs text-danger-text focus:text-danger-text"
                 disabled={!canWrite}
                 onSelect={() => setDeleteTarget(row.original)}
               >
@@ -964,7 +964,7 @@ export default function Menu() {
         <Button
           size="sm"
           disabled={!canWrite || !selectedBrandId}
-          className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+          className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
         >
           <Plus className="h-3.5 w-3.5" />
           Add New Item
@@ -977,7 +977,7 @@ export default function Menu() {
           <DialogTitle>Add Menu Item</DialogTitle>
           <DialogDescription>
             Add a new item to{' '}
-            <span className="font-semibold text-zinc-200">
+            <span className="font-semibold text-foreground">
               {brands.find((b) => b.id === selectedBrandId)?.name ?? 'the selected brand'}
             </span>
             .
@@ -986,7 +986,7 @@ export default function Menu() {
         <form onSubmit={(e) => void handleAddItem(e)} className="space-y-4">
           {/* Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Name</label>
+            <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input
               required
               value={addName}
@@ -997,7 +997,7 @@ export default function Menu() {
 
           {/* Price */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Price (₱)</label>
+            <label className="text-xs font-medium text-muted-foreground">Price (₱)</label>
             <Input
               required
               type="number"
@@ -1011,7 +1011,7 @@ export default function Menu() {
 
           {/* Prep time */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Prep Time (min)</label>
+            <label className="text-xs font-medium text-muted-foreground">Prep Time (min)</label>
             <Input
               type="number"
               min="0"
@@ -1023,7 +1023,7 @@ export default function Menu() {
 
           {/* Station */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Kitchen Station</label>
+            <label className="text-xs font-medium text-muted-foreground">Kitchen Station</label>
             <Select value={addStation} onValueChange={setAddStation}>
               <SelectTrigger>
                 <SelectValue placeholder="Select station…" />
@@ -1041,7 +1041,7 @@ export default function Menu() {
 
           {/* Availability */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Initial Availability</label>
+            <label className="text-xs font-medium text-muted-foreground">Initial Availability</label>
             <Select
               value={addAvailability}
               onValueChange={(v) => setAddAvailability(v as Availability)}
@@ -1059,7 +1059,7 @@ export default function Menu() {
 
           {/* Product number (MOTM) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Product No. (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Product No. (optional)</label>
             <Input
               value={addItemNo}
               maxLength={32}
@@ -1070,20 +1070,20 @@ export default function Menu() {
 
           {/* Remarks (MOTM) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Remarks (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Remarks (optional)</label>
             <textarea
               value={addRemarks}
               maxLength={500}
               rows={2}
               onChange={(e) => setAddRemarks(e.target.value)}
               placeholder="Notes about this item…"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
             />
           </div>
 
           {/* Photo (MOTM) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Photo (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Photo (optional)</label>
             <div className="flex items-center gap-3">
               {addImageUrl ? (
                 <img
@@ -1092,11 +1092,11 @@ export default function Menu() {
                   className="h-14 w-14 rounded-lg object-cover ring-1 ring-border"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-800 text-zinc-600">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
                   <UtensilsCrossed className="h-5 w-5" />
                 </div>
               )}
-              <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-zinc-800/60">
+              <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary/60">
                 {addUploading ? 'Uploading…' : addImageUrl ? 'Replace photo' : 'Upload photo'}
                 <input
                   type="file"
@@ -1110,7 +1110,7 @@ export default function Menu() {
                 <button
                   type="button"
                   onClick={() => setAddImageUrl('')}
-                  className="rounded text-xs text-zinc-500 transition-colors duration-200 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  className="rounded text-xs text-muted-foreground transition-colors duration-200 hover:text-danger-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   Remove
                 </button>
@@ -1120,7 +1120,7 @@ export default function Menu() {
 
           {/* Recipe (ingredients consumed per serving) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Recipe (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Recipe (optional)</label>
             <RecipeEditor
               lines={addRecipeLines}
               onChange={(next) => {
@@ -1144,7 +1144,7 @@ export default function Menu() {
               type="submit"
               size="sm"
               disabled={addSubmitting || addUploading}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {addSubmitting ? 'Adding…' : 'Add Item'}
             </Button>
@@ -1174,13 +1174,13 @@ export default function Menu() {
           <DialogTitle>Edit Menu Item</DialogTitle>
           <DialogDescription>
             Update{' '}
-            <span className="font-semibold text-zinc-200">{editOriginal?.name ?? 'this item'}</span>.
+            <span className="font-semibold text-foreground">{editOriginal?.name ?? 'this item'}</span>.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(e) => void handleEditItem(e)} className="space-y-4">
           {/* Name */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Name</label>
+            <label className="text-xs font-medium text-muted-foreground">Name</label>
             <Input
               required
               value={editName}
@@ -1191,7 +1191,7 @@ export default function Menu() {
 
           {/* Price */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Price (₱)</label>
+            <label className="text-xs font-medium text-muted-foreground">Price (₱)</label>
             <Input
               required
               type="number"
@@ -1205,7 +1205,7 @@ export default function Menu() {
 
           {/* Prep time */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Prep Time (min)</label>
+            <label className="text-xs font-medium text-muted-foreground">Prep Time (min)</label>
             <Input
               type="number"
               min="0"
@@ -1217,7 +1217,7 @@ export default function Menu() {
 
           {/* Station */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Kitchen Station</label>
+            <label className="text-xs font-medium text-muted-foreground">Kitchen Station</label>
             <Select value={editStation} onValueChange={setEditStation}>
               <SelectTrigger>
                 <SelectValue placeholder="Select station…" />
@@ -1235,7 +1235,7 @@ export default function Menu() {
 
           {/* Availability */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Availability</label>
+            <label className="text-xs font-medium text-muted-foreground">Availability</label>
             <Select
               value={editAvailability}
               onValueChange={(v) => setEditAvailability(v as Availability)}
@@ -1253,7 +1253,7 @@ export default function Menu() {
 
           {/* Product number (MOTM) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Product No. (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Product No. (optional)</label>
             <Input
               value={editItemNo}
               maxLength={32}
@@ -1264,20 +1264,20 @@ export default function Menu() {
 
           {/* Remarks (MOTM) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Remarks (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Remarks (optional)</label>
             <textarea
               value={editRemarks}
               maxLength={500}
               rows={2}
               onChange={(e) => setEditRemarks(e.target.value)}
               placeholder="Notes about this item…"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
             />
           </div>
 
           {/* Photo (MOTM) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Photo (optional)</label>
+            <label className="text-xs font-medium text-muted-foreground">Photo (optional)</label>
             <div className="flex items-center gap-3">
               {editImageUrl ? (
                 <img
@@ -1286,11 +1286,11 @@ export default function Menu() {
                   className="h-14 w-14 rounded-lg object-cover ring-1 ring-border"
                 />
               ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-800 text-zinc-600">
+                <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
                   <UtensilsCrossed className="h-5 w-5" />
                 </div>
               )}
-              <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold text-zinc-300 hover:bg-zinc-800/60">
+              <label className="cursor-pointer rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary/60">
                 {editUploading ? 'Uploading…' : editImageUrl ? 'Replace photo' : 'Upload photo'}
                 <input
                   type="file"
@@ -1304,7 +1304,7 @@ export default function Menu() {
                 <button
                   type="button"
                   onClick={() => setEditImageUrl('')}
-                  className="rounded text-xs text-zinc-500 transition-colors duration-200 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
+                  className="rounded text-xs text-muted-foreground transition-colors duration-200 hover:text-danger-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                 >
                   Remove
                 </button>
@@ -1315,9 +1315,9 @@ export default function Menu() {
           {/* Recipe (ingredients consumed per serving) — pre-loaded from
               GET /menu/:id/recipe; PUT only when touched (see handleEditItem). */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Recipe</label>
+            <label className="text-xs font-medium text-muted-foreground">Recipe</label>
             {editRecipeLoading ? (
-              <p className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-zinc-500">
+              <p className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground">
                 Loading recipe…
               </p>
             ) : (
@@ -1345,7 +1345,7 @@ export default function Menu() {
               type="submit"
               size="sm"
               disabled={editSubmitting || editUploading}
-              className="bg-emerald-600 text-white hover:bg-emerald-500"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {editSubmitting ? 'Saving…' : 'Save Changes'}
             </Button>
@@ -1360,12 +1360,12 @@ export default function Menu() {
     <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open && !deleteSubmitting) setDeleteTarget(null) }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-400">
+          <DialogTitle className="flex items-center gap-2 text-danger-text">
             <Trash2 className="h-4 w-4" />
             Delete menu item
           </DialogTitle>
           <DialogDescription>
-            Permanently delete <span className="font-medium text-zinc-200">&ldquo;{deleteTarget?.name}&rdquo;</span> and
+            Permanently delete <span className="font-medium text-foreground">&ldquo;{deleteTarget?.name}&rdquo;</span> and
             its recipe from this brand? Items that already appear in orders cannot be
             deleted — pause them instead. This cannot be undone.
           </DialogDescription>
@@ -1403,7 +1403,7 @@ export default function Menu() {
           subtitle="Items, availability and channel visibility"
         />
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-6 text-center">
-          <p className="text-sm font-medium text-red-400">{errorBrands}</p>
+          <p className="text-sm font-medium text-danger-text">{errorBrands}</p>
           <p className="mt-1 text-xs text-red-500/70">
             Make sure the backend is running on :4000
           </p>
@@ -1425,7 +1425,7 @@ export default function Menu() {
 
       {/* ── Brand selector ─────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3">
-        <span className="text-xs font-medium text-zinc-500">Brand</span>
+        <span className="text-xs font-medium text-muted-foreground">Brand</span>
         <Select
           value={selectedBrandId}
           onValueChange={setSelectedBrandId}
@@ -1464,7 +1464,7 @@ export default function Menu() {
         {/* ── Menu table ─────────────────────────────────────────────────── */}
         <section className="flex min-w-0 flex-1 flex-col gap-3">
           {errorMenu ? (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-danger-text">
               {errorMenu}
             </div>
           ) : (
@@ -1484,7 +1484,7 @@ export default function Menu() {
           )}
 
           {/* Channel visibility note */}
-          <p className="text-[11px] text-zinc-600">
+          <p className="text-[11px] text-muted-foreground">
             Channel visibility toggles (FP / GF / Direct) are presentational — stored locally only.
             Backend has no per-channel availability field.
           </p>
@@ -1494,11 +1494,11 @@ export default function Menu() {
         <aside className="w-full shrink-0 lg:w-72">
           <Card className="border-border bg-card">
             <CardHeader className="pb-2 pt-4">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
-                <AlertTriangle className="h-4 w-4 text-amber-400" aria-hidden />
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <AlertTriangle className="h-4 w-4 text-warn-text" aria-hidden />
                 Stock Alerts
                 {lowStockItems.length > 0 && (
-                  <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-amber-400 ring-1 ring-inset ring-amber-500/30">
+                  <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold tabular-nums text-warn-text ring-1 ring-inset ring-amber-500/30">
                     {lowStockItems.length}
                   </span>
                 )}
@@ -1519,10 +1519,10 @@ export default function Menu() {
                       key={item.id}
                       className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2.5"
                     >
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn-text" aria-hidden />
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-zinc-200">{item.ingredient.name}</p>
-                        <p className="mt-0.5 tabular-nums text-[11px] text-zinc-500">
+                        <p className="truncate text-xs font-medium text-foreground">{item.ingredient.name}</p>
+                        <p className="mt-0.5 tabular-nums text-[11px] text-muted-foreground">
                           {item.quantity} {item.ingredient.unit} (threshold: {item.ingredient.lowStockThreshold} {item.ingredient.unit})
                         </p>
                       </div>

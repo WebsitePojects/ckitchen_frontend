@@ -119,9 +119,9 @@ const CUSTOM_SENTINEL = '__custom__'
 const DISCOUNT_TYPES: DiscountType[] = ['PERCENT', 'FIXED', 'SENIOR', 'PWD', 'VOUCHER']
 
 const STATUS_BADGE_CLASS: Record<ApprovalStatus, string> = {
-  APPROVED: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-  PENDING: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
-  REJECTED: 'border-red-500/40 bg-red-500/10 text-red-300',
+  APPROVED: 'border-emerald-500/40 bg-emerald-500/10 text-ink-accent',
+  PENDING: 'border-amber-500/40 bg-amber-500/10 text-warn-text',
+  REJECTED: 'border-red-500/40 bg-red-500/10 text-danger-text',
 }
 
 const LEVEL_LABEL: Record<ApprovalLevel, string> = {
@@ -297,25 +297,25 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
 
         <div className="space-y-4">
           {dataErrorMsg && (
-            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400">
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-danger-text">
               {dataErrorMsg}
             </p>
           )}
 
           {/* Totals summary */}
           {loadingSummary ? (
-            <p className="text-sm text-zinc-500">Loading discount summary…</p>
+            <p className="text-sm text-muted-foreground">Loading discount summary…</p>
           ) : summary ? (
             <div className="space-y-1 rounded-md border border-border bg-background/40 p-3 text-sm">
-              <div className="flex items-center justify-between text-zinc-400">
+              <div className="flex items-center justify-between text-muted-foreground">
                 <span>Subtotal</span>
                 <span className="tabular-nums">{money(summary.subtotal)}</span>
               </div>
-              <div className="flex items-center justify-between text-zinc-400">
+              <div className="flex items-center justify-between text-muted-foreground">
                 <span>Discount total</span>
-                <span className="tabular-nums text-emerald-400">−{money(summary.discount_total)}</span>
+                <span className="tabular-nums text-ink-accent">−{money(summary.discount_total)}</span>
               </div>
-              <div className="flex items-center justify-between border-t border-border pt-1.5 font-semibold text-zinc-50">
+              <div className="flex items-center justify-between border-t border-border pt-1.5 font-semibold text-foreground">
                 <span>Effective total</span>
                 <span className="tabular-nums">{money(summary.effective_total)}</span>
               </div>
@@ -324,7 +324,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
 
           {/* Applied discounts */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Applied Discounts</label>
+            <label className="text-xs font-medium text-muted-foreground">Applied Discounts</label>
             {loadingSummary ? null : !summary || summary.discounts.length === 0 ? (
               <EmptyState
                 icon={Tag}
@@ -337,19 +337,19 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
                 {summary.discounts.map((d) => (
                   <li key={d.id} className="space-y-1 px-3 py-2 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                      <span className="min-w-0 flex-1 truncate text-zinc-200">{d.label}</span>
-                      <span className="shrink-0 tabular-nums text-zinc-300">−{money(d.amount)}</span>
+                      <span className="min-w-0 flex-1 truncate text-foreground">{d.label}</span>
+                      <span className="shrink-0 tabular-nums text-foreground">−{money(d.amount)}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Badge variant="outline" className={STATUS_BADGE_CLASS[d.status]}>
                         {d.status}
                       </Badge>
-                      <Badge variant="outline" className="border-zinc-600/50 bg-zinc-800/60 text-zinc-400">
+                      <Badge variant="outline" className="border-input/50 bg-secondary/60 text-muted-foreground">
                         {LEVEL_LABEL[d.approvalLevel]}
                       </Badge>
                     </div>
-                    <p className="text-xs text-zinc-500">Reason: {d.reason}</p>
-                    {d.idNote && <p className="text-xs text-zinc-500">ID note: {d.idNote}</p>}
+                    <p className="text-xs text-muted-foreground">Reason: {d.reason}</p>
+                    {d.idNote && <p className="text-xs text-muted-foreground">ID note: {d.idNote}</p>}
                   </li>
                 ))}
               </ul>
@@ -358,7 +358,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
 
           {/* Apply discount form */}
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3 border-t border-border pt-3">
-            <label className="text-xs font-medium text-zinc-400">Apply Discount</label>
+            <label className="text-xs font-medium text-muted-foreground">Apply Discount</label>
 
             <Select value={selectedValue} onValueChange={setSelectedValue} disabled={loadingCatalog}>
               <SelectTrigger>
@@ -377,7 +377,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
             {isCustom && (
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">Type</label>
+                  <label className="text-xs font-medium text-muted-foreground">Type</label>
                   <Select value={customType} onValueChange={(v) => setCustomType(v as DiscountType)}>
                     <SelectTrigger>
                       <SelectValue />
@@ -392,7 +392,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Value {customType === 'PERCENT' || customType === 'SENIOR' || customType === 'PWD' ? '(%)' : '(₱)'}
                   </label>
                   <Input
@@ -405,7 +405,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
                   />
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-400">Label (optional)</label>
+                  <label className="text-xs font-medium text-muted-foreground">Label (optional)</label>
                   <Input
                     value={customLabel}
                     onChange={(e) => setCustomLabel(e.target.value)}
@@ -416,13 +416,13 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
             )}
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-400">Reason (required)</label>
+              <label className="text-xs font-medium text-muted-foreground">Reason (required)</label>
               <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this discount applied?" />
             </div>
 
             {idNoteRequired && (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-400">
+                <label className="text-xs font-medium text-muted-foreground">
                   ID Note (required for Senior/PWD)
                 </label>
                 <Input
@@ -441,7 +441,7 @@ export default function OrderDiscountDialog({ order, open, onOpenChange, onChang
                 type="submit"
                 size="sm"
                 disabled={submitting || !selectedValue}
-                className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <Percent className="h-3.5 w-3.5" />
                 {submitting ? 'Applying…' : 'Apply Discount'}

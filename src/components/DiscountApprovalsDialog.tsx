@@ -126,13 +126,13 @@ export default function DiscountApprovalsDialog({ open, onOpenChange, onChanged 
         </DialogHeader>
 
         {errorMsg && (
-          <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-red-400">
+          <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2.5 text-xs text-danger-text">
             {errorMsg}
           </p>
         )}
 
         {isLoading ? (
-          <p className="py-6 text-center text-sm text-zinc-500">Loading approvals…</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Loading approvals…</p>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={ShieldCheck}
@@ -146,34 +146,34 @@ export default function DiscountApprovalsDialog({ open, onOpenChange, onChanged 
               <li key={row.id} className="space-y-2 px-3 py-3 text-sm">
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-zinc-200">
+                    <p className="truncate font-medium text-foreground">
                       {row.label}{' '}
-                      <span className="font-mono text-xs text-zinc-500">· {orderRefFor(row)}</span>
+                      <span className="font-mono text-xs text-muted-foreground">· {orderRefFor(row)}</span>
                     </p>
-                    <p className="text-xs text-zinc-500">Requested by {row.requestedBy}</p>
+                    <p className="text-xs text-muted-foreground">Requested by {row.requestedBy}</p>
                   </div>
-                  <span className="shrink-0 tabular-nums font-semibold text-zinc-100">
+                  <span className="shrink-0 tabular-nums font-semibold text-foreground">
                     −{money(row.amount)}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge variant="outline" className="border-zinc-600/50 bg-zinc-800/60 text-zinc-400">
+                  <Badge variant="outline" className="border-input/50 bg-secondary/60 text-muted-foreground">
                     {row.type}
                   </Badge>
-                  <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-300">
+                  <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-warn-text">
                     Needs {LEVEL_LABEL[row.approvalLevel]}
                   </Badge>
                 </div>
 
-                <p className="text-xs text-zinc-500">Reason: {row.reason}</p>
-                {row.idNote && <p className="text-xs text-zinc-500">ID note: {row.idNote}</p>}
+                <p className="text-xs text-muted-foreground">Reason: {row.reason}</p>
+                {row.idNote && <p className="text-xs text-muted-foreground">ID note: {row.idNote}</p>}
 
                 <div className="flex justify-end gap-2 pt-1">
                   <Button
                     size="sm"
                     variant="outline"
-                    className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                    className="gap-1.5 border-red-500/40 text-danger-text hover:bg-red-500/10 hover:text-danger-text"
                     disabled={actioningId === row.id}
                     onClick={() => void handleReject(row.id)}
                   >
@@ -182,7 +182,7 @@ export default function DiscountApprovalsDialog({ open, onOpenChange, onChanged 
                   </Button>
                   <Button
                     size="sm"
-                    className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                    className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
                     disabled={actioningId === row.id}
                     onClick={() => void handleApprove(row.id)}
                   >

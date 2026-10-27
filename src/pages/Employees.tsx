@@ -125,14 +125,14 @@ const DEPARTMENTS = [
 type Department = typeof DEPARTMENTS[number]
 
 const DEPT_CLASS: Record<string, string> = {
-  KITCHEN:    'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  WAREHOUSE:  'bg-violet-500/15 text-violet-400 border-violet-500/30',
-  PURCHASING: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30',
-  SALES:      'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  PRODUCTION: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  QA:         'bg-rose-500/15 text-rose-400 border-rose-500/30',
-  ACCOUNTING: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
-  ADMIN:      'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+  KITCHEN:    'bg-amber-500/15 text-warn-text border-amber-500/30',
+  WAREHOUSE:  'bg-violet-500/15 text-violet-700 dark:text-violet-400 border-violet-500/30',
+  PURCHASING: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-500/30',
+  SALES:      'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30',
+  PRODUCTION: 'bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30',
+  QA:         'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30',
+  ACCOUNTING: 'bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30',
+  ADMIN:      'bg-emerald-500/15 text-ink-accent border-emerald-500/30',
 }
 
 const STATUSES = ['ACTIVE', 'INACTIVE'] as const // backend employee_status enum
@@ -238,8 +238,8 @@ function WorkDaysPicker({
               className={cn(
                 'rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500',
                 on
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-                  : 'border-border bg-background/40 text-zinc-500 hover:text-zinc-300',
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-ink-accent'
+                  : 'border-border bg-background/40 text-muted-foreground hover:text-foreground',
                 disabled && 'opacity-50',
               )}
             >
@@ -248,7 +248,7 @@ function WorkDaysPicker({
           )
         })}
       </div>
-      <p className="mt-1.5 text-[11px] text-zinc-600">
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
         {formatWorkDays(value)} — at least one working day is required.
       </p>
     </div>
@@ -277,7 +277,7 @@ function EmployeeFormFields({
   return (
     <>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Employee #</label>
+        <label className="text-xs font-medium text-muted-foreground">Employee #</label>
         {mode === 'add' ? (
           <Input
             placeholder="e.g. EMP-001"
@@ -287,13 +287,13 @@ function EmployeeFormFields({
           />
         ) : (
           // Employee # is the payroll identity — deliberately not editable.
-          <p className="rounded-md border border-border bg-background/40 px-3 py-2 font-mono text-sm text-zinc-400">
+          <p className="rounded-md border border-border bg-background/40 px-3 py-2 font-mono text-sm text-muted-foreground">
             {form.employee_no}
           </p>
         )}
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Full Name</label>
+        <label className="text-xs font-medium text-muted-foreground">Full Name</label>
         <Input
           placeholder="e.g. Juan dela Cruz"
           value={form.full_name}
@@ -302,7 +302,7 @@ function EmployeeFormFields({
         />
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Department</label>
+        <label className="text-xs font-medium text-muted-foreground">Department</label>
         <Select
           value={form.department}
           onValueChange={(v) => setForm((f) => ({ ...f, department: v as Department }))}
@@ -321,7 +321,7 @@ function EmployeeFormFields({
         </Select>
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Position (optional)</label>
+        <label className="text-xs font-medium text-muted-foreground">Position (optional)</label>
         <Input
           placeholder="e.g. Line Cook"
           value={form.position}
@@ -330,7 +330,7 @@ function EmployeeFormFields({
         />
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Outlet</label>
+        <label className="text-xs font-medium text-muted-foreground">Outlet</label>
         <Select
           value={form.location_id}
           onValueChange={(v) =>
@@ -352,7 +352,7 @@ function EmployeeFormFields({
         </Select>
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Working days</label>
+        <label className="text-xs font-medium text-muted-foreground">Working days</label>
         <WorkDaysPicker
           value={form.work_days}
           onChange={(days) => setForm((f) => ({ ...f, work_days: days }))}
@@ -360,7 +360,7 @@ function EmployeeFormFields({
         />
       </div>
       <div className="space-y-1.5">
-        <label className="text-xs font-medium text-zinc-400">Hired on (optional)</label>
+        <label className="text-xs font-medium text-muted-foreground">Hired on (optional)</label>
         <Input
           type="date"
           value={form.hired_at}
@@ -370,7 +370,7 @@ function EmployeeFormFields({
       </div>
       {mode === 'edit' && (
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-zinc-400">Status</label>
+          <label className="text-xs font-medium text-muted-foreground">Status</label>
           <Select
             value={form.status}
             onValueChange={(v) => setForm((f) => ({ ...f, status: v as FormState['status'] }))}
@@ -422,8 +422,8 @@ function AccountFields({
     <div className="space-y-3 rounded-lg border border-border bg-background/40 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-zinc-200">Login account</p>
-          <p className="text-xs text-zinc-500">This person will log in to ORION.</p>
+          <p className="text-sm font-medium text-foreground">Login account</p>
+          <p className="text-xs text-muted-foreground">This person will log in to ORION.</p>
         </div>
         <Switch
           checked={account.enabled}
@@ -438,7 +438,7 @@ function AccountFields({
       {account.enabled && (
         <div className="space-y-3 pt-1">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Email</label>
+            <label className="text-xs font-medium text-muted-foreground">Email</label>
             <Input
               type="email"
               placeholder="name@company.com"
@@ -450,10 +450,10 @@ function AccountFields({
               disabled={submitting}
               autoComplete="off"
             />
-            {emailError && <p className="text-xs text-red-400">{emailError}</p>}
+            {emailError && <p className="text-xs text-danger-text">{emailError}</p>}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Password</label>
+            <label className="text-xs font-medium text-muted-foreground">Password</label>
             <div className="relative">
               <Input
                 type={showPassword ? 'text' : 'password'}
@@ -467,7 +467,7 @@ function AccountFields({
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
@@ -476,7 +476,7 @@ function AccountFields({
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-400">Role</label>
+            <label className="text-xs font-medium text-muted-foreground">Role</label>
             <Select
               value={effectiveRole}
               onValueChange={(v) => setAccount((a) => ({ ...a, role: v }))}
@@ -773,7 +773,7 @@ export default function Employees() {
             setShowPassword={setShowAccountPassword}
           />
           {formError && (
-            <p className="text-xs text-red-400">{formError}</p>
+            <p className="text-xs text-danger-text">{formError}</p>
           )}
           <DialogFooter>
             <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
@@ -802,7 +802,7 @@ export default function Employees() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search name, employee #, position…"
             value={search}
@@ -823,15 +823,15 @@ export default function Employees() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-sm text-zinc-500">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
       </div>
 
       {/* Table */}
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading employees…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading employees…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-danger-text">{error}</p>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={UserCog}
@@ -860,33 +860,33 @@ export default function Employees() {
                   className="cursor-pointer border-border"
                   onClick={() => navigate(`/employees/${emp.id}`)}
                 >
-                  <TableCell className="font-mono text-xs tabular-nums text-zinc-300">
+                  <TableCell className="font-mono text-xs tabular-nums text-foreground">
                     {emp.employeeNo ?? '—'}
                   </TableCell>
-                  <TableCell className="font-medium text-zinc-100">
+                  <TableCell className="font-medium text-foreground">
                     {emp.fullName ?? '—'}
                   </TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
-                      className={DEPT_CLASS[emp.department] ?? 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30'}
+                      className={DEPT_CLASS[emp.department] ?? 'bg-zinc-500/15 text-foreground border-zinc-500/30'}
                     >
                       {(emp.department ?? '—').charAt(0) + (emp.department ?? '').slice(1).toLowerCase()}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-zinc-400">
+                  <TableCell className="text-sm text-muted-foreground">
                     {emp.locationId ? outletNameById.get(emp.locationId) ?? '—' : '—'}
                   </TableCell>
-                  <TableCell className="text-sm text-zinc-400">
+                  <TableCell className="text-sm text-muted-foreground">
                     {emp.position ?? '—'}
                   </TableCell>
                   <TableCell>
                     {sanitizeWorkDays(emp.workDays).length > 0 ? (
-                      <Badge variant="outline" className="border-zinc-500/30 bg-zinc-500/10 text-zinc-300">
+                      <Badge variant="outline" className="border-zinc-500/30 bg-zinc-500/10 text-foreground">
                         {formatWorkDays(emp.workDays)}
                       </Badge>
                     ) : (
-                      <span className="text-sm text-zinc-600">—</span>
+                      <span className="text-sm text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -897,18 +897,18 @@ export default function Employees() {
                       <div className="flex flex-col gap-0.5" title={emp.userEmail ?? undefined}>
                         <Badge
                           variant="outline"
-                          className="w-fit gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                          className="w-fit gap-1 border-emerald-500/30 bg-emerald-500/10 text-ink-accent"
                         >
                           <KeyRound className="h-3 w-3" /> Has login
                         </Badge>
                         {emp.userEmail && (
-                          <span className="max-w-[10rem] truncate text-[10px] text-zinc-500">
+                          <span className="max-w-[10rem] truncate text-[10px] text-muted-foreground">
                             {emp.userEmail}
                           </span>
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs text-zinc-600">No login</span>
+                      <span className="text-xs text-muted-foreground">No login</span>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -972,7 +972,7 @@ export default function Employees() {
                 outlets={outlets}
                 outletsLoading={outletsQuery.isLoading}
               />
-              {editError && <p className="text-xs text-red-400">{editError}</p>}
+              {editError && <p className="text-xs text-danger-text">{editError}</p>}
               <DialogFooter>
                 <Button type="submit" disabled={editSubmitting} className="w-full sm:w-auto">
                   {editSubmitting ? 'Saving…' : 'Save Changes'}

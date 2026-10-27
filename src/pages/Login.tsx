@@ -4,6 +4,8 @@ import { Orbit, Loader2, AlertCircle, Mail, Lock } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { CKApiError, warmUpApi } from '../lib/api'
 import { PLATFORM_NAME, PLATFORM_TAGLINE, PLATFORM_ATTRIBUTION } from '../lib/branding'
+import { NightSky, PaperGeometry } from '../components/brand/OrionArt'
+import ThemeToggle from '../components/layout/ThemeToggle'
 
 // Clerk's sign-in widget is its own chunk: password-only deployments never download it.
 const ClerkSignInPanel = lazy(() => import('../auth/ClerkSignInPanel'))
@@ -63,138 +65,141 @@ export default function Login() {
   }
 
   const inputClass =
-    'peer block h-11 w-full rounded-lg border border-border bg-background/60 pl-10 pr-3 text-sm text-foreground placeholder-zinc-500 outline-none transition-colors duration-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-60'
+    'peer block h-11 w-full rounded-lg border border-input bg-card pl-10 pr-3 text-base text-foreground placeholder:text-muted-foreground outline-none transition-colors duration-200 focus:border-ink-accent focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm'
 
   const iconClass =
-    'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500 transition-colors duration-200 peer-focus:text-emerald-400'
+    'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors duration-200 peer-focus:text-ink-accent'
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4">
-      {/* aurora — soft, low-opacity emerald/teal blobs behind the card */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute left-1/4 top-1/4 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-600/10 blur-3xl" />
-        <div className="absolute right-1/4 top-2/3 h-72 w-72 translate-x-1/3 rounded-full bg-teal-500/10 blur-3xl" />
-        <div className="absolute bottom-0 left-1/2 h-64 w-64 -translate-x-1/2 translate-y-1/3 rounded-full bg-emerald-500/5 blur-3xl" />
-      </div>
-
-      <div className="relative w-full max-w-sm motion-safe:animate-fade-in-up">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-700/10 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/40">
-            <Orbit className="h-7 w-7 text-emerald-400" aria-hidden />
-          </span>
-          <span className="text-2xl font-bold tracking-tight text-foreground">{PLATFORM_NAME}</span>
-          <p className="mt-1 text-sm text-zinc-500">{PLATFORM_TAGLINE}</p>
+    <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1.1fr)_minmax(26rem,0.9fr)]">
+      {/* Art panel: the ORION sky by night, geometry on paper by day. Phones get a short band. */}
+      <section className="relative isolate flex h-56 flex-col justify-end overflow-hidden border-b border-border p-6 sm:h-72 lg:h-auto lg:border-b-0 lg:border-r lg:p-12">
+        <NightSky className="orion-art-dark absolute inset-0 -z-10 h-full w-full" />
+        <PaperGeometry className="orion-art-light absolute inset-0 -z-10 h-full w-full" placement="side" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-background/40 to-transparent" aria-hidden />
+        <div className="flex items-center gap-2.5">
+          <Orbit className="h-6 w-6 text-ink-accent" aria-hidden />
+          <span className="font-display text-3xl leading-none">{PLATFORM_NAME}</span>
         </div>
+        <h2 className="mt-4 hidden max-w-xl font-display text-5xl leading-[1.02] tracking-tight lg:block xl:text-6xl">
+          Every brand, every outlet, <em className="text-ink-accent">one sky.</em>
+        </h2>
+        <ul className="mt-6 hidden max-w-md divide-y divide-border border-y border-border text-sm text-muted-foreground lg:block">
+          <li className="py-2.5">GrabFood and foodpanda orders in one live board</li>
+          <li className="py-2.5">Recipe costing and stock that deduct as you cook</li>
+          <li className="py-2.5">Staff time, attendance and alerts when something is left</li>
+        </ul>
+      </section>
 
-        {clerkEnabled && (
-          <Suspense fallback={<div className="mx-auto h-80 w-full max-w-sm animate-pulse rounded-xl bg-muted/50" role="status" aria-label="Loading sign-in" />}>
-            <ClerkSignInPanel />
-          </Suspense>
-        )}
+      {/* Form column */}
+      <section className="relative flex flex-col px-4 py-8 sm:px-10">
+        <div className="flex justify-end">
+          <ThemeToggle />
+        </div>
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center motion-safe:animate-fade-in-up">
+          <p className="eyebrow">{PLATFORM_TAGLINE}</p>
+          <h1 className="mt-2 font-display text-4xl leading-tight tracking-tight">Sign in</h1>
+          <div className="rule-double mb-6 mt-4" aria-hidden />
 
-        {clerkEnabled && (
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-expanded={showPassword}
-            className="mx-auto mt-4 block text-xs text-zinc-500 underline-offset-4 hover:text-zinc-300 hover:underline"
-          >
-            {showPassword ? 'Hide IT sign-in' : 'IT team: sign in with password'}
-          </button>
-        )}
-
-        {showPassword && (
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl border border-border bg-card/90 p-7 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.55),0_0_45px_-10px_rgba(16,185,129,0.25)] backdrop-blur-xl"
-          noValidate
-        >
-          <div className="space-y-5">
-            <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-muted-foreground">
-                Email address
-              </label>
-              <div className="relative">
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={submitting}
-                  className={inputClass}
-                  placeholder="you@cloudkitchen.local"
-                />
-                <Mail className={iconClass} aria-hidden />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-muted-foreground">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={submitting}
-                  className={inputClass}
-                  placeholder="••••••••"
-                />
-                <Lock className={iconClass} aria-hidden />
-              </div>
-            </div>
-
-            {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-400"
-              >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:bg-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                'Sign in'
-              )}
-            </button>
-
-            {slowHint && (
-              <p className="text-center text-xs text-zinc-500">
-                Waking up the server — this can take up to a minute on first use. Hang tight.
-              </p>
-            )}
-          </div>
-
-          {import.meta.env.DEV && (
-            <p className="mt-5 rounded-lg bg-muted px-3 py-2 text-center text-xs text-muted-foreground">
-              Demo: <span className="text-foreground">admin@cloudkitchen.local</span> /{' '}
-              <span className="text-foreground">admin123</span>
-            </p>
+          {clerkEnabled && (
+            <Suspense fallback={<div className="h-80 w-full animate-pulse rounded-xl bg-secondary" role="status" aria-label="Loading sign-in" />}>
+              <ClerkSignInPanel />
+            </Suspense>
           )}
-        </form>
-        )}
 
-        <p className="mt-4 text-center text-xs text-zinc-600">
-          {PLATFORM_NAME} — {PLATFORM_ATTRIBUTION}
+          {clerkEnabled && (
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-expanded={showPassword}
+              className="mt-5 self-start text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              {showPassword ? 'Hide Prince IT sign-in' : 'Prince IT staff: sign in with password'}
+            </button>
+          )}
+
+          {showPassword && (
+            <form onSubmit={handleSubmit} className="mt-4 space-y-5 border-t border-border pt-5" noValidate>
+              <div>
+                <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-foreground">
+                  Email address
+                </label>
+                <div className="relative">
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={submitting}
+                    className={inputClass}
+                    placeholder="you@company.com"
+                  />
+                  <Mail className={iconClass} aria-hidden />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-foreground">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={submitting}
+                    className={inputClass}
+                    placeholder="••••••••"
+                  />
+                  <Lock className={iconClass} aria-hidden />
+                </div>
+              </div>
+
+              {error && (
+                <p role="alert" className="flex items-start gap-2 text-sm text-danger-text">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <span>{error}</span>
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-[transform,opacity] duration-200 hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Signing in…
+                  </>
+                ) : (
+                  'Sign in'
+                )}
+              </button>
+
+              {slowHint && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Waking up the server — this can take up to a minute on first use. Hang tight.
+                </p>
+              )}
+
+              {import.meta.env.DEV && (
+                <p className="border-t border-border pt-3 text-center text-xs text-muted-foreground">
+                  Demo: <span className="text-foreground">admin@cloudkitchen.local</span> / <span className="text-foreground">admin123</span>
+                </p>
+              )}
+            </form>
+          )}
+        </div>
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          {PLATFORM_NAME} · {PLATFORM_ATTRIBUTION}
         </p>
-      </div>
+      </section>
     </div>
   )
 }

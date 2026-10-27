@@ -392,7 +392,7 @@ function OrderCard({ order, now: _now, stage, canAct, disabledReason, busy, onAc
                 data-testid="order-accept-button"
                 data-order-id={order.id}
                 title={!canAct ? disabledReason : undefined}
-                className="min-h-[44px] flex-1 bg-emerald-600 text-white hover:bg-emerald-500"
+                className="min-h-[44px] flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 Accept
@@ -887,7 +887,7 @@ function ContestCancellationDialog({ order, onOpenChange, onSubmit }: ContestDia
           <Button
             onClick={() => void handleSubmit()}
             disabled={submitting}
-            className="min-h-[44px] bg-emerald-600 text-white hover:bg-emerald-500"
+            className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
             Submit contest
@@ -1537,7 +1537,7 @@ export default function MerchantConsole() {
                     disabled={!canPause || pauseResumeBusy}
                     title={!canPause ? pauseDisabledReason : undefined}
                     data-testid="resume-store-button"
-                    className="min-h-[44px] bg-emerald-600 text-white hover:bg-emerald-500"
+                    className="min-h-[44px] bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     {pauseResumeBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                     Resume

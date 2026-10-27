@@ -36,12 +36,12 @@ interface CustomerDialogProps {
 }
 
 const INPUT_CLS =
-  'bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9'
+  'bg-background border-border text-foreground placeholder:text-muted-foreground h-9'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-zinc-400">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
   )
@@ -130,12 +130,12 @@ export default function CustomerDialog({ open, onOpenChange, customer }: Custome
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
+      <DialogContent className="bg-card border-border text-foreground max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50">
+          <DialogTitle className="text-foreground">
             {isEdit ? `Edit customer — ${customer.name}` : 'Add customer'}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogDescription className="text-muted-foreground">
             {isEdit
               ? 'Update this customer’s contact details and status.'
               : 'Create a customer record for sales and receivables.'}
@@ -223,7 +223,7 @@ export default function CustomerDialog({ open, onOpenChange, customer }: Custome
                   id="customer-active"
                   aria-label="Customer active"
                 />
-                <label htmlFor="customer-active" className="text-sm text-zinc-300">
+                <label htmlFor="customer-active" className="text-sm text-foreground">
                   Active
                 </label>
               </div>
@@ -235,7 +235,7 @@ export default function CustomerDialog({ open, onOpenChange, customer }: Custome
               type="submit"
               disabled={saving}
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
             >
               {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save customer'}
             </Button>

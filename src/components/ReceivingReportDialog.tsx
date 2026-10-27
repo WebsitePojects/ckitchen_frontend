@@ -82,7 +82,7 @@ const CHOOSE = '_choose'
 const INTERNAL = '_internal'
 
 const INPUT_CLS =
-  'bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9'
+  'bg-background border-border text-foreground placeholder:text-muted-foreground h-9'
 
 let nextKey = 1
 function blankLine(): LineDraft {
@@ -245,13 +245,13 @@ export default function ReceivingReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-xl">
+      <DialogContent className="bg-card border-border text-foreground max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-zinc-50">
+          <DialogTitle className="flex items-center gap-2 text-foreground">
             <PackageCheck className="h-4 w-4 text-emerald-500" aria-hidden />
             Receive into MAIN Warehouse
           </DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogDescription className="text-muted-foreground">
             Log a supplier delivery. Posting credits the MAIN warehouse and writes
             the stock ledger.
           </DialogDescription>
@@ -261,37 +261,37 @@ export default function ReceivingReportDialog({
           {/* Header fields */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                 Supplier
               </label>
               <Select
                 value={supplierId === '' ? CHOOSE : supplierId}
                 onValueChange={(v) => setSupplierId(v === CHOOSE ? '' : v)}
               >
-                <SelectTrigger className="bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 text-sm h-9">
+                <SelectTrigger className="bg-background border-border text-foreground text-sm h-9">
                   <SelectValue placeholder="Who delivered this stock?" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#121A17] border-[#1F2A24]">
-                  <SelectItem value={CHOOSE} className="text-zinc-400">
+                <SelectContent className="bg-card border-border">
+                  <SelectItem value={CHOOSE} className="text-muted-foreground">
                     Who delivered this stock?
                   </SelectItem>
-                  <SelectItem value={INTERNAL} className="text-zinc-300">
+                  <SelectItem value={INTERNAL} className="text-foreground">
                     No supplier / internal
                   </SelectItem>
                   {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id} className="text-zinc-200">
+                    <SelectItem key={s.id} value={s.id} className="text-foreground">
                       {s.code} — {s.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="mt-1 text-[11px] text-zinc-600">
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 Recording the supplier keeps this delivery's cost history — pick
                 “No supplier / internal” for stock that didn't come from one.
               </p>
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                 Delivery reference
               </label>
               <Input
@@ -303,7 +303,7 @@ export default function ReceivingReportDialog({
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                 Notes
               </label>
               <Input
@@ -319,8 +319,8 @@ export default function ReceivingReportDialog({
           {/* Line items */}
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className="block text-xs font-medium text-zinc-400">Items received *</label>
-              <span className="text-[11px] text-zinc-500">total {peso(total)}</span>
+              <label className="block text-xs font-medium text-muted-foreground">Items received *</label>
+              <span className="text-[11px] text-muted-foreground">total {peso(total)}</span>
             </div>
             <div className="space-y-2">
               {lines.map((l) => {
@@ -367,7 +367,7 @@ export default function ReceivingReportDialog({
                       onClick={() => removeLine(l.key)}
                       disabled={lines.length === 1}
                       aria-label="Remove line"
-                      className="h-9 w-9 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40"
+                      className="h-9 w-9 flex-none text-muted-foreground hover:text-danger-text hover:bg-red-500/10 disabled:opacity-40"
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -380,7 +380,7 @@ export default function ReceivingReportDialog({
               variant="ghost"
               size="sm"
               onClick={() => setLines((ls) => [...ls, blankLine()])}
-              className="mt-2 h-8 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+              className="mt-2 h-8 text-ink-accent hover:text-ink-accent hover:bg-emerald-500/10"
             >
               <Plus className="h-3.5 w-3.5" />
               Add item
@@ -394,7 +394,7 @@ export default function ReceivingReportDialog({
             <Button
               type="submit"
               disabled={saving}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
             >
               {saving ? 'Receiving…' : 'Receive into MAIN'}
             </Button>

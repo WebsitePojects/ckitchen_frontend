@@ -48,7 +48,7 @@ interface ReceiveDialogProps {
 }
 
 const INPUT_CLS =
-  'bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9'
+  'bg-background border-border text-foreground placeholder:text-muted-foreground h-9'
 
 export default function ReceiveDialog({ open, onOpenChange, po, ingredients }: ReceiveDialogProps) {
   const queryClient = useQueryClient()
@@ -132,27 +132,27 @@ export default function ReceiveDialog({ open, onOpenChange, po, ingredients }: R
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-xl">
+      <DialogContent className="bg-card border-border text-foreground max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-zinc-50">
+          <DialogTitle className="flex items-center gap-2 text-foreground">
             <PackageCheck className="h-4 w-4 text-emerald-500" aria-hidden />
             Receive — {po?.poNo ?? ''}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogDescription className="text-muted-foreground">
             Confirm what arrived. Quantities default to what’s still outstanding;
             posting credits the MAIN warehouse and writes the stock ledger.
           </DialogDescription>
         </DialogHeader>
 
         {isLoading || !detail ? (
-          <div className="flex items-center gap-2 py-6 text-sm text-zinc-500">
+          <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             Loading order lines…
           </div>
         ) : (
           <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-            <div className="overflow-hidden rounded-lg border border-[#1F2A24]">
-              <div className="grid grid-cols-[1fr_5rem_5rem_6rem] gap-2 border-b border-[#1F2A24] bg-[#0A0F0D] px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+            <div className="overflow-hidden rounded-lg border border-border">
+              <div className="grid grid-cols-[1fr_5rem_5rem_6rem] gap-2 border-b border-border bg-background px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 <span>Item</span>
                 <span className="text-right">Ordered</span>
                 <span className="text-right">Received</span>
@@ -166,24 +166,24 @@ export default function ReceiveDialog({ open, onOpenChange, po, ingredients }: R
                   return (
                     <div
                       key={l.id}
-                      className="grid grid-cols-[1fr_5rem_5rem_6rem] items-center gap-2 border-b border-[#1F2A24]/60 px-3 py-2 last:border-b-0"
+                      className="grid grid-cols-[1fr_5rem_5rem_6rem] items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm text-zinc-200">
+                        <p className="truncate text-sm text-foreground">
                           {ing?.name ?? l.ingredientId.slice(0, 8)}
                         </p>
-                        <p className="text-[11px] text-zinc-500">
+                        <p className="text-[11px] text-muted-foreground">
                           {ing?.unit ?? ''} · {peso(l.unitCost)}/unit
                         </p>
                       </div>
-                      <span className="text-right text-sm tabular-nums text-zinc-300">
+                      <span className="text-right text-sm tabular-nums text-foreground">
                         {num(l.quantity)}
                       </span>
-                      <span className="text-right text-sm tabular-nums text-zinc-400">
+                      <span className="text-right text-sm tabular-nums text-muted-foreground">
                         {num(l.qtyReceived)}
                       </span>
                       {done ? (
-                        <span className="text-right text-[11px] font-semibold text-emerald-400">
+                        <span className="text-right text-[11px] font-semibold text-ink-accent">
                           COMPLETE
                         </span>
                       ) : (
@@ -207,7 +207,7 @@ export default function ReceiveDialog({ open, onOpenChange, po, ingredients }: R
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-400">Notes</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Notes</label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -224,7 +224,7 @@ export default function ReceiveDialog({ open, onOpenChange, po, ingredients }: R
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
               >
                 {saving ? 'Posting…' : 'Post receiving report'}
               </Button>

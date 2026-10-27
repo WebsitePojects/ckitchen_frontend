@@ -271,7 +271,7 @@ export default function Orders() {
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Approvals
                   {pendingDiscountCount > 0 && (
-                    <Badge className="h-5 min-w-5 justify-center rounded-full border-transparent bg-amber-500/20 px-1.5 text-[10px] text-amber-300">
+                    <Badge className="h-5 min-w-5 justify-center rounded-full border-transparent bg-amber-500/20 px-1.5 text-[10px] text-warn-text">
                       {pendingDiscountCount}
                     </Badge>
                   )}
@@ -292,7 +292,7 @@ export default function Orders() {
                 <Button
                   size="sm"
                   onClick={() => setWalkInOpen(true)}
-                  className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-500"
+                  className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   New Walk-in Order
@@ -313,7 +313,7 @@ export default function Orders() {
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search order #, brand, customer…"
             value={search}
@@ -334,14 +334,14 @@ export default function Orders() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-sm text-zinc-500">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
       </div>
 
       <Card className="border-border bg-card">
         {loading ? (
-          <p className="p-6 text-sm text-zinc-500">Loading orders…</p>
+          <p className="p-6 text-sm text-muted-foreground">Loading orders…</p>
         ) : error ? (
-          <p className="p-6 text-sm text-red-400">{error}</p>
+          <p className="p-6 text-sm text-danger-text">{error}</p>
         ) : rows.length === 0 ? (
           <EmptyState
             icon={ReceiptText}
@@ -368,7 +368,7 @@ export default function Orders() {
                 // animates in on mount (stable keys mean existing rows never
                 // re-animate on a re-sort/refetch).
                 <TableRow key={o.id} className="border-border animate-in fade-in slide-in-from-top-1 duration-500">
-                  <TableCell className="font-mono text-xs text-zinc-300">
+                  <TableCell className="font-mono text-xs text-foreground">
                     <span className="inline-flex items-center gap-1">
                       {orderDisplayCode(o)}
                       <Button
@@ -377,23 +377,23 @@ export default function Orders() {
                         onClick={() => void copyOrderCode(orderDisplayCode(o))}
                         aria-label={`Copy order code ${orderDisplayCode(o)}`}
                         title="Copy order code"
-                        className="h-5 w-5 shrink-0 text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200"
+                        className="h-5 w-5 shrink-0 text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                       >
                         <Copy className="h-3 w-3" />
                       </Button>
                     </span>
                     {/* Aggregator device order #, so staff can match a row to the tablet. */}
                     {o.aggregator !== 'OTHER' && o.externalRef !== orderDisplayCode(o) && (
-                      <span className="block text-[11px] text-zinc-500" title="Order number on the aggregator device">
+                      <span className="block text-[11px] text-muted-foreground" title="Order number on the aggregator device">
                         Device #{o.externalRef}
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-zinc-400">{fmtTime(o.placedAt)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{fmtTime(o.placedAt)}</TableCell>
                   <TableCell><AggregatorBadge aggregator={o.aggregator} /></TableCell>
                   <TableCell><BrandChip brand={brands[o.brandId]} /></TableCell>
-                  <TableCell className="text-sm text-zinc-300">{o.customerName ?? '—'}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums text-zinc-100">
+                  <TableCell className="text-sm text-foreground">{o.customerName ?? '—'}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums text-foreground">
                     ₱{Number(o.total ?? 0).toLocaleString()}
                   </TableCell>
                   <TableCell><StatusBadge status={o.status} /></TableCell>

@@ -32,7 +32,7 @@ import {
 } from 'recharts'
 import { BarChart3 } from 'lucide-react'
 import EmptyState from '../common/EmptyState'
-import { CHART_CATEGORICAL } from '../../lib/theme'
+import { CHART_CATEGORICAL, CHART_CHROME } from '../../lib/theme'
 
 // ─── Data shape (derived client-side by Dashboard.tsx) ────────────────────────
 
@@ -69,11 +69,10 @@ const MAX_BRAND_SERIES = 6
 const OTHER_KEY = '__other'
 const OTHER_COLOR = '#71717A' // zinc-500 — neutral residual, never a brand hue
 
-const CHART_GRID = '#27272a'
-const CHART_TICK = '#71717A'
-/** Card surface (dark `--card: 158 18% 9%`) — 1px stroke = gap between segments. */
-const SEGMENT_STROKE = '#131b18'
-const CURSOR_FILL = 'rgba(16,185,129,0.06)'
+const CHART_GRID = CHART_CHROME.grid
+const CHART_TICK = CHART_CHROME.tick
+const SEGMENT_STROKE = CHART_CHROME.segmentStroke
+const CURSOR_FILL = CHART_CHROME.cursor
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
@@ -173,12 +172,11 @@ function StackTooltip({
   const total = payload.reduce((s, p) => s + (p.value ?? 0), 0)
   return (
     <div
-      className="rounded-lg border px-3 py-2 text-xs"
-      style={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#F4F4F5' }}
+      className="rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground"
     >
-      <p className="mb-1 font-semibold text-zinc-200">{hourLabel(Number(label))}</p>
+      <p className="mb-1 font-semibold text-foreground">{hourLabel(Number(label))}</p>
       {nonZero.length === 0 ? (
-        <p className="text-zinc-500">No orders</p>
+        <p className="text-muted-foreground">No orders</p>
       ) : (
         <ul className="space-y-0.5">
           {nonZero.map(p => (
@@ -188,14 +186,14 @@ function StackTooltip({
                 style={{ backgroundColor: p.color }}
                 aria-hidden
               />
-              <span className="text-zinc-400">{p.name}</span>
-              <span className="ml-auto pl-3 tabular-nums text-zinc-200">{p.value}</span>
+              <span className="text-muted-foreground">{p.name}</span>
+              <span className="ml-auto pl-3 tabular-nums text-foreground">{p.value}</span>
             </li>
           ))}
           {nonZero.length > 1 && (
-            <li className="mt-1 flex items-center gap-1.5 border-t border-zinc-800 pt-1 font-semibold">
-              <span className="text-zinc-400">Total</span>
-              <span className="ml-auto pl-3 tabular-nums text-zinc-100">{total}</span>
+            <li className="mt-1 flex items-center gap-1.5 border-t border-border pt-1 font-semibold">
+              <span className="text-muted-foreground">Total</span>
+              <span className="ml-auto pl-3 tabular-nums text-foreground">{total}</span>
             </li>
           )}
         </ul>
@@ -252,7 +250,7 @@ export default function OrdersByHourByBrandChart({ brands, buckets }: Props) {
           iconType="circle"
           iconSize={8}
           formatter={value => (
-            <span style={{ fontSize: 11, color: '#A1A1AA' }}>{value}</span>
+            <span className="text-[11px] text-muted-foreground">{value}</span>
           )}
         />
         {/* Render in rank order: biggest brand at the stack base, Other on top.

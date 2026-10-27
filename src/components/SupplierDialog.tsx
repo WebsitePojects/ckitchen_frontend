@@ -60,12 +60,12 @@ interface SupplierDialogProps {
 }
 
 const INPUT_CLS =
-  'bg-[#0A0F0D] border-[#1F2A24] text-zinc-200 placeholder:text-zinc-600 h-9'
+  'bg-background border-border text-foreground placeholder:text-muted-foreground h-9'
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-zinc-400">{label}</label>
+      <label className="mb-1.5 block text-xs font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
   )
@@ -247,12 +247,12 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!saving) onOpenChange(o) }}>
-      <DialogContent className="bg-[#121A17] border-[#1F2A24] text-zinc-50 max-w-lg">
+      <DialogContent className="bg-card border-border text-foreground max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-zinc-50">
+          <DialogTitle className="text-foreground">
             {isEdit ? `Edit supplier — ${name || code}` : 'Add supplier'}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500">
+          <DialogDescription className="text-muted-foreground">
             {isEdit
               ? 'Update contact details and manage which inventory items this supplier provides.'
               : 'Create the supplier record first — then link the items it supplies.'}
@@ -341,9 +341,9 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                   id="supplier-active"
                   aria-label="Supplier active"
                 />
-                <label htmlFor="supplier-active" className="text-sm text-zinc-300">
+                <label htmlFor="supplier-active" className="text-sm text-foreground">
                   Active{' '}
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-muted-foreground">
                     — inactive suppliers are hidden from purchase-order pickers
                   </span>
                 </label>
@@ -356,7 +356,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
               type="submit"
               disabled={saving}
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
             >
               {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save supplier'}
             </Button>
@@ -364,30 +364,30 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
         </form>
 
         {/* ── Items supplied ── */}
-        <div className="mt-1 border-t border-[#1F2A24] pt-4">
+        <div className="mt-1 border-t border-border pt-4">
           <div className="mb-2 flex items-center gap-2">
             <Package className="h-4 w-4 text-emerald-500" aria-hidden />
-            <h3 className="text-sm font-semibold text-zinc-100">Items supplied</h3>
+            <h3 className="text-sm font-semibold text-foreground">Items supplied</h3>
             {isEdit && linkedItems.length > 0 && (
-              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+              <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-ink-accent">
                 {linkedItems.length}
               </span>
             )}
           </div>
 
           {!isEdit ? (
-            <p className="rounded-lg border border-dashed border-[#1F2A24] bg-[#0A0F0D] px-3 py-2.5 text-xs text-zinc-500">
+            <p className="rounded-lg border border-dashed border-border bg-background px-3 py-2.5 text-xs text-muted-foreground">
               Save the supplier first, then link the inventory items it provides.
             </p>
           ) : (
             <>
               {ingredientsLoading ? (
-                <div className="flex items-center gap-2 py-3 text-xs text-zinc-500">
+                <div className="flex items-center gap-2 py-3 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                   Loading items…
                 </div>
               ) : linkedItems.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-[#1F2A24] bg-[#0A0F0D] px-3 py-2.5 text-xs text-zinc-500">
+                <p className="rounded-lg border border-dashed border-border bg-background px-3 py-2.5 text-xs text-muted-foreground">
                   No items linked yet — add the inventory items this supplier provides.
                 </p>
               ) : (
@@ -395,11 +395,11 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                   {linkedItems.map((item) => (
                     <li
                       key={item.id}
-                      className="flex items-center gap-2 rounded-lg border border-[#1F2A24] bg-[#0A0F0D] px-3 py-2"
+                      className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-zinc-200">{item.name}</p>
-                        <p className="mt-0.5 text-[11px] text-zinc-500">per {item.unit}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">per {item.unit}</p>
                       </div>
                       <Button
                         type="button"
@@ -409,7 +409,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                         disabled={removingId === item.id}
                         aria-label={`Unlink ${item.name}`}
                         title="Remove from this supplier"
-                        className="h-8 w-8 flex-none text-zinc-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                        className="h-8 w-8 flex-none text-muted-foreground hover:text-danger-text hover:bg-red-500/10 disabled:opacity-50"
                       >
                         {removingId === item.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -423,13 +423,13 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
               )}
 
               {/* Add item row */}
-              <div className="mt-3 space-y-2 rounded-lg border border-[#1F2A24] bg-[#0A0F0D]/60 p-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              <div className="mt-3 space-y-2 rounded-lg border border-border bg-background/60 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Add item
                 </p>
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="min-w-[10rem] flex-1">
-                    <label className="mb-1 block text-[11px] text-zinc-500">Ingredient</label>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Ingredient</label>
                     <IngredientPicker
                       ingredients={ingredients}
                       value={addIngredientId}
@@ -439,7 +439,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                     />
                   </div>
                   <div className="w-32">
-                    <label className="mb-1 block text-[11px] text-zinc-500">
+                    <label className="mb-1 block text-[11px] text-muted-foreground">
                       Supplier item code
                     </label>
                     <Input
@@ -451,7 +451,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                     />
                   </div>
                   <div className="w-24">
-                    <label className="mb-1 block text-[11px] text-zinc-500">Last ₱</label>
+                    <label className="mb-1 block text-[11px] text-muted-foreground">Last ₱</label>
                     <Input
                       type="number"
                       min="0"
@@ -467,7 +467,7 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                     size="sm"
                     onClick={() => void handleLinkItem()}
                     disabled={linking || !addIngredientId}
-                    className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-60"
+                    className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold disabled:opacity-60"
                   >
                     {linking ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -477,12 +477,12 @@ export default function SupplierDialog({ open, onOpenChange, supplier }: Supplie
                     Link
                   </Button>
                 </div>
-                <p className="text-[11px] text-zinc-600">
+                <p className="text-[11px] text-muted-foreground">
                   Supplier item code — the code this supplier uses for the item on their invoices
                   (optional).
                 </p>
                 {ingredients.length > 0 && ingredients.length === linkedIds.size && (
-                  <p className="text-[11px] text-zinc-600">
+                  <p className="text-[11px] text-muted-foreground">
                     Every ingredient is already linked to this supplier.
                   </p>
                 )}
