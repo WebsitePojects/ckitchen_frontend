@@ -36,7 +36,6 @@ import {
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { UnitSelect } from './units/UnitSelect'
-import { rescaleTyped } from '../lib/units'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -207,10 +206,7 @@ export default function AdjustmentDialog({
                 ingredientId={ingredient?.id}
                 stockUnit={ingredient?.unit}
                 value={unit}
-                onChange={(next, ratio) => {
-                  setUnit(next)
-                  setQuantity(q => rescaleTyped(q, 1 / ratio))
-                }}
+                onChange={next => setUnit(next)}
               />
             </div>
           </div>

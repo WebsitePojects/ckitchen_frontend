@@ -241,6 +241,19 @@ export default function Menu() {
   })
   const lowStockItems = useMemo(() => kitchenStock.filter(i => i.below_threshold), [kitchenStock])
 
+  // ── "No kitchen stock" check before saving a recipe ───────────────────────
+  // An item whose ingredients have no kitchen stock gets flagged or refused at the counter,
+  // so the owner is asked once, at save time, with the names. "Save anyway" re-runs the
+  // same save with the check skipped.
+  const [stockPrompt, setStockPrompt] = useState<{ names: string[]; proceed: () => void } | null>(null)
+  function unstockedIngredientNames(lines: RecipeLine[]): string[] {
+    const inKitchen = new Map(kitchenStock.map(r => [r.ingredientId, Number(r.quantity)]))
+    const catalogue = queryClient.getQueryData<Array<{ id: string; name: string }>>(['ingredients']) ?? []
+    const nameOf = (id: string) => catalogue.find(i => i.id === id)?.name ?? kitchenStock.find(r => r.ingredientId === id)?.ingredient.name ?? 'An ingredient'
+    const ids = [...new Set(lines.filter(l => l.ingredientId && l.portionQty.trim() !== '').map(l => l.ingredientId))]
+    return ids.filter(id => !((inKitchen.get(id) ?? 0) > 0)).map(nameOf)
+  }
+
   // ── Per-item promo badge (MOTM 2026-07-01 #2b/#7) ─────────────────────────
   // One brand-wide fetch mapped by menuItemId, rather than N per-row queries —
   // cheap enough to keep the table lightweight. Refetched whenever
@@ -446,10 +459,17 @@ export default function Menu() {
   )
 
   // ── Add item submit ────────────────────────────────────────────────────────
-  async function handleAddItem(e: FormEvent) {
-    e.preventDefault()
+  async function handleAddItem(e?: FormEvent, skipStockCheck = false) {
+    e?.preventDefault()
     if (addSubmitting) return
     if (!selectedBrandId) return
+    if (!skipStockCheck && addRecipeTouched) {
+      const names = unstockedIngredientNames(addRecipeLines)
+      if (names.length > 0) {
+        setStockPrompt({ names, proceed: () => void handleAddItem(undefined, true) })
+        return
+      }
+    }
     setAddSubmitting(true)
 
     try {
@@ -605,10 +625,17 @@ export default function Menu() {
    * endpoint, so an empty/"_none" selection is simply omitted rather than
    * sent as null (which the backend would reject as a validation error).
    */
-  async function handleEditItem(e: FormEvent) {
-    e.preventDefault()
+  async function handleEditItem(e?: FormEvent, skipStockCheck = false) {
+    e?.preventDefault()
     if (editSubmitting) return
     if (!editOriginal) return
+    if (!skipStockCheck && editRecipeTouched) {
+      const names = unstockedIngredientNames(editRecipeLines)
+      if (names.length > 0) {
+        setStockPrompt({ names, proceed: () => void handleEditItem(undefined, true) })
+        return
+      }
+    }
     setEditSubmitting(true)
 
     const payload: Record<string, unknown> = {}
@@ -1147,6 +1174,7 @@ export default function Menu() {
             <label className="text-xs font-medium text-muted-foreground">Recipe (optional)</label>
             <RecipeEditor
               lines={addRecipeLines}
+              sellingPrice={Number(addPrice) || undefined}
               onChange={(next) => {
                 setAddRecipeLines(next)
                 setAddRecipeTouched(true)
@@ -1347,6 +1375,7 @@ export default function Menu() {
             ) : (
               <RecipeEditor
                 lines={editRecipeLines}
+                sellingPrice={Number(editPrice) || undefined}
                 onChange={(next) => {
                   setEditRecipeLines(next)
                   setEditRecipeTouched(true)
@@ -1558,6 +1587,35 @@ export default function Menu() {
 
       {/* Edit dialog — no DialogTrigger; opened via openEditDialog() from row actions */}
       {editItemDialog}
+
+      <Dialog open={stockPrompt !== null} onOpenChange={o => { if (!o) setStockPrompt(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>No kitchen stock for {stockPrompt?.names.length === 1 ? 'this ingredient' : 'these ingredients'}</DialogTitle>
+            <DialogDescription>
+              Orders for this item will be flagged (delivery apps) or refused (walk-in) until the kitchen has stock.
+              Receive a delivery from the recipe line, or transfer from the main warehouse in Inventory.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="list-disc space-y-0.5 pl-5 text-sm text-foreground">
+            {stockPrompt?.names.map(n => <li key={n}>{n}</li>)}
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStockPrompt(null)}>
+              Go back
+            </Button>
+            <Button
+              onClick={() => {
+                const proceed = stockPrompt?.proceed
+                setStockPrompt(null)
+                proceed?.()
+              }}
+            >
+              Save anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {deleteDialog}
 
       {/* Discounts / Promo dialog — no DialogTrigger; opened via openDiscountsDialog() from row actions */}

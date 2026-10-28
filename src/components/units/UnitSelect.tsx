@@ -26,9 +26,10 @@ export function useIngredientCustomUnits(ingredientId: string | undefined) {
  * Picks the unit a quantity is typed in, for one ingredient: its stock unit, the standard
  * units of the same kind (g / mg for an ingredient stocked in kg), and its custom units.
  *
- * onChange also gives `ratio` = (new unit in stock units) / (old unit in stock units), so a
- * form can keep the same physical amount: amount / ratio, and a per-unit price × ratio
- * (0.25 kg at 40/kg -> 250 g at 0.04/g).
+ * Picking a unit never changes the amount typed: people type "250" already meaning 250 g
+ * (converting it to 250,000 when g is picked after kg was the bug). onChange also gives
+ * `ratio` = (new unit in stock units) / (old unit in stock units) for a PER-UNIT PRICE on the
+ * same line, which must follow the unit: ₱40/kg becomes ₱0.04/g (price × ratio).
  */
 export function UnitSelect({
   ingredientId,

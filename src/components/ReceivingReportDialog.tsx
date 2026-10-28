@@ -65,6 +65,8 @@ interface ReceivingReportDialogProps {
   onOpenChange: (open: boolean) => void
   /** Called after a successful receipt so the host can refresh its own views. */
   onReceived?: () => void
+  /** Start with this ingredient on the first line (e.g. "receive it now" from a recipe). */
+  initialIngredientId?: string
 }
 
 /** POST /inventory/receive response — only `rr` is read here (defensively). */
@@ -99,6 +101,7 @@ export default function ReceivingReportDialog({
   open,
   onOpenChange,
   onReceived,
+  initialIngredientId,
 }: ReceivingReportDialogProps) {
   const queryClient = useQueryClient()
 
@@ -131,9 +134,9 @@ export default function ReceivingReportDialog({
     setSupplierId('')
     setReference('')
     setNotes('')
-    setLines([blankLine()])
+    setLines([initialIngredientId ? { ...blankLine(), ingredientId: initialIngredientId } : blankLine()])
     setSaving(false)
-  }, [open])
+  }, [open, initialIngredientId])
 
   // Only a REAL supplier (not the internal / placeholder sentinels) has links.
   const realSupplierId =
@@ -358,7 +361,7 @@ export default function ReceivingReportDialog({
                       stockUnit={ing?.unit}
                       value={l.unit}
                       onChange={(unit, ratio) =>
-                        updateLine(l.key, { unit, qty: rescaleTyped(l.qty, 1 / ratio), cost: rescaleTyped(l.cost, ratio) })
+                        updateLine(l.key, { unit, cost: rescaleTyped(l.cost, ratio) })
                       }
                       disabled={!ing}
                     />

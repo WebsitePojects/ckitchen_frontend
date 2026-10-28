@@ -236,7 +236,7 @@ export default function PurchaseRequestDialog({
                       stockUnit={ing?.unit}
                       value={l.unit}
                       onChange={(unit, ratio) =>
-                        updateLine(l.key, { unit, qty: rescaleTyped(l.qty, 1 / ratio), estCost: rescaleTyped(l.estCost, ratio) })
+                        updateLine(l.key, { unit, estCost: rescaleTyped(l.estCost, ratio) })
                       }
                       disabled={!ing}
                     />

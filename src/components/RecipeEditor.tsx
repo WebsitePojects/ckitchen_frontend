@@ -20,7 +20,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Plus, Search, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, PackagePlus, Plus, Search, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { get, post } from '../lib/api'
 import { useOutlet } from '../context/OutletContext'
@@ -34,8 +34,9 @@ import {
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
-import { formatQuantity, previewInStock, rescaleTyped, type CustomUnit } from '../lib/units'
+import { formatQuantity, previewInStock, type CustomUnit } from '../lib/units'
 import { StockUnitPicker, UnitSelect } from './units/UnitSelect'
+import ReceivingReportDialog from './ReceivingReportDialog'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,9 @@ interface SupplierParty {
 
 interface RecipeEditorProps {
   lines: RecipeLine[]
+  /** The item's price, so a recipe costing more than it sells for (usually a unit slip,
+   * 250 kg typed for 250 g) is called out while it is being written. */
+  sellingPrice?: number
   onChange: (lines: RecipeLine[]) => void
   disabled?: boolean
 }
@@ -420,7 +424,7 @@ function NewIngredientForm({ suppliers, onCancel, onCreated }: NewIngredientForm
 
 // ─── RecipeEditor ───────────────────────────────────────────────────────────
 
-export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditorProps) {
+export default function RecipeEditor({ lines, onChange, disabled, sellingPrice }: RecipeEditorProps) {
   const { selectedOutletId } = useOutlet()
   const queryClient = useQueryClient()
 
@@ -432,10 +436,19 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
     queryFn: async () => (await get<Ingredient[]>('/ingredients')).data,
   })
 
-  const { data: kitchenStock = [] } = useQuery({
+  const { data: kitchenStock = [], isSuccess: stockLoaded } = useQuery({
     queryKey: ['inventory', 'KITCHEN', selectedOutletId],
     queryFn: async () => (await get<KitchenStockRow[]>('/inventory?warehouse=KITCHEN')).data,
   })
+
+  // Main warehouse too, so an empty kitchen can say whether a transfer would fix it.
+  const { data: mainStock = [] } = useQuery({
+    queryKey: ['inventory', 'MAIN', selectedOutletId],
+    queryFn: async () => (await get<KitchenStockRow[]>('/inventory?warehouse=MAIN')).data,
+  })
+  // Ingredient being received from the "Receive delivery" shortcut (dialog opens in place,
+  // so the menu item being edited is never lost to a page change).
+  const [receiveFor, setReceiveFor] = useState<string | null>(null)
 
   const { data: suppliers = [] } = useQuery({
     queryKey: ['suppliers', 'active'],
@@ -456,6 +469,12 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
 
   const availableFor = (ingredientId: string): number | null =>
     availableByIngredient.has(ingredientId) ? availableByIngredient.get(ingredientId)! : null
+
+  const mainByIngredient = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const row of mainStock) m.set(row.ingredientId, toNum(row.available) ?? toNum(row.quantity) ?? 0)
+    return m
+  }, [mainStock])
 
   // ── Line mutations ────────────────────────────────────────────────────────
   function updateLine(index: number, patch: Partial<RecipeLine>) {
@@ -546,7 +565,7 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
                       ingredientId={line.ingredientId || undefined}
                       stockUnit={ing?.unit}
                       value={line.unit}
-                      onChange={(unit, ratio) => updateLine(index, { unit, portionQty: rescaleTyped(line.portionQty, 1 / ratio) })}
+                      onChange={unit => updateLine(index, { unit })}
                       disabled={disabled || !ing}
                     />
                   </div>
@@ -567,6 +586,16 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
                   <p className="pl-1 text-[11px] text-muted-foreground">
                     = {formatQuantity(stockAmount(line), ing.unit)} from stock per serving
                   </p>
+                )}
+
+                {ing && stockLoaded && (availableFor(ing.id) ?? 0) <= 0 && (
+                  <NoStockNotice
+                    name={ing.name}
+                    unit={ing.unit}
+                    mainQty={mainByIngredient.get(ing.id) ?? 0}
+                    onReceive={() => setReceiveFor(ing.id)}
+                    disabled={disabled}
+                  />
                 )}
 
                 {newFormFor === index && (
@@ -601,6 +630,64 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
           </span>
         </div>
       </div>
+
+      {sellingPrice !== undefined && sellingPrice > 0 && recipeCost > sellingPrice && (
+        <p role="status" className="mt-2 flex items-start gap-1.5 text-[12px] text-danger-text">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          Recipe cost ₱{recipeCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} is more than the price
+          ₱{sellingPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}. Check the amounts and units (g vs kg).
+        </p>
+      )}
+
+      <ReceivingReportDialog
+        open={receiveFor !== null}
+        onOpenChange={open => { if (!open) setReceiveFor(null) }}
+        initialIngredientId={receiveFor ?? undefined}
+        onReceived={() => void queryClient.invalidateQueries({ queryKey: ['inventory'] })}
+      />
+    </div>
+  )
+}
+
+/**
+ * Shown under a recipe line whose ingredient has nothing in the kitchen: orders for this item
+ * would be flagged (delivery apps) or refused (walk-in) at the counter, so say it here, at the
+ * moment the recipe is written, with the next step.
+ */
+function NoStockNotice({
+  name,
+  unit,
+  mainQty,
+  onReceive,
+  disabled,
+}: {
+  name: string
+  unit: string
+  mainQty: number
+  onReceive: () => void
+  disabled?: boolean
+}) {
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-[12px]">
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warn-text" aria-hidden />
+      <span className="min-w-0 flex-1 text-foreground">
+        {mainQty > 0 ? (
+          <>
+            No {name} in the kitchen yet. The main warehouse has {formatQuantity(mainQty, unit)}: request a transfer
+            from Inventory so orders can be made.
+          </>
+        ) : (
+          <>
+            {name} is not in inventory yet. Orders for this item will be flagged or refused until stock is received and
+            moved to the kitchen.
+          </>
+        )}
+      </span>
+      {mainQty <= 0 && (
+        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={onReceive} disabled={disabled}>
+          <PackagePlus className="h-3.5 w-3.5" aria-hidden /> Receive delivery
+        </Button>
+      )}
     </div>
   )
 }

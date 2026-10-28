@@ -90,7 +90,7 @@ import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
 import { UnitSelect } from '../components/units/UnitSelect'
-import { rescaleTyped } from '../lib/units'
+import { formatQuantity, previewInStock } from '../lib/units'
 
 // ─── Role helpers ──────────────────────────────────────────────────────────────
 
@@ -553,12 +553,14 @@ interface ItoRequestItem {
 
 interface ItoRequestFormProps {
   ingredients: Ingredient[]
+  /** ingredientId -> what the main warehouse can still give (available, else on hand). */
+  mainAvailable: Map<string, number>
   outletId?: string
   onSuccess: () => void
   onClose: () => void
 }
 
-function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoRequestFormProps) {
+function ItoRequestForm({ ingredients, mainAvailable, outletId, onSuccess, onClose }: ItoRequestFormProps) {
   const [items, setItems] = useState<ItoRequestItem[]>([{ ingredientId: '', quantity: '', unit: '' }])
   const [submitting, setSubmitting] = useState(false)
 
@@ -654,6 +656,19 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                   ))}
                 </SelectContent>
               </Select>
+              {item.ingredientId && (() => {
+                const ing = ingredients.find(i => i.id === item.ingredientId)
+                const have = mainAvailable.get(item.ingredientId) ?? 0
+                const asked = ing && item.quantity.trim() !== '' ? previewInStock(item.quantity, item.unit || undefined, ing.unit) : null
+                const short = have <= 0 || (asked !== null && asked > have)
+                return (
+                  <p className={`mt-1 text-[11px] ${short ? 'text-warn-text' : 'text-muted-foreground'}`} role={short ? 'status' : undefined}>
+                    {have <= 0
+                      ? 'Main warehouse has none: receive a delivery first, or this transfer cannot be confirmed.'
+                      : `Main has ${formatQuantity(have, ing?.unit)}${asked !== null && asked > have ? ': less than requested' : ''}`}
+                  </p>
+                )
+              })()}
             </div>
             <div className="w-28">
               {idx === 0 && (
@@ -677,8 +692,8 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                   ingredientId={item.ingredientId || undefined}
                   stockUnit={ingredients.find(i => i.id === item.ingredientId)?.unit}
                   value={item.unit || undefined}
-                  onChange={(unit, ratio) =>
-                    setItems(prev => prev.map((row, i) => (i === idx ? { ...row, unit, quantity: rescaleTyped(row.quantity, 1 / ratio) } : row)))
+                  onChange={unit =>
+                    setItems(prev => prev.map((row, i) => (i === idx ? { ...row, unit } : row)))
                   }
                   disabled={!item.ingredientId}
                 />
@@ -1451,6 +1466,10 @@ export default function Inventory() {
     r => r.below_threshold || alertedIds.has(r.ingredientId),
   )
   const pendingAdjustmentCount = adjustments.filter(a => a.status === 'PENDING').length
+  const mainAvailableByIngredient = useMemo(
+    () => new Map(mainStock.map(r => [r.ingredientId, reservationView(r).available])),
+    [mainStock],
+  )
 
   // ── View: one task per tab, one stock table at a time (HCI: the old page showed two
   // tables, alerts, transfers and adjustments at once). Tab, tier and filters live in the
@@ -1762,6 +1781,7 @@ export default function Inventory() {
           </DialogHeader>
           <ItoRequestForm
             ingredients={ingredients}
+            mainAvailable={mainAvailableByIngredient}
             onSuccess={() => void refetchItos()}
             onClose={() => setShowRequestIto(false)}
           />
