@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChevronRight, GitCompareArrows, Trophy } from 'lucide-react'
@@ -137,61 +138,7 @@ export default function BrandCompare() {
                 <h2 id="compare-table-title" className="mb-2 text-ws-section font-semibold text-foreground">
                   Side by side
                 </h2>
-                <div className="overflow-x-auto" tabIndex={0} aria-label="Brand comparison table">
-                  <table className="w-full min-w-[36rem] text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left">
-                        <th className="py-2 pr-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Metric</th>
-                        {selected.map((b) => (
-                          <th key={b.brand.id} className="py-2 pr-3 text-right font-semibold text-foreground">
-                            <Link to={`/brands/${b.brand.id}`} className="hover:underline">
-                              {b.brand.name}
-                            </Link>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-border">
-                        <td className="py-2 pr-3 text-muted-foreground">Verdict</td>
-                        {selected.map((b) => (
-                          <td key={b.brand.id} className="py-2 pr-3 text-right">
-                            <span className={cn('status justify-end text-xs', verdictClass(b.verdict))}>{b.verdict.headline}</span>
-                          </td>
-                        ))}
-                      </tr>
-                      {METRICS.map((metric) => {
-                        const values = selected.map(metric.value)
-                        const present = values.filter((v): v is number => v != null)
-                        const best = present.length > 1 ? (metric.better === 'high' ? Math.max(...present) : Math.min(...present)) : null
-                        return (
-                          <tr key={metric.label} className="border-b border-border last:border-b-0">
-                            <td className="py-2 pr-3 text-muted-foreground">{metric.label}</td>
-                            {values.map((v, i) => {
-                              const isBest = best != null && v === best
-                              return (
-                                <td key={selected[i]!.brand.id} className={cn('py-2 pr-3 text-right tabular-nums text-foreground', isBest && 'font-semibold')}>
-                                  {metric.format(v)}
-                                  {isBest && <span className="sr-only"> (best)</span>}
-                                  {isBest && <Trophy className="ml-1 inline h-3 w-3 -translate-y-px text-ink-accent" aria-hidden />}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        )
-                      })}
-                      <tr>
-                        <td className="py-2 pr-3 text-muted-foreground">Momentum</td>
-                        {selected.map((b) => (
-                          <td key={b.brand.id} className="py-2 pr-3 text-right text-foreground">
-                            {MOMENTUM_LABEL[b.verdict.momentum]}
-                            <span className="block text-[11px] text-muted-foreground">{CONFIDENCE_LABEL[b.trend.confidence]}</span>
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                <CompareTable brands={selected} />
               </section>
 
               <section className="ledger-section space-y-3" aria-labelledby="compare-chart-title">
@@ -257,3 +204,120 @@ function Ranking({ brands }: { brands: BrandPerformance[] }) {
     </section>
   )
 }
+
+interface CompareRow {
+  label: string
+  cells: Array<{ key: string; content: ReactNode; best: boolean }>
+}
+
+/** Every comparison row, built once and rendered as a table (wide) or stacked blocks (phone). */
+function compareRows(brands: BrandPerformance[]): CompareRow[] {
+  const rows: CompareRow[] = [
+    {
+      label: 'Verdict',
+      cells: brands.map((b) => ({
+        key: b.brand.id,
+        best: false,
+        content: <span className={cn('status text-xs', verdictClass(b.verdict))}>{b.verdict.headline}</span>,
+      })),
+    },
+  ]
+  for (const metric of METRICS) {
+    const values = brands.map(metric.value)
+    const present = values.filter((v): v is number => v != null)
+    const best = present.length > 1 ? (metric.better === 'high' ? Math.max(...present) : Math.min(...present)) : null
+    rows.push({
+      label: metric.label,
+      cells: values.map((v, i) => ({ key: brands[i]!.brand.id, best: best != null && v === best, content: metric.format(v) })),
+    })
+  }
+  rows.push({
+    label: 'Momentum',
+    cells: brands.map((b) => ({
+      key: b.brand.id,
+      best: false,
+      content: (
+        <>
+          {MOMENTUM_LABEL[b.verdict.momentum]}
+          <span className="block text-[11px] text-muted-foreground">{CONFIDENCE_LABEL[b.trend.confidence]}</span>
+        </>
+      ),
+    })),
+  })
+  return rows
+}
+
+function BestMark() {
+  return (
+    <>
+      <span className="sr-only"> (best)</span>
+      <Trophy className="ml-1 inline h-3 w-3 -translate-y-px text-ink-accent" aria-hidden />
+    </>
+  )
+}
+
+/**
+ * Wide screens: a metric x brand table. Phones: one block per metric listing each brand's
+ * value, so nothing scrolls sideways (a 6-brand table cannot fit 390 px).
+ */
+function CompareTable({ brands }: { brands: BrandPerformance[] }) {
+  const rows = compareRows(brands)
+  const nameOf = new Map(brands.map((b) => [b.brand.id, b.brand]))
+  return (
+    <>
+      <table className="hidden w-full text-sm sm:table">
+        <thead>
+          <tr className="border-b border-border text-left">
+            <th className="py-2 pr-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Metric</th>
+            {brands.map((b) => (
+              <th key={b.brand.id} className="py-2 pr-3 text-right font-semibold text-foreground">
+                <Link to={`/brands/${b.brand.id}`} className="hover:underline">
+                  {b.brand.name}
+                </Link>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.label} className="border-b border-border last:border-b-0">
+              <td className="py-2 pr-3 text-muted-foreground">{row.label}</td>
+              {row.cells.map((cell) => (
+                <td key={cell.key} className={cn('py-2 pr-3 text-right tabular-nums text-foreground', cell.best && 'font-semibold')}>
+                  {cell.content}
+                  {cell.best && <BestMark />}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="divide-y divide-border sm:hidden">
+        {rows.map((row) => (
+          <div key={row.label} className="py-2.5">
+            <p className="eyebrow mb-1">{row.label}</p>
+            <dl className="space-y-1">
+              {row.cells.map((cell) => {
+                const brand = nameOf.get(cell.key)!
+                return (
+                  <div key={cell.key} className="flex items-baseline justify-between gap-3 text-sm">
+                    <dt className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+                      <span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: brand.color }} aria-hidden />
+                      <span className="truncate">{brand.name}</span>
+                    </dt>
+                    <dd className={cn('text-right tabular-nums text-foreground', cell.best && 'font-semibold')}>
+                      {cell.content}
+                      {cell.best && <BestMark />}
+                    </dd>
+                  </div>
+                )
+              })}
+            </dl>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
