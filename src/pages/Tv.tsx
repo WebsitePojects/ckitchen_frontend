@@ -16,6 +16,10 @@
  * Business Rule #9) rather than a second copy of the fetch/socket wiring.
  * This page adds no advance/cancel actions — the board is read-only.
  *
+ * Colours come from the theme tokens (background/card/secondary/border/foreground), so the
+ * board follows Light/Dark like the rest of ORION; stage accents use a darker shade in light
+ * mode to stay readable from across the kitchen.
+ *
  * KPI trio: an actual "gross sales today" figure would need /analytics/brands
  * (checked against Dashboard/Analytics.tsx), but that endpoint's RBAC is
  * OWNER/BRAND_MANAGER/ACCOUNTING only (backend analytics/routes.ts) — the
@@ -50,10 +54,12 @@ const MAX_VISIBLE_CARDS = 8
 // ─── Column accent tokens (mirrors Kitchen.tsx's per-stage colors) ────────────
 
 const COLUMN_ACCENT: Record<'NEW' | 'PREPARING' | 'READY', string> = {
-  NEW: 'text-blue-400',
-  PREPARING: 'text-amber-400',
-  READY: 'text-emerald-400',
+  NEW: 'text-blue-700 dark:text-blue-400',
+  PREPARING: 'text-amber-700 dark:text-amber-400',
+  READY: 'text-emerald-700 dark:text-emerald-400',
 }
+
+const OVERDUE_TEXT = 'text-red-600 dark:text-red-400'
 
 // ─── TvOrderCard ──────────────────────────────────────────────────────────────
 
@@ -70,8 +76,8 @@ function TvOrderCard({ order, brand }: TvOrderCardProps) {
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-2xl border bg-[#121A17] p-4 shadow-lg',
-        isOverdue ? 'border-red-500/60 ring-2 ring-red-500/40' : 'border-[#1F2A24]',
+        'flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm',
+        isOverdue ? 'border-red-500/60 ring-2 ring-red-500/40' : 'border-border',
       )}
       style={{ borderLeftColor: brand?.color ?? '#52525B', borderLeftWidth: 5 }}
     >
@@ -79,25 +85,25 @@ function TvOrderCard({ order, brand }: TvOrderCardProps) {
         <BrandChip brand={brand} className="text-xs px-3 py-1" />
         <AggregatorBadge aggregator={order.aggregator} />
         {isOverdue && (
-          <AlertTriangle className="ml-auto h-5 w-5 shrink-0 text-red-400" aria-label="Overdue" />
+          <AlertTriangle className={cn('ml-auto h-5 w-5 shrink-0', OVERDUE_TEXT)} aria-label="Overdue" />
         )}
       </div>
 
       <div className="flex items-end justify-between gap-3">
-        <span className="text-4xl font-black leading-none tabular-nums text-zinc-50">
+        <span className="text-4xl font-black leading-none tabular-nums text-foreground">
           #{shortOrderNo(order.externalRef)}
         </span>
         <span
           className={cn(
             'text-2xl font-bold leading-none tabular-nums',
-            isOverdue ? 'text-red-400' : 'text-zinc-300',
+            isOverdue ? OVERDUE_TEXT : 'text-foreground/80',
           )}
         >
           {elapsedMMSS(start)}
         </span>
       </div>
 
-      <div className="text-sm font-medium text-zinc-500">
+      <div className="text-sm font-medium text-muted-foreground">
         {itemCount} item{itemCount === 1 ? '' : 's'}
       </div>
     </div>
@@ -120,20 +126,20 @@ function TvColumn({ label, icon: Icon, accent, orders, brandMap }: TvColumnProps
 
   return (
     <section
-      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[#1F2A24] bg-[#0C1310] shadow-xl"
+      className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-secondary/40 shadow-sm"
       aria-label={`${label} orders`}
     >
-      <div className="flex shrink-0 items-center gap-3 border-b border-[#1F2A24] bg-[#121A17] px-5 py-4">
+      <div className="flex shrink-0 items-center gap-3 border-b border-border bg-secondary px-5 py-4">
         <Icon className={cn('h-7 w-7 shrink-0', accent)} aria-hidden />
         <h2 className={cn('text-2xl font-bold tracking-wide', accent)}>{label}</h2>
-        <span className="ml-auto rounded-full bg-zinc-700/60 px-3 py-1 text-lg font-bold tabular-nums text-zinc-200">
+        <span className="ml-auto rounded-full bg-background px-3 py-1 text-lg font-bold tabular-nums text-foreground">
           {orders.length}
         </span>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         {visible.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-zinc-600">
+          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             No {label.toLowerCase()} orders
           </div>
         ) : (
@@ -142,7 +148,7 @@ function TvColumn({ label, icon: Icon, accent, orders, brandMap }: TvColumnProps
           ))
         )}
         {hiddenCount > 0 && (
-          <div className="shrink-0 rounded-xl border border-dashed border-zinc-700 py-3 text-center text-sm font-semibold text-zinc-500">
+          <div className="shrink-0 rounded-xl border border-dashed border-border py-3 text-center text-sm font-semibold text-muted-foreground">
             +{hiddenCount} more
           </div>
         )}
@@ -179,52 +185,52 @@ export default function Tv() {
   const readyOrders = useMemo(() => orders.filter(o => o.status === 'READY'), [orders])
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#0A0F0D] text-zinc-50">
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       {/* ── Top strip ── */}
-      <header className="flex h-20 shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#1F2A24] bg-[#0C1310] px-6 sm:px-8">
+      <header className="flex h-20 shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-border bg-card px-6 sm:px-8">
         <div className="flex shrink-0 items-center gap-2.5">
           <Orbit className="h-7 w-7 text-emerald-500" aria-hidden />
           <span className="text-xl font-bold tracking-tight">{PLATFORM_NAME}</span>
         </div>
 
         {outletName && (
-          <div className="flex shrink-0 items-center gap-2 text-zinc-400">
+          <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
             <Building2 className="h-5 w-5 shrink-0" aria-hidden />
-            <span className="text-lg font-semibold text-zinc-200">{outletName}</span>
+            <span className="text-lg font-semibold text-foreground">{outletName}</span>
           </div>
         )}
 
         {/* KPI trio — orders / preparing / ready (see file header for why not gross sales) */}
         <div className="ml-auto flex items-center gap-4 sm:gap-8">
           <div className="flex items-center gap-2">
-            <ReceiptText className="h-5 w-5 text-zinc-500" aria-hidden />
-            <span className="text-2xl font-bold tabular-nums text-zinc-50">{orders.length}</span>
-            <span className="hidden text-xs font-medium uppercase tracking-wide text-zinc-500 sm:inline">
+            <ReceiptText className="h-5 w-5 text-muted-foreground" aria-hidden />
+            <span className="text-2xl font-bold tabular-nums text-foreground">{orders.length}</span>
+            <span className="hidden text-xs font-medium uppercase tracking-wide text-muted-foreground sm:inline">
               Orders
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Flame className="h-5 w-5 text-amber-500" aria-hidden />
-            <span className="text-2xl font-bold tabular-nums text-zinc-50">{preparingOrders.length}</span>
-            <span className="hidden text-xs font-medium uppercase tracking-wide text-zinc-500 sm:inline">
+            <Flame className="h-5 w-5 text-amber-600 dark:text-amber-500" aria-hidden />
+            <span className="text-2xl font-bold tabular-nums text-foreground">{preparingOrders.length}</span>
+            <span className="hidden text-xs font-medium uppercase tracking-wide text-muted-foreground sm:inline">
               Preparing
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <PackageCheck className="h-5 w-5 text-emerald-500" aria-hidden />
-            <span className="text-2xl font-bold tabular-nums text-zinc-50">{readyOrders.length}</span>
-            <span className="hidden text-xs font-medium uppercase tracking-wide text-zinc-500 sm:inline">
+            <PackageCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-500" aria-hidden />
+            <span className="text-2xl font-bold tabular-nums text-foreground">{readyOrders.length}</span>
+            <span className="hidden text-xs font-medium uppercase tracking-wide text-muted-foreground sm:inline">
               Ready
             </span>
           </div>
         </div>
 
         {/* Connection indicator + live clock */}
-        <div className="flex shrink-0 items-center gap-4 border-l border-[#1F2A24] pl-4 sm:pl-6">
+        <div className="flex shrink-0 items-center gap-4 border-l border-border pl-4 sm:pl-6">
           <span
             className={cn(
               'flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide',
-              socketStatus === 'connected' ? 'text-zinc-600' : 'text-red-400',
+              socketStatus === 'connected' ? 'text-muted-foreground' : OVERDUE_TEXT,
             )}
           >
             <span
@@ -236,7 +242,7 @@ export default function Tv() {
             />
             {socketStatus === 'connected' ? 'Live' : 'Offline'}
           </span>
-          <span className="font-mono text-2xl font-bold tabular-nums text-zinc-100">{clock}</span>
+          <span className="font-mono text-2xl font-bold tabular-nums text-foreground">{clock}</span>
         </div>
       </header>
 
@@ -251,15 +257,15 @@ export default function Tv() {
       {/* ── Board ── */}
       <main className="min-h-0 flex-1 overflow-hidden p-4 sm:p-6">
         {loading ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-zinc-500">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-emerald-500" />
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-border border-t-emerald-500" />
             <p className="text-sm">Loading board…</p>
           </div>
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center p-8">
             <div className="w-full max-w-md rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center">
-              <AlertTriangle className="mx-auto mb-3 h-8 w-8 text-red-400" />
-              <p className="text-sm font-semibold text-red-300">{error}</p>
+              <AlertTriangle className={cn('mx-auto mb-3 h-8 w-8', OVERDUE_TEXT)} />
+              <p className="text-sm font-semibold text-red-700 dark:text-red-300">{error}</p>
             </div>
           </div>
         ) : (
@@ -274,7 +280,7 @@ export default function Tv() {
       {/* ── Exit (bottom corner, subtle) ── */}
       <Link
         to="/"
-        className="fixed bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-500 backdrop-blur transition-colors hover:border-zinc-600 hover:text-zinc-200"
+        className="fixed bottom-4 right-4 z-10 flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5 text-xs text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
         aria-label="Exit TV Mode"
       >
         <X className="h-3.5 w-3.5" aria-hidden />

@@ -220,7 +220,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         'transition-all duration-300',
         style.cardBorder,
         isOverdue
-          ? 'animate-pulse ring-2 ring-red-500/60 ring-offset-2 ring-offset-[#0A0F0D] border-red-500/60'
+          ? 'animate-pulse ring-2 ring-red-500/60 ring-offset-2 ring-offset-background border-red-500/60'
           : '',
         stale ? 'opacity-60' : '',
       ].join(' ')}
@@ -244,7 +244,7 @@ function OrderCard({ order, brand, stationId, now: _now, onAdvance, onCancel, ad
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {stale && (
             <span
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground ring-1 ring-inset ring-zinc-700"
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground ring-1 ring-inset ring-border"
               title={`No activity for over ${STALE_HOURS}h — likely abandoned`}
             >
               Stale
