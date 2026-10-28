@@ -6,6 +6,7 @@ import axios, {
 } from 'axios'
 import { destroySocket } from './socket'
 import { currentBearerToken } from './authToken'
+import { getKioskToken } from './kioskToken'
 
 // ─── Error shape from CK1-API-003 §1 ─────────────────────────────────────────
 
@@ -144,6 +145,11 @@ apiClient.interceptors.request.use(async (config) => {
   if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // Kiosk calls carry the screen's pairing token (D56), never a person's session.
+  if (config.url?.startsWith('/public/')) {
+    const kiosk = getKioskToken()
+    if (kiosk) config.headers['X-Kiosk-Token'] = kiosk
+  }
   const outletId = getOutletId()
   if (outletId && !config.headers['X-Outlet-Id']) {
     config.headers['X-Outlet-Id'] = outletId
@@ -183,8 +189,9 @@ apiClient.interceptors.response.use(
       if (err.response.status === 401) {
         localStorage.removeItem(TOKEN_KEY)
         destroySocket()
-        // /join and /signup serve people who are not in ORION yet; their pages explain a refusal.
-        if (!['/login', '/join', '/signup'].includes(window.location.pathname)) {
+        // /join and /signup serve people who are not in ORION yet, and the kiosk has no session:
+        // their pages explain a refusal instead of the session-expired redirect.
+        if (!['/login', '/join', '/signup', '/kiosk/attendance'].includes(window.location.pathname)) {
           const handled = reportCrucialError({
             kind: 'session',
             title: 'Session expired',

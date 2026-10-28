@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   LogIn,
   LogOut,
-  MonitorSmartphone,
   Search,
   UserCheck,
   UserX,
@@ -23,6 +22,7 @@ import {
 } from '../auth/RequireAttendance'
 import { useAttendanceCamera, AttendanceCameraView } from '../components/AttendanceCamera'
 import PageContainer from '../components/layout/PageContainer'
+import { KioskScreensPanel, OpenKioskButton } from '../components/attendance/KioskScreens'
 import PageHeader from '../components/common/PageHeader'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -254,11 +254,7 @@ export default function Attendance() {
         }
         actions={
           isOwner ? (
-            <Button asChild variant="outline" size="sm">
-              <Link to="/kiosk/attendance">
-                <MonitorSmartphone className="mr-2 h-4 w-4" /> Public kiosk
-              </Link>
-            </Button>
+            <OpenKioskButton />
           ) : undefined
         }
       />
@@ -469,6 +465,11 @@ export default function Attendance() {
           )}
         </Card>
       </div>
+      {isOwner && (
+        <div className="mt-ws-gap">
+          <KioskScreensPanel />
+        </div>
+      )}
     </PageContainer>
   )
 }

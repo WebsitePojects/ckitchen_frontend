@@ -280,6 +280,8 @@ export default function AttendanceKiosk() {
   const flagOff =
     disabledByFlag ||
     (employeesQuery.error instanceof CKApiError && employeesQuery.error.status === 404)
+  // D56: this screen was never paired to a business, or its pairing was revoked.
+  const notPaired = employeesQuery.error instanceof CKApiError && employeesQuery.error.code === 'KIOSK_NOT_PAIRED'
 
   const departments = useMemo(() => {
     const set = new Set((employeesQuery.data ?? []).map((e) => e.department).filter(Boolean))
@@ -311,6 +313,22 @@ export default function AttendanceKiosk() {
   }
 
   // ── Feature flag off → dedicated disabled screen ───────────────────────────
+  if (notPaired) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground">
+        <MonitorOff className="h-14 w-14 text-muted-foreground" />
+        <h1 className="text-3xl font-bold tracking-tight">This screen is not set up as a kiosk</h1>
+        <p className="max-w-md text-base text-muted-foreground">
+          On this tablet, sign in as the business owner, open Attendance and press Public kiosk. The kiosk
+          then shows only that business's staff.
+        </p>
+        <Button asChild size="lg" className="h-12 px-6 text-base">
+          <a href="/attendance">Sign in to set it up</a>
+        </Button>
+      </div>
+    )
+  }
+
   if (flagOff) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground">
