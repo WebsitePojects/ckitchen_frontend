@@ -1,5 +1,5 @@
 import { type FormEvent, lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Loader2, AlertCircle, Mail, Lock } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { CKApiError, warmUpApi } from '../lib/api'
@@ -150,6 +150,11 @@ export default function Login() {
             </p>
           )}
         </form>
+      )}
+      {clerkEnabled && (
+        <p className="mt-ws-gutter text-center text-ws-small text-muted-foreground">
+          New business? <Link to="/signup" className="font-medium text-foreground underline-offset-4 hover:underline">Create a workspace</Link>
+        </p>
       )}
     </AuthShell>
   )

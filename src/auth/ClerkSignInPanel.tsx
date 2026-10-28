@@ -61,6 +61,14 @@ export default function ClerkSignInPanel({ redirectUrl }: { redirectUrl?: string
             <p className="mt-1 text-muted-foreground">{authError.message}</p>
           </div>
         </div>
+        {authError.code === 'NOT_INVITED' && (
+          <a
+            href="/signup"
+            className="flex h-ws-control w-full items-center justify-center rounded-md bg-primary text-ws-small font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Create your own workspace
+          </a>
+        )}
         <button
           type="button"
           onClick={logout}

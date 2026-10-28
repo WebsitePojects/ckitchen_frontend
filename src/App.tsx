@@ -43,6 +43,7 @@ const MasterData = lazyPage('/master-data')
 const Purchasing = lazyPage('/purchasing')
 const MerchantConsole = lazyPage('/merchant-console')
 const Join = lazyPage('/join')
+const Signup = lazyPage('/signup')
 
 export default function App() {
   return (
@@ -59,6 +60,8 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             {/* Join links: for people ORION does not know yet, so outside RequireAuth. */}
             <Route path="/join" element={<Join />} />
+            {/* Self-serve sign-up: a new business owner creates their own workspace. */}
+            <Route path="/signup" element={<Signup />} />
             {/* Public attendance kiosk (CK1-EMS-005 §3) — wall-tablet time
                 clock, deliberately OUTSIDE RequireAuth (unauthenticated by
                 design; photo is the identity evidence) and absent from

@@ -39,6 +39,7 @@ export const PAGE_LOADERS: Record<string, Loader> = {
   '/outlet-profile': () => import('../pages/OutletProfile'),
   '/settings': () => import('../pages/Settings'),
   '/join': () => import('../pages/Join'),
+  '/signup': () => import('../pages/Signup'),
 }
 
 const lazyCache = new Map<string, ComponentType>()
