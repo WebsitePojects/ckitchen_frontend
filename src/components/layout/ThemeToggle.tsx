@@ -42,7 +42,7 @@ export default function ThemeToggle({ className }: { className?: string }) {
   // next-themes resolves the theme after mount; render a stable icon until then.
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
-  const isDark = !mounted || resolvedTheme !== 'light'
+  const isDark = mounted && resolvedTheme === 'dark'
 
   return (
     <button

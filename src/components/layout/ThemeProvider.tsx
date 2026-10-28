@@ -14,21 +14,16 @@ interface ThemeProviderProps {
  * instead of hand-rolling the same localStorage + matchMedia + class-toggle
  * logic.
  *
- * `defaultTheme="dark"` matches index.html's static `<html class="dark">`,
- * so a first-time visitor (no persisted choice yet) sees zero flash — the
- * provider's mount effect confirms what's already painted instead of
- * changing it. A returning visitor who chose "light" gets one brief
- * dark->light flash on load; this is a CSR-only SPA (no SSR/static
- * pre-render to read localStorage before first paint), and index.html's
- * strict CSP (`script-src 'self'`, no `unsafe-inline`) rules out the usual
- * blocking inline anti-flash script. Acceptable tradeoff — documented rather
- * than silently left unexplained.
+ * Light is the default (owner's decision 2026-10-28): a first-time visitor, or anyone who
+ * never picked a theme, gets light. index.html has no `dark` class, and public/theme-boot.js
+ * (an external script, because the CSP forbids inline ones) applies a saved "dark" or
+ * "system" choice before first paint, so a returning dark-mode user sees no flash either.
  */
 export default function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       enableSystem
       storageKey="orion-theme"
       disableTransitionOnChange

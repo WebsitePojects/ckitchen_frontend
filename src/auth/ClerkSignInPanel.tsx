@@ -47,7 +47,7 @@ export default function ClerkSignInPanel({ redirectUrl }: { redirectUrl?: string
   const { session } = useSession()
   const { signOut } = useClerk()
   const { resolvedTheme } = useTheme()
-  const appearance = resolvedTheme === 'light' ? APPEARANCE.light : APPEARANCE.dark
+  const appearance = resolvedTheme === 'dark' ? APPEARANCE.dark : APPEARANCE.light
 
   // Never render <SignIn> while Clerk holds a session: it auto-redirects a signed-in visitor
   // away from /login, and the route guard sends them straight back (an endless reload loop).

@@ -139,7 +139,7 @@ export default function Topbar({ mobileNavOpen, onMobileNavChange }: TopbarProps
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <p className="eyebrow px-2 pb-1 pt-1.5">Theme</p>
-            <DropdownMenuRadioGroup value={theme ?? 'dark'} onValueChange={(v) => switchTo(v as 'light' | 'dark' | 'system')}>
+            <DropdownMenuRadioGroup value={theme ?? 'light'} onValueChange={(v) => switchTo(v as 'light' | 'dark' | 'system')}>
               <DropdownMenuRadioItem value="light" className="gap-2">
                 <Sun className="h-4 w-4" aria-hidden /> Light
               </DropdownMenuRadioItem>

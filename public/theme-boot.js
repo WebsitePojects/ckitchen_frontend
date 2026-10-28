@@ -1,11 +1,12 @@
-// Runs synchronously in <head> before first paint so a saved "light" choice never flashes dark.
-// Mirrors next-themes (storageKey "orion-theme", class strategy; see ThemeProvider.tsx).
+// Runs synchronously in <head> before first paint so a saved "dark" choice never flashes light.
+// Light is the default (no saved choice). Mirrors next-themes (storageKey "orion-theme",
+// class strategy; see ThemeProvider.tsx).
 ;(function () {
   try {
-    var saved = localStorage.getItem('orion-theme') || 'dark'
-    var dark = saved === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : saved !== 'light'
+    var saved = localStorage.getItem('orion-theme') || 'light'
+    var dark = saved === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : saved === 'dark'
     document.documentElement.classList.toggle('dark', dark)
   } catch (e) {
-    // Storage blocked (private mode): keep the default dark class from index.html.
+    // Storage blocked (private mode): stay on the light default from index.html.
   }
 })()
