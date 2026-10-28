@@ -25,6 +25,7 @@
  * (see OutletProfile.tsx / Menu.tsx). See the end-of-task report for the
  * per-control guard list.
  */
+import { useSalesChannels } from '../lib/salesChannels'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -597,7 +598,10 @@ export default function MerchantManagement() {
 
   // ── Listings tab: create / edit account ───────────────────────────────────
   const [addListingOpen, setAddListingOpen] = useState(false)
-  const [addListingAggregator, setAddListingAggregator] = useState<'FOODPANDA' | 'GRABFOOD' | 'OTHER'>('FOODPANDA')
+  const [addListingChannelId, setAddListingChannelId] = useState('')
+  const salesChannels = useSalesChannels({ activeOnly: true })
+  const addListingChannel = salesChannels.data?.find((c) => c.id === addListingChannelId)
+  const addListingIsApi = addListingChannel ? addListingChannel.integration !== 'MANUAL' : false
   const [addListingExternalId, setAddListingExternalId] = useState('')
   const [addListingCredentialRef, setAddListingCredentialRef] = useState('')
   const [addListingLocationId, setAddListingLocationId] = useState('')
@@ -605,12 +609,12 @@ export default function MerchantManagement() {
 
   const handleAddListing = addListingGuard.guard(async (e: FormEvent) => {
     e.preventDefault()
-    if (!selectedBrandId) return
+    if (!selectedBrandId || !addListingChannelId) return
     try {
       await createAccount(selectedBrandId, {
-        aggregator: addListingAggregator,
+        channel_id: addListingChannelId,
         external_merchant_id: addListingExternalId.trim(),
-        credential_ref: addListingCredentialRef.trim(),
+        credential_ref: addListingCredentialRef.trim() || undefined,
         location_id: addListingLocationId || undefined,
       })
       toast.success('Listing added')
@@ -1119,24 +1123,32 @@ export default function MerchantManagement() {
                           </DialogHeader>
                           <form onSubmit={(e) => void handleAddListing(e)} className="space-y-4">
                             <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-muted-foreground">Aggregator</label>
-                              <Select value={addListingAggregator} onValueChange={(v) => setAddListingAggregator(v as typeof addListingAggregator)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
+                              <label className="text-xs font-medium text-muted-foreground">Sales channel</label>
+                              <Select value={addListingChannelId} onValueChange={setAddListingChannelId}>
+                                <SelectTrigger><SelectValue placeholder={salesChannels.isPending ? 'Loading…' : 'Choose a channel…'} /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="FOODPANDA">foodpanda</SelectItem>
-                                  <SelectItem value="GRABFOOD">GrabFood</SelectItem>
-                                  <SelectItem value="OTHER">Other</SelectItem>
+                                  {(salesChannels.data ?? []).filter((c) => c.code !== 'WALK_IN').map((c) => (
+                                    <SelectItem key={c.id} value={c.id}>
+                                      <span className="flex items-center gap-2">
+                                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} aria-hidden />
+                                        {c.name}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
+                              <p className="text-[11px] text-muted-foreground">Add new channels under Channel Listings.</p>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-muted-foreground">External merchant ID</label>
+                              <label className="text-xs font-medium text-muted-foreground">{addListingIsApi ? 'Store ID (as the platform knows it)' : 'Listing name or ID'}</label>
                               <Input required value={addListingExternalId} onChange={(e) => setAddListingExternalId(e.target.value)} />
                             </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-muted-foreground">Credential reference</label>
-                              <Input required value={addListingCredentialRef} onChange={(e) => setAddListingCredentialRef(e.target.value)} placeholder="vault key / id, never a raw secret" />
-                            </div>
+                            {addListingIsApi && (
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">Credential reference</label>
+                                <Input required value={addListingCredentialRef} onChange={(e) => setAddListingCredentialRef(e.target.value)} placeholder="vault key / id, never a raw secret" />
+                              </div>
+                            )}
                             <div className="space-y-1.5">
                               <label className="text-xs font-medium text-muted-foreground">Outlet (optional)</label>
                               <Select value={addListingLocationId || '_none'} onValueChange={(v) => setAddListingLocationId(v === '_none' ? '' : v)}>
@@ -1149,7 +1161,7 @@ export default function MerchantManagement() {
                             </div>
                             <DialogFooter>
                               <Button type="button" variant="outline" size="sm" onClick={() => setAddListingOpen(false)} disabled={addListingGuard.pending}>Cancel</Button>
-                              <Button type="submit" size="sm" disabled={addListingGuard.pending} className="bg-primary text-primary-foreground hover:bg-primary/90">
+                              <Button type="submit" size="sm" disabled={addListingGuard.pending || !addListingChannelId} className="bg-primary text-primary-foreground hover:bg-primary/90">
                                 {addListingGuard.pending ? 'Adding…' : 'Add Listing'}
                               </Button>
                             </DialogFooter>

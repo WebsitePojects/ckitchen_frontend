@@ -95,9 +95,11 @@ export interface MerchantAccount {
 }
 
 export interface CreateAccountBody {
-  aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
+  /** The owner's sales channel (D60); the server derives the integration from it. */
+  channel_id: string
   external_merchant_id: string
-  credential_ref: string
+  /** Required only for partner-API channels (GrabFood / foodpanda). */
+  credential_ref?: string
   location_id?: string
 }
 

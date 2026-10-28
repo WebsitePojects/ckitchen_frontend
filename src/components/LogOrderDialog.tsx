@@ -30,6 +30,7 @@
  * Controlled component: the parent (Orders.tsx) owns `open` state and the
  * trigger button (incl. the role gate) — matches WalkInOrderDialog's pattern.
  */
+import type { ListingChannel } from '../lib/salesChannels'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Minus, Plus, ShoppingCart, Trash2 } from 'lucide-react'
@@ -75,10 +76,11 @@ interface MenuItemRow {
   availability: Availability
 }
 
-/** GET /brands/:id/accounts row — a brand's Foodpanda/GrabFood channel listing. */
+/** GET /brands/:id/accounts row — the brand's listing on one sales channel (D60). */
 interface Account {
   id: string
   aggregator: 'FOODPANDA' | 'GRABFOOD' | 'OTHER'
+  channel?: ListingChannel | null
   externalMerchantId?: string
   external_merchant_id?: string
   isActive?: boolean
@@ -196,8 +198,17 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
     queryFn: async () => (await get<Account[]>(`/brands/${brandId}/accounts`)).data,
     enabled: open && !!brandId,
   })
+  // Every active listing on an active channel, except the Walk-in listing itself: the explicit
+  // "Walk-in" option below already routes there (the server picks the outlet's walk-in listing).
   const activeAccounts = useMemo(
-    () => accounts.filter((a) => a.isActive ?? a.is_active ?? true),
+    () =>
+      accounts.filter(
+        (a) =>
+          (a.isActive ?? a.is_active ?? true) &&
+          a.channel?.isActive !== false &&
+          a.channel?.code !== 'WALK_IN' &&
+          !(a.externalMerchantId ?? a.external_merchant_id ?? '').startsWith('WALKIN-'),
+      ),
     [accounts],
   )
 
@@ -427,13 +438,19 @@ export default function LogOrderDialog({ open, onOpenChange, canOversell }: LogO
                 <SelectValue placeholder={loadingAccounts ? 'Loading…' : 'Select channel…'} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={WALKIN_CHANNEL_VALUE}>Walk-in / Other</SelectItem>
+                <SelectItem value={WALKIN_CHANNEL_VALUE}>Walk-in / Direct</SelectItem>
                 {activeAccounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {AGGREGATOR_CHANNEL_LABEL[a.aggregator]}
-                    {a.externalMerchantId || a.external_merchant_id
-                      ? ` — ${a.externalMerchantId ?? a.external_merchant_id}`
-                      : ''}
+                    <span className="flex items-center gap-2">
+                      {a.channel && (
+                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: a.channel.color }} aria-hidden />
+                      )}
+                      {a.channel?.name ?? AGGREGATOR_CHANNEL_LABEL[a.aggregator]}
+                      {/* Manual channels have a generated listing id; only partner store IDs help the cook. */}
+                      {a.aggregator !== 'OTHER' && (a.externalMerchantId || a.external_merchant_id)
+                        ? ` — ${a.externalMerchantId ?? a.external_merchant_id}`
+                        : ''}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

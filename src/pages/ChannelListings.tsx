@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Link2 } from 'lucide-react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { CheckCircle2, Link2, Radio } from 'lucide-react'
 import { get } from '../lib/api'
 import { useOutlet } from '../context/OutletContext'
+import { useAuth } from '../auth/AuthContext'
+import { hasRole } from '../auth/access'
+import type { ListingChannel } from '../lib/salesChannels'
+import SalesChannelsPanel from '../components/channels/SalesChannelsPanel'
 import { outletScopedPath } from '../lib/outletScope'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
@@ -33,12 +38,14 @@ interface Account {
   external_merchant_id?: string
   isActive?: boolean
   is_active?: boolean
+  channel?: ListingChannel | null
 }
 
 interface ChannelListing {
   id: string
   brand: Brand
   aggregator: string
+  channel: ListingChannel | null
   merchantId: string
   active: boolean
 }
@@ -51,69 +58,56 @@ export default function ChannelListings() {
   // to brands deployed at that outlet; selectedOutletId in the effect's deps
   // makes an outlet switch actually re-run the fetch.
   const { selectedOutletId } = useOutlet()
-  const [listings, setListings] = useState<ChannelListing[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+  const isOwner = hasRole(user?.role, [])
 
-  useEffect(() => {
-    let alive = true
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const { data: brands } = await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))
-        const lists = await Promise.all(
-          brands.map((brand) =>
-            get<Account[]>(`/brands/${brand.id}/accounts`)
-              .then((response) => ({ brand, accounts: response.data }))
-              .catch(() => ({ brand, accounts: [] as Account[] })),
-          ),
-        )
-        if (!alive) return
-
-        const flat: ChannelListing[] = []
-        for (const { brand, accounts } of lists) {
-          for (const account of accounts) {
-            flat.push({
-              id: account.id,
-              brand,
-              aggregator: account.aggregator,
-              merchantId: account.externalMerchantId ?? account.external_merchant_id ?? '—',
-              active: account.isActive ?? account.is_active ?? true,
-            })
-          }
-        }
-        setListings(flat)
-      } catch (e) {
-        if (alive) setError((e as { message?: string })?.message ?? 'Failed to load listings')
-      } finally {
-        if (alive) setLoading(false)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [selectedOutletId])
+  // One cached query (keyed by outlet) so "Offer at all brands" can refresh it.
+  const listingsQuery = useQuery({
+    queryKey: ['channel-listings', selectedOutletId],
+    queryFn: async (): Promise<ChannelListing[]> => {
+      const { data: brands } = await get<Brand[]>(outletScopedPath('/brands', selectedOutletId))
+      const lists = await Promise.all(
+        brands.map((brand) =>
+          get<Account[]>(`/brands/${brand.id}/accounts`)
+            .then((response) => ({ brand, accounts: response.data }))
+            .catch(() => ({ brand, accounts: [] as Account[] })),
+        ),
+      )
+      return lists.flatMap(({ brand, accounts }) =>
+        accounts.map((account) => ({
+          id: account.id,
+          brand,
+          aggregator: account.aggregator,
+          channel: account.channel ?? null,
+          merchantId: account.externalMerchantId ?? account.external_merchant_id ?? '—',
+          active: account.isActive ?? account.is_active ?? true,
+        })),
+      )
+    },
+  })
+  const listings = useMemo(() => listingsQuery.data ?? [], [listingsQuery.data])
+  const loading = listingsQuery.isPending
+  const error = listingsQuery.isError ? (listingsQuery.error instanceof Error ? listingsQuery.error.message : 'Failed to load listings') : null
 
   const stats = useMemo(() => {
-    const foodpanda = listings.filter((listing) => listing.aggregator === 'FOODPANDA').length
-    const grabfood = listings.filter((listing) => listing.aggregator === 'GRABFOOD').length
     const active = listings.filter((listing) => listing.active).length
-    return { foodpanda, grabfood, active }
+    const channelsInUse = new Set(listings.filter((l) => l.active).map((l) => l.channel?.id ?? l.aggregator)).size
+    return { active, channelsInUse }
   }, [listings])
 
   return (
     <PageContainer>
       <PageHeader
         title="Channel Listings"
-        subtitle="Each brand's Foodpanda, GrabFood, or delivery-platform merchant listing"
+        subtitle="Sales channels, and each brand's listing on them"
       />
+
+      <SalesChannelsPanel canManage={isOwner} />
 
       <KpiRibbon>
         <KpiCard icon={Link2} label="Total Listings" value={listings.length} />
         <KpiCard icon={CheckCircle2} label="Active" value={stats.active} />
-        <KpiCard icon={Link2} label="foodpanda" value={stats.foodpanda} />
-        <KpiCard icon={Link2} label="GrabFood" value={stats.grabfood} />
+        <KpiCard icon={Radio} label="Channels in use" value={stats.channelsInUse} />
       </KpiRibbon>
 
       <Card className="border-border bg-card">
@@ -125,15 +119,15 @@ export default function ChannelListings() {
           <EmptyState
             icon={Link2}
             title="No channel listings"
-            description="Add Foodpanda or GrabFood accounts to brands from Merchant Management."
+            description="Add a brand's store ID for GrabFood or foodpanda in Merchant Management, or offer a manual channel above."
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead>Brand</TableHead>
-                <TableHead>Platform</TableHead>
-                <TableHead>Merchant ID</TableHead>
+                <TableHead>Channel</TableHead>
+                <TableHead>Store ID</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -144,10 +138,11 @@ export default function ChannelListings() {
                     <BrandChip brand={listing.brand} />
                   </TableCell>
                   <TableCell>
-                    <AggregatorBadge aggregator={listing.aggregator} />
+                    <AggregatorBadge aggregator={listing.aggregator} channel={listing.channel} />
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
-                    {listing.merchantId}
+                    {/* Manual channels get a generated id nobody types; say what it means instead. */}
+                    {listing.aggregator === 'OTHER' ? <span className="font-sans">Keyed in manually</span> : listing.merchantId}
                   </TableCell>
                   <TableCell>
                     <span className="flex items-center gap-1.5 text-xs">

@@ -94,6 +94,10 @@ interface ApiHourBucket {
 
 interface ApiAggregatorSplit {
   aggregator: string
+  /** Sales channel (D60): one row per channel, so Lalamove and phone orders are apart. */
+  channel_id?: string | null
+  channel_name?: string
+  color?: string | null
   order_count: number | null | undefined
   revenue: number | null | undefined
 }
@@ -508,6 +512,12 @@ function OrdersByHourSection({ date }: { date: string }) {
 
 // ─── Section: Aggregator Split (FR-AN-04) ─────────────────────────────────────
 
+const channelKey = (d: ApiAggregatorSplit) => d.channel_id ?? d.aggregator
+const channelLabel = (d: ApiAggregatorSplit) =>
+  d.channel_name ?? AGGREGATOR_LABEL[d.aggregator as keyof typeof AGGREGATOR_LABEL] ?? d.aggregator
+const channelColor = (d: ApiAggregatorSplit) =>
+  d.color ?? AGGREGATOR_COLOR[d.aggregator as keyof typeof AGGREGATOR_COLOR] ?? '#71717A'
+
 function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
   // Cached + background refresh (hooks/useApiQuery.ts): no spinner on revisit.
   const { data: cached, loading, error } = useApiQuery<ApiAggregatorSplit[]>(`/analytics/aggregators?${rangeParams(from, to)}`, { fallbackError: 'Failed to load aggregator data.' })
@@ -517,11 +527,11 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
   const totalRevenue = data.reduce((s, d) => s + (d.revenue   ?? 0), 0)
 
   const pieData = data.map(d => ({
-    name:    AGGREGATOR_LABEL[d.aggregator as keyof typeof AGGREGATOR_LABEL] ?? d.aggregator,
+    name:    channelLabel(d),
     value:   d.order_count ?? 0,
     revenue: d.revenue ?? 0,
-    color:   AGGREGATOR_COLOR[d.aggregator as keyof typeof AGGREGATOR_COLOR] ?? '#71717A',
-    key:     d.aggregator,
+    color:   channelColor(d),
+    key:     channelKey(d),
   }))
 
   return (
@@ -599,10 +609,10 @@ function AggregatorSplitSection({ from, to }: { from: string; to: string }) {
                   {data.map(d => {
                     const orders = d.order_count ?? 0
                     const rev    = d.revenue ?? 0
-                    const color  = AGGREGATOR_COLOR[d.aggregator as keyof typeof AGGREGATOR_COLOR] ?? '#71717A'
-                    const label  = AGGREGATOR_LABEL[d.aggregator as keyof typeof AGGREGATOR_LABEL] ?? d.aggregator
+                    const color  = channelColor(d)
+                    const label  = channelLabel(d)
                     return (
-                      <tr key={d.aggregator} className="border-b border-border/50 last:border-0">
+                      <tr key={channelKey(d)} className="border-b border-border/50 last:border-0">
                         <td className="py-2.5">
                           <div className="flex items-center gap-2">
                             <span
