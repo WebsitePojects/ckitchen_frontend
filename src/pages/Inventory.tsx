@@ -84,6 +84,8 @@ import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
 import EmptyState from '../components/common/EmptyState'
+import { UnitSelect } from '../components/units/UnitSelect'
+import { rescaleTyped } from '../lib/units'
 
 // ─── Role helpers ──────────────────────────────────────────────────────────────
 
@@ -540,6 +542,8 @@ function StockTable({
 interface ItoRequestItem {
   ingredientId: string
   quantity: string
+  /** Unit the amount is typed in; '' = the ingredient's stock unit (D57). */
+  unit: string
 }
 
 interface ItoRequestFormProps {
@@ -550,11 +554,11 @@ interface ItoRequestFormProps {
 }
 
 function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoRequestFormProps) {
-  const [items, setItems] = useState<ItoRequestItem[]>([{ ingredientId: '', quantity: '' }])
+  const [items, setItems] = useState<ItoRequestItem[]>([{ ingredientId: '', quantity: '', unit: '' }])
   const [submitting, setSubmitting] = useState(false)
 
   function addRow() {
-    setItems(prev => [...prev, { ingredientId: '', quantity: '' }])
+    setItems(prev => [...prev, { ingredientId: '', quantity: '', unit: '' }])
   }
 
   function removeRow(idx: number) {
@@ -600,12 +604,13 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
         items: valid.map(it => ({
           ingredient_id: it.ingredientId,
           quantity: Number(it.quantity),
+          ...(it.unit ? { unit: it.unit } : {}),
         })),
       })
       toast.success(
         `ITO requested for ${valid.length} ingredient(s). Awaiting warehouse confirmation.`,
       )
-      setItems([{ ingredientId: '', quantity: '' }])
+      setItems([{ ingredientId: '', quantity: '', unit: '' }])
       onSuccess()
       onClose()
     } catch (e) {
@@ -628,7 +633,7 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
               )}
               <Select
                 value={item.ingredientId || '_none'}
-                onValueChange={v => setField(idx, 'ingredientId', v === '_none' ? '' : v)}
+                onValueChange={v => setItems(prev => prev.map((row, i) => (i === idx ? { ...row, ingredientId: v === '_none' ? '' : v, unit: '' } : row)))}
               >
                 <SelectTrigger className="bg-background border-border text-foreground text-sm h-9">
                   <SelectValue placeholder="Select ingredient…" />
@@ -651,16 +656,28 @@ function ItoRequestForm({ ingredients, outletId, onSuccess, onClose }: ItoReques
                   Quantity
                 </label>
               )}
-              <Input
-                type="number"
-                min="0.01"
-                step="any"
-                value={item.quantity}
-                onChange={e => setField(idx, 'quantity', e.target.value)}
-                required
-                placeholder="0"
-                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
-              />
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  inputMode="decimal"
+                  value={item.quantity}
+                  onChange={e => setField(idx, 'quantity', e.target.value)}
+                  required
+                  placeholder="0"
+                  className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
+                />
+                <UnitSelect
+                  ingredientId={item.ingredientId || undefined}
+                  stockUnit={ingredients.find(i => i.id === item.ingredientId)?.unit}
+                  value={item.unit || undefined}
+                  onChange={(unit, ratio) =>
+                    setItems(prev => prev.map((row, i) => (i === idx ? { ...row, unit, quantity: rescaleTyped(row.quantity, 1 / ratio) } : row)))
+                  }
+                  disabled={!item.ingredientId}
+                />
+              </div>
             </div>
             {items.length > 1 && (
               <Button

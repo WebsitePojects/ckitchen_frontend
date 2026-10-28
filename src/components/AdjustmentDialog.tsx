@@ -35,6 +35,8 @@ import {
 } from './ui/select'
 import { Input } from './ui/input'
 import { Button } from './ui/button'
+import { UnitSelect } from './units/UnitSelect'
+import { rescaleTyped } from '../lib/units'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +85,8 @@ export default function AdjustmentDialog({
 }: AdjustmentDialogProps) {
   const [direction, setDirection] = useState<AdjustmentDirection>('OUT')
   const [quantity, setQuantity] = useState('')
+  /** Unit the amount is typed in; undefined = the ingredient's stock unit (D57). */
+  const [unit, setUnit] = useState<string | undefined>(undefined)
   const [reason, setReason] = useState<AdjustmentReason>('EXPIRY')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -92,6 +96,7 @@ export default function AdjustmentDialog({
     if (open) {
       setDirection('OUT')
       setQuantity('')
+      setUnit(undefined)
       setReason('EXPIRY')
       setNote('')
       setSubmitting(false)
@@ -114,6 +119,7 @@ export default function AdjustmentDialog({
         ingredient_id: ingredient.id,
         direction,
         quantity: qtyNum,
+        ...(unit ? { unit } : {}),
         reason,
         note: note.trim() || undefined,
       })
@@ -187,8 +193,9 @@ export default function AdjustmentDialog({
             <div className="flex items-center gap-2">
               <Input
                 type="number"
-                min="0.01"
+                min="0"
                 step="any"
+                inputMode="decimal"
                 value={quantity}
                 onChange={e => setQuantity(e.target.value)}
                 required
@@ -196,9 +203,15 @@ export default function AdjustmentDialog({
                 placeholder="0"
                 className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
               />
-              <span className="shrink-0 text-sm text-muted-foreground min-w-[3rem]">
-                {ingredient?.unit ?? ''}
-              </span>
+              <UnitSelect
+                ingredientId={ingredient?.id}
+                stockUnit={ingredient?.unit}
+                value={unit}
+                onChange={(next, ratio) => {
+                  setUnit(next)
+                  setQuantity(q => rescaleTyped(q, 1 / ratio))
+                }}
+              />
             </div>
           </div>
 

@@ -141,6 +141,10 @@ interface RecipeGetLine {
   portionQty?: string | number
   portion_qty?: string | number
   ingredient?: { id?: string }
+  /** What was typed and its unit (D57); portionQty is always in the stock unit. */
+  enteredQuantity?: string | null
+  enteredUnit?: string | null
+  unit?: string
 }
 
 /** Normalize a GET /menu/:id/recipe payload into the editor's RecipeLine shape. */
@@ -149,17 +153,25 @@ function toRecipeLines(rows: RecipeGetLine[]): RecipeLine[] {
   return rows
     .map(r => ({
       ingredientId: r.ingredientId ?? r.ingredient_id ?? r.ingredient?.id ?? '',
-      portionQty: String(r.portionQty ?? r.portion_qty ?? ''),
+      // Show what was typed (250 g); older lines fall back to the stock-unit amount.
+      portionQty: trimDecimal(String(r.enteredQuantity ?? r.portionQty ?? r.portion_qty ?? '')),
+      unit: r.enteredUnit ?? r.unit ?? undefined,
     }))
     .filter(l => l.ingredientId)
 }
 
 /** Build the PUT /menu/:id/recipe body from editor lines (drops incomplete rows). */
-function recipePutBody(lines: RecipeLine[]): { lines: { ingredient_id: string; portion_qty: number }[] } {
+/** Saves exactly what was typed (string, any decimals) and its unit; the server converts (D57). */
+/** "250.000000" -> "250", "0.250000" -> "0.25" (stored values carry 6 decimals). */
+function trimDecimal(value: string): string {
+  return value.includes('.') ? value.replace(/0+$/, '').replace(/\.$/, '') : value
+}
+
+function recipePutBody(lines: RecipeLine[]): { lines: { ingredient_id: string; quantity: string; unit?: string }[] } {
   return {
     lines: lines
       .filter(l => l.ingredientId && Number(l.portionQty) > 0)
-      .map(l => ({ ingredient_id: l.ingredientId, portion_qty: Number(l.portionQty) })),
+      .map(l => ({ ingredient_id: l.ingredientId, quantity: l.portionQty.trim(), ...(l.unit ? { unit: l.unit } : {}) })),
   }
 }
 

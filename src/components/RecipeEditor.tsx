@@ -13,7 +13,10 @@
  *   GET  /suppliers?active=true            → [{ id, code, name, isActive }]
  *   POST /ingredients { name, unit, unit_cost, low_stock_threshold, supplier_id, supplier_sku? } → created row
  *
- * The parent issues PUT /menu/:id/recipe { lines: [{ ingredient_id, portion_qty }] } on save.
+ * The parent issues PUT /menu/:id/recipe { lines: [{ ingredient_id, quantity, unit }] } on save.
+ * A line may be typed in any unit the ingredient accepts (250 g for potatoes stocked in kg, or
+ * a custom unit like "scoop"); the server converts it to the stock unit (D57). Previews and the
+ * cost here use the same factors but are display only.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -31,13 +34,17 @@ import {
 import { Input } from './ui/input'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
+import { formatQuantity, previewInStock, rescaleTyped, type CustomUnit } from '../lib/units'
+import { StockUnitPicker, UnitSelect } from './units/UnitSelect'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface RecipeLine {
   ingredientId: string
-  /** Kept as a string so the numeric input can hold partial values. */
+  /** The typed amount, kept as a string: exact, and the input can hold partial values. */
   portionQty: string
+  /** The unit it was typed in; undefined = the ingredient's stock unit. */
+  unit?: string
 }
 
 interface Ingredient {
@@ -330,14 +337,8 @@ function NewIngredientForm({ suppliers, onCancel, onCreated }: NewIngredientForm
           />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-muted-foreground">Unit</label>
-          <Input
-            value={unit}
-            onChange={e => setUnit(e.target.value)}
-            disabled={noSuppliers || submitting}
-            placeholder="kg, g, pcs"
-            className="h-8 text-sm"
-          />
+          <label className="mb-1 block text-[11px] text-muted-foreground">Stock unit</label>
+          <StockUnitPicker value={unit} onChange={setUnit} disabled={noSuppliers || submitting} />
         </div>
         <div>
           <label className="mb-1 block text-[11px] text-muted-foreground">Unit cost (₱)</label>
@@ -465,7 +466,7 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
     onChange(lines.filter((_, i) => i !== index))
   }
   function addLine() {
-    onChange([...lines, { ingredientId: '', portionQty: '' }])
+    onChange([...lines, { ingredientId: '', portionQty: '', unit: undefined }])
   }
 
   function handleCreated(index: number, created: Ingredient) {
@@ -480,17 +481,23 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
     setNewFormFor(null)
   }
 
-  // ── Recipe cost (Σ portion × unit_cost, per serving) ─────────────────────
-  const recipeCost = useMemo(() => {
-    let total = 0
-    for (const l of lines) {
-      const ing = ingredientsById.get(l.ingredientId)
-      const portion = toNum(l.portionQty)
-      const cost = toNum(ing?.unitCost)
-      if (ing && portion !== undefined && cost !== undefined) total += portion * cost
-    }
-    return total
-  }, [lines, ingredientsById])
+  // The custom units UnitSelect loaded for each line's ingredient (same query cache).
+  const customUnitsFor = (ingredientId: string): CustomUnit[] =>
+    queryClient.getQueryData<CustomUnit[]>(['ingredient-units', ingredientId]) ?? []
+
+  /** A line's amount in its ingredient's stock unit (preview; the server converts on save). */
+  const stockAmount = (line: RecipeLine): number | null => {
+    const ing = ingredientsById.get(line.ingredientId)
+    if (!ing || line.portionQty.trim() === '') return null
+    return previewInStock(line.portionQty, line.unit, ing.unit, customUnitsFor(line.ingredientId))
+  }
+
+  // ── Recipe cost (Σ amount in stock unit × unit_cost, per serving) ────────
+  const recipeCost = lines.reduce((total, l) => {
+    const amount = stockAmount(l)
+    const cost = toNum(ingredientsById.get(l.ingredientId)?.unitCost)
+    return amount !== null && cost !== undefined ? total + amount * cost : total
+  }, 0)
 
   return (
     <div className="rounded-lg border border-border bg-card/40 p-3">
@@ -517,26 +524,31 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
                       value={line.ingredientId}
                       ingredients={ingredients}
                       availableFor={availableFor}
-                      onSelect={id => updateLine(index, { ingredientId: id })}
+                      onSelect={id => updateLine(index, { ingredientId: id, unit: undefined })}
                       onNew={() => setNewFormFor(index)}
                       disabled={disabled}
                     />
                   </div>
-                  <div className="w-32">
-                    <div className="flex items-center gap-1.5">
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={line.portionQty}
-                        onChange={e => updateLine(index, { portionQty: e.target.value })}
-                        disabled={disabled}
-                        placeholder="qty"
-                        className="h-9 text-sm"
-                        aria-label="Portion quantity per serving"
-                      />
-                      <span className="shrink-0 text-xs text-muted-foreground">{ing?.unit ?? ''}</span>
-                    </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      inputMode="decimal"
+                      value={line.portionQty}
+                      onChange={e => updateLine(index, { portionQty: e.target.value })}
+                      disabled={disabled}
+                      placeholder="qty"
+                      className="h-9 w-24 text-sm"
+                      aria-label="Amount per serving"
+                    />
+                    <UnitSelect
+                      ingredientId={line.ingredientId || undefined}
+                      stockUnit={ing?.unit}
+                      value={line.unit}
+                      onChange={(unit, ratio) => updateLine(index, { unit, portionQty: rescaleTyped(line.portionQty, 1 / ratio) })}
+                      disabled={disabled || !ing}
+                    />
                   </div>
                   <Button
                     type="button"
@@ -550,6 +562,12 @@ export default function RecipeEditor({ lines, onChange, disabled }: RecipeEditor
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {ing && line.unit && line.unit !== ing.unit && line.portionQty.trim() !== '' && (
+                  <p className="pl-1 text-[11px] text-muted-foreground">
+                    = {formatQuantity(stockAmount(line), ing.unit)} from stock per serving
+                  </p>
+                )}
 
                 {newFormFor === index && (
                   <NewIngredientForm

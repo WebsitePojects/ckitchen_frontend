@@ -18,6 +18,8 @@
  * /ingredients now embeds `suppliers`).
  */
 import { useEffect, useState } from 'react'
+import CustomUnitsEditor from './units/CustomUnitsEditor'
+import { StockUnitPicker } from './units/UnitSelect'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Building2, Loader2, Plus, Trash2 } from 'lucide-react'
@@ -161,7 +163,7 @@ export default function IngredientDialog({
       return
     }
     if (!unit.trim()) {
-      toast.error('Unit is required (e.g. kg, g, L, pcs).')
+      toast.error('Choose a stock unit (e.g. kg, g, L, pc).')
       return
     }
     const costNum = Number(unitCost)
@@ -269,17 +271,11 @@ export default function IngredientDialog({
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Unit</label>
-              <Input
-                value={unit}
-                onChange={e => setUnit(e.target.value)}
-                required
-                placeholder="kg, g, L, pcs"
-                className="bg-background border-border text-foreground placeholder:text-muted-foreground h-9"
-              />
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Stock unit</label>
+              <StockUnitPicker value={unit} onChange={setUnit} disabled={saving} />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Unit cost (₱)</label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Cost (₱ per {unit || 'unit'})</label>
               <Input
                 type="number"
                 min="0"
@@ -322,6 +318,9 @@ export default function IngredientDialog({
             </Button>
           </div>
         </form>
+
+        {/* ── Other units (sack, pack, scoop…) ── */}
+        {ingredient && <CustomUnitsEditor ingredientId={ingredient.id} stockUnit={ingredient.unit} />}
 
         {/* ── Suppliers section ── */}
         <div className="mt-1 border-t border-border pt-4">

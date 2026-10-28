@@ -37,12 +37,16 @@ import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import IngredientPicker from './IngredientPicker'
 import { DEPARTMENTS, deptLabel, peso, type Ingredient, type PurchaseRequest } from './types'
+import { UnitSelect } from '../units/UnitSelect'
+import { rescaleTyped } from '../../lib/units'
 
 interface LineDraft {
   key: number
   ingredientId: string
   qty: string
   estCost: string
+  /** Unit the quantity (and price) is typed in; undefined = stock unit (D57). */
+  unit?: string
 }
 
 let nextKey = 1
@@ -91,7 +95,7 @@ export default function PurchaseRequestDialog({
   function pickIngredient(key: number, id: string) {
     const ing = ingredientById.get(id)
     // Prefill est. cost from the ingredient master unit cost (editable).
-    updateLine(key, { ingredientId: id, estCost: ing ? String(Number(ing.unitCost)) : '' })
+    updateLine(key, { ingredientId: id, unit: undefined, estCost: ing ? String(Number(ing.unitCost)) : '' })
   }
 
   function removeLine(key: number) {
@@ -141,6 +145,7 @@ export default function PurchaseRequestDialog({
         lines: filled.map((l) => ({
           ingredient_id: l.ingredientId,
           quantity: Number(l.qty),
+          ...(l.unit ? { unit: l.unit } : {}),
           est_unit_cost: l.estCost !== '' ? Number(l.estCost) : undefined,
         })),
       })
@@ -210,11 +215,20 @@ export default function PurchaseRequestDialog({
                         step="any"
                         value={l.qty}
                         onChange={(e) => updateLine(l.key, { qty: e.target.value })}
-                        placeholder={ing ? `qty (${ing.unit})` : 'qty'}
+                        placeholder="qty"
                         aria-label="Quantity"
                         className={INPUT_CLS}
                       />
                     </div>
+                    <UnitSelect
+                      ingredientId={l.ingredientId || undefined}
+                      stockUnit={ing?.unit}
+                      value={l.unit}
+                      onChange={(unit, ratio) =>
+                        updateLine(l.key, { unit, qty: rescaleTyped(l.qty, 1 / ratio), estCost: rescaleTyped(l.estCost, ratio) })
+                      }
+                      disabled={!ing}
+                    />
                     <div className="w-28">
                       <Input
                         type="number"
@@ -222,7 +236,7 @@ export default function PurchaseRequestDialog({
                         step="any"
                         value={l.estCost}
                         onChange={(e) => updateLine(l.key, { estCost: e.target.value })}
-                        placeholder="est. ₱/unit"
+                        placeholder={`est. ₱/${l.unit ?? ing?.unit ?? 'unit'}`}
                         aria-label="Estimated unit cost"
                         className={INPUT_CLS}
                       />

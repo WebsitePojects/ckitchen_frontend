@@ -50,12 +50,16 @@ import {
   type PurchaseOrder,
   type SupplierParty,
 } from './types'
+import { UnitSelect } from '../units/UnitSelect'
+import { rescaleTyped } from '../../lib/units'
 
 interface LineDraft {
   key: number
   ingredientId: string
   qty: string
   cost: string
+  /** Unit the quantity (and price) is typed in; undefined = stock unit (D57). */
+  unit?: string
 }
 
 let nextKey = 1
@@ -153,7 +157,7 @@ export default function PurchaseOrderDialog({
         // Affiliation lookup is best-effort — fall back to the master cost.
       }
     }
-    updateLine(key, { ingredientId: id, cost: Number.isFinite(cost) ? String(cost) : '' })
+    updateLine(key, { ingredientId: id, unit: undefined, cost: Number.isFinite(cost) ? String(cost) : '' })
   }
 
   function removeLine(key: number) {
@@ -204,6 +208,7 @@ export default function PurchaseOrderDialog({
         lines: filled.map((l) => ({
           ingredient_id: l.ingredientId,
           quantity: Number(l.qty),
+          ...(l.unit ? { unit: l.unit } : {}),
           unit_cost: l.cost !== '' ? Number(l.cost) : undefined,
         })),
       })
@@ -288,11 +293,20 @@ export default function PurchaseOrderDialog({
                         step="any"
                         value={l.qty}
                         onChange={(e) => updateLine(l.key, { qty: e.target.value })}
-                        placeholder={ing ? `qty (${ing.unit})` : 'qty'}
+                        placeholder="qty"
                         aria-label="Quantity"
                         className={INPUT_CLS}
                       />
                     </div>
+                    <UnitSelect
+                      ingredientId={l.ingredientId || undefined}
+                      stockUnit={ing?.unit}
+                      value={l.unit}
+                      onChange={(unit, ratio) =>
+                        updateLine(l.key, { unit, qty: rescaleTyped(l.qty, 1 / ratio), cost: rescaleTyped(l.cost, ratio) })
+                      }
+                      disabled={!ing}
+                    />
                     <div className="w-28">
                       <Input
                         type="number"
@@ -300,7 +314,7 @@ export default function PurchaseOrderDialog({
                         step="any"
                         value={l.cost}
                         onChange={(e) => updateLine(l.key, { cost: e.target.value })}
-                        placeholder="₱/unit"
+                        placeholder={`₱/${l.unit ?? ing?.unit ?? 'unit'}`}
                         aria-label="Unit cost"
                         className={INPUT_CLS}
                       />
