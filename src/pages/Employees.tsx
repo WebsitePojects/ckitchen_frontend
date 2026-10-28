@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import {
   Users,
   UserCog,
-  Building2,
   Search,
   Plus,
   UserCheck,
@@ -13,6 +12,8 @@ import {
   EyeOff,
   Pencil,
   KeyRound,
+  Monitor,
+  HardHat,
 } from 'lucide-react'
 import { get, post, patch, CKApiError } from '../lib/api'
 import { useAuth } from '../auth/AuthContext'
@@ -90,8 +91,12 @@ interface Employee {
   locationId?: string | null
   // Employee-login link (client flaw fix, 2026-07-22) — absent entirely on an
   // old deploy; treat as "no login" rather than crashing.
+  /** SYSTEM_USER = has an ORION login; STAFF_ONLY = clocks in at the kiosk only (D58). */
+  access?: 'SYSTEM_USER' | 'STAFF_ONLY'
   hasLogin?: boolean
   userEmail?: string | null
+  userRole?: string | null
+  userStatus?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -506,11 +511,46 @@ function AccountFields({
 
 const NO_EMPLOYEES: Employee[] = []
 
+/** Older API responses carry only hasLogin; access is the same fact (D58). */
+function accessOf(e: Employee): 'SYSTEM_USER' | 'STAFF_ONLY' {
+  return e.access ?? (e.hasLogin ? 'SYSTEM_USER' : 'STAFF_ONLY')
+}
+
+/** System access as a dot + words, so the tag reads without colour (no pill per row). */
+function AccessCell({ employee }: { employee: Employee }) {
+  if (accessOf(employee) === 'STAFF_ONLY') {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" aria-hidden />
+        Staff only
+      </span>
+    )
+  }
+  const blocked = employee.userStatus != null && employee.userStatus !== 'ACTIVE'
+  const roleLabel = employee.userRole
+    ? ACCOUNT_ROLE_LABEL[employee.userRole] ?? employee.userRole.charAt(0) + employee.userRole.slice(1).toLowerCase().replace(/_/g, ' ')
+    : null
+  return (
+    <div className="flex flex-col gap-0.5" title={employee.userEmail ?? undefined}>
+      <span className={cn('flex items-center gap-1.5 text-xs font-medium', blocked ? 'text-danger-text' : 'text-ink-accent')}>
+        <KeyRound className="h-3 w-3" aria-hidden />
+        {blocked ? 'Login blocked' : 'System user'}
+        {roleLabel && <span className="font-normal text-muted-foreground">· {roleLabel}</span>}
+      </span>
+      {employee.userEmail && (
+        <span className="max-w-[12rem] truncate text-[11px] text-muted-foreground">{employee.userEmail}</span>
+      )}
+    </div>
+  )
+}
+
 export default function Employees() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  // OWNER-only (+ legacy SUPER_ADMIN, via hasRole's alias normalization).
-  const isSuperAdmin = hasRole(user?.role, [])
+  // OWNER-only (+ legacy SUPER_ADMIN, via hasRole's alias normalization): only an owner
+  // gives an employee system access (a login). Adding/editing staff is wider (D58).
+  const isOwner = hasRole(user?.role, [])
+  const canManageStaff = hasRole(user?.role, ['HR', 'OUTLET_MANAGER'])
 
   // Cached list: a revisit paints instantly and refreshes in the background.
   const employeesQuery = useApiQuery<Employee[]>('/employees', { fallbackError: 'Failed to load employees', staleTimeMs: 30_000 })
@@ -520,6 +560,7 @@ export default function Employees() {
 
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState<string>('ALL')
+  const [accessFilter, setAccessFilter] = useState<'ALL' | 'SYSTEM_USER' | 'STAFF_ONLY'>('ALL')
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -566,10 +607,7 @@ export default function Employees() {
 
   const totalCount = employees.length
   const activeCount = employees.filter((e) => e.status === 'ACTIVE').length
-  const deptCount = useMemo(() => {
-    const set = new Set(employees.map((e) => e.department))
-    return set.size
-  }, [employees])
+  const systemUserCount = employees.filter((e) => accessOf(e) === 'SYSTEM_USER').length
 
   // ── Filtered rows ────────────────────────────────────────────────────
 
@@ -578,6 +616,7 @@ export default function Employees() {
     return employees.filter((e) => {
       const matchesDept = deptFilter === 'ALL' || e.department === deptFilter
       if (!matchesDept) return false
+      if (accessFilter !== 'ALL' && accessOf(e) !== accessFilter) return false
       if (!q) return true
       return (
         (e.fullName ?? '').toLowerCase().includes(q) ||
@@ -585,7 +624,7 @@ export default function Employees() {
         (e.position ?? '').toLowerCase().includes(q)
       )
     })
-  }, [employees, search, deptFilter])
+  }, [employees, search, deptFilter, accessFilter])
 
   // ── Create ───────────────────────────────────────────────────────────
 
@@ -608,7 +647,7 @@ export default function Employees() {
       setFormError('Pick at least one working day.')
       return
     }
-    if (accountForm.enabled) {
+    if (isOwner && accountForm.enabled) {
       if (!isValidAccountEmail(accountForm.email)) {
         setFormError('Enter a valid email for the login account.')
         return
@@ -636,7 +675,7 @@ export default function Employees() {
         ...(form.location_touched
           ? { location_id: form.location_id === UNASSIGNED_OUTLET ? null : form.location_id }
           : {}),
-        ...(accountForm.enabled
+        ...(isOwner && accountForm.enabled
           ? {
               account: {
                 email: accountForm.email.trim(),
@@ -660,6 +699,8 @@ export default function Employees() {
     } catch (err: unknown) {
       if (err instanceof CKApiError && err.code === 'EMAIL_TAKEN') {
         setAccountEmailError('This email is already registered.')
+      } else if (err instanceof CKApiError && err.code === 'EMPLOYEE_NO_TAKEN') {
+        setFormError('That employee number is already used. Pick another.')
       } else {
         setFormError(errMsg(err, 'Failed to create employee'))
       }
@@ -733,7 +774,7 @@ export default function Employees() {
 
   // ── Render ───────────────────────────────────────────────────────────
 
-  const addButton = isSuperAdmin ? (
+  const addButton = canManageStaff ? (
     <Dialog
       open={dialogOpen}
       onOpenChange={(open) => {
@@ -762,6 +803,7 @@ export default function Employees() {
             outlets={outlets}
             outletsLoading={outletsQuery.isLoading}
           />
+          {isOwner ? (
           <AccountFields
             account={accountForm}
             setAccount={setAccountForm}
@@ -772,6 +814,11 @@ export default function Employees() {
             showPassword={showAccountPassword}
             setShowPassword={setShowAccountPassword}
           />
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Added as staff only: they clock in at the kiosk. An owner can give them a system login later.
+            </p>
+          )}
           {formError && (
             <p className="text-xs text-danger-text">{formError}</p>
           )}
@@ -796,7 +843,8 @@ export default function Employees() {
       <KpiRibbon>
         <KpiCard icon={Users} label="Total" value={totalCount} />
         <KpiCard icon={UserCheck} label="Active" value={activeCount} />
-        <KpiCard icon={Building2} label="Departments" value={deptCount} />
+        <KpiCard icon={Monitor} label="System users" value={systemUserCount} />
+        <KpiCard icon={HardHat} label="Staff only" value={totalCount - systemUserCount} />
       </KpiRibbon>
 
       {/* Filters */}
@@ -823,6 +871,16 @@ export default function Employees() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={accessFilter} onValueChange={(v) => setAccessFilter(v as typeof accessFilter)}>
+          <SelectTrigger className="w-44" aria-label="Filter by system access">
+            <SelectValue placeholder="All access" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Everyone</SelectItem>
+            <SelectItem value="SYSTEM_USER">System users</SelectItem>
+            <SelectItem value="STAFF_ONLY">Staff only</SelectItem>
+          </SelectContent>
+        </Select>
         <span className="text-sm text-muted-foreground">{rows.length} shown</span>
       </div>
 
@@ -836,7 +894,7 @@ export default function Employees() {
           <EmptyState
             icon={UserCog}
             title="No employees found"
-            description={search || deptFilter !== 'ALL' ? 'Try adjusting your filters.' : 'Add an employee to get started.'}
+            description={search || deptFilter !== 'ALL' || accessFilter !== 'ALL' ? 'Try adjusting your filters.' : 'Add an employee to get started.'}
           />
         ) : (
           <Table>
@@ -849,7 +907,7 @@ export default function Employees() {
                 <TableHead>Position</TableHead>
                 <TableHead>Schedule</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Login</TableHead>
+                <TableHead>System access</TableHead>
                 <TableHead className="w-24 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -893,23 +951,7 @@ export default function Employees() {
                     <StatusBadge status={emp.status} />
                   </TableCell>
                   <TableCell>
-                    {emp.hasLogin ? (
-                      <div className="flex flex-col gap-0.5" title={emp.userEmail ?? undefined}>
-                        <Badge
-                          variant="outline"
-                          className="w-fit gap-1 border-emerald-500/30 bg-emerald-500/10 text-ink-accent"
-                        >
-                          <KeyRound className="h-3 w-3" /> Has login
-                        </Badge>
-                        {emp.userEmail && (
-                          <span className="max-w-[10rem] truncate text-[10px] text-muted-foreground">
-                            {emp.userEmail}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">No login</span>
-                    )}
+                    <AccessCell employee={emp} />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -925,7 +967,7 @@ export default function Employees() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {isSuperAdmin && (
+                      {canManageStaff && (
                         <Button
                           variant="ghost"
                           size="icon"

@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -31,6 +32,8 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  ScrollText,
+  Search,
   SlidersHorizontal,
   Trash2,
   Wallet,
@@ -67,6 +70,8 @@ import {
   SelectValue,
 } from '../components/ui/select'
 import { Input } from '../components/ui/input'
+import { Switch } from '../components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import {
   Table,
@@ -1100,6 +1105,9 @@ function AdjustmentsPanel({
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
+const VIEW_TABS = ['stock', 'transfers', 'adjustments'] as const
+type ViewTab = (typeof VIEW_TABS)[number]
+
 export default function Inventory() {
   const { user } = useAuth()
   const role = user?.role
@@ -1191,6 +1199,7 @@ export default function Inventory() {
 
   // — Low-stock alert ingredient IDs (for extra row highlight beyond API flag)
   const [alertedIds, setAlertedIds] = useState<Set<string>>(new Set())
+  const [searchParams, setSearchParams] = useSearchParams()
 
   // — Dialog visibility
   const [showReceive, setShowReceive] = useState(false)
@@ -1437,10 +1446,38 @@ export default function Inventory() {
     mainStock.reduce((s, r) => s + Number(r.quantity) * Number(r.ingredient?.unitCost ?? 0), 0) +
     kitchenStock.reduce((s, r) => s + Number(r.quantity) * Number(r.ingredient?.unitCost ?? 0), 0)
 
-  // KITCHEN items below threshold or recently alerted (for the alerts panel)
+  // KITCHEN items below threshold or recently alerted (for the alerts banner)
   const kitchenAlerts = kitchenStock.filter(
     r => r.below_threshold || alertedIds.has(r.ingredientId),
   )
+  const pendingAdjustmentCount = adjustments.filter(a => a.status === 'PENDING').length
+
+  // ── View: one task per tab, one stock table at a time (HCI: the old page showed two
+  // tables, alerts, transfers and adjustments at once). Tab, tier and filters live in the
+  // URL so a link ("kitchen, low only") opens exactly that view.
+  const tab = VIEW_TABS.includes(searchParams.get('tab') as ViewTab) ? (searchParams.get('tab') as ViewTab) : 'stock'
+  const tier: 'MAIN' | 'KITCHEN' = searchParams.get('tier') === 'MAIN' ? 'MAIN' : 'KITCHEN'
+  const lowOnly = searchParams.get('low') === '1'
+  const [stockSearch, setStockSearch] = useState('')
+  function setView(patch: Record<string, string | null>) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === null) next.delete(key)
+        else next.set(key, value)
+      }
+      return next
+    }, { replace: true })
+  }
+  const tierRows = tier === 'MAIN' ? mainStock : kitchenStock
+  const visibleStock = useMemo(() => {
+    const q = stockSearch.trim().toLowerCase()
+    return tierRows.filter(r => {
+      if (q && !r.ingredient.name.toLowerCase().includes(q)) return false
+      if (!lowOnly) return true
+      return r.below_threshold || alertedIds.has(r.ingredientId) || reservationView(r).atRisk
+    })
+  }, [tierRows, stockSearch, lowOnly, alertedIds])
 
   // ── Refresh handler ───────────────────────────────────────────────────────────
 
@@ -1529,124 +1566,137 @@ export default function Inventory() {
         />
       </KpiRibbon>
 
-      {/* ── Main content ── */}
-      <div className="flex min-w-0 flex-col gap-4 xl:flex-row">
-
-        {/* ── Left: two-tier stock tables ── */}
-        <section className="flex min-w-0 flex-1 flex-col gap-4">
-
-          {/* Two-tier tables: side-by-side on lg+, stacked on smaller */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <StockTable
-              title="MAIN Warehouse"
-              tier="MAIN"
-              rows={mainStock}
-              loading={mainLoading}
-              error={mainError}
-              alertedIds={alertedIds}
-              canAdjust={canAdjust}
-              onAdjust={row => openAdjust(row, 'MAIN')}
-              canEditIngredient={canEditIngredient}
-              onEditIngredient={openEditIngredient}
-            />
-            <StockTable
-              title="KITCHEN Warehouse"
-              tier="KITCHEN"
-              rows={kitchenStock}
-              loading={kitchenLoading}
-              error={kitchenError}
-              alertedIds={alertedIds}
-              canAdjust={canAdjust}
-              onAdjust={row => openAdjust(row, 'KITCHEN')}
-              canEditIngredient={canEditIngredient}
-              onEditIngredient={openEditIngredient}
-            />
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-sm bg-red-500/15 border border-red-500/30" />
-              Below threshold — repurchase or ITO required
+      {/* ── Low-stock banner: one line, one action (replaces the alerts side panel) ── */}
+      {kitchenAlerts.length > 0 && !(tab === 'stock' && tier === 'KITCHEN' && lowOnly) && (
+        <div role="status" className="flex flex-wrap items-center gap-3 border-y border-border py-2.5 text-sm">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-danger-text" aria-hidden />
+          <span className="text-foreground">
+            <span className="font-semibold tabular-nums">{kitchenAlerts.length}</span> kitchen{' '}
+            {kitchenAlerts.length === 1 ? 'item is' : 'items are'} at or below the reorder level
+            <span className="text-muted-foreground">
+              {' '}({kitchenAlerts.slice(0, 3).map(r => r.ingredient.name).join(', ')}
+              {kitchenAlerts.length > 3 ? ', …' : ''})
             </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-3 rounded-sm bg-emerald-500/15 border border-emerald-500/30" />
-              Stock OK
-            </span>
-            <span className="ml-auto text-[11px] italic text-muted-foreground">
-              Real-time via stock.updated
-            </span>
-          </div>
-        </section>
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto h-8"
+            onClick={() => setView({ tab: null, tier: 'KITCHEN', low: '1' })}
+          >
+            Show them
+          </Button>
+        </div>
+      )}
 
-        {/* ── Right: alerts + ITO panel ── */}
-        <aside className="w-full shrink-0 xl:w-80 flex flex-col gap-4">
+      <Tabs value={tab} onValueChange={v => setView({ tab: v === 'stock' ? null : v })} className="flex flex-col gap-4">
+        <TabsList className="grid w-full grid-cols-3 sm:inline-flex sm:w-auto sm:self-start">
+          <TabsTrigger value="stock" className="gap-1.5">
+            <Boxes className="h-3.5 w-3.5" aria-hidden /> Stock
+          </TabsTrigger>
+          <TabsTrigger value="transfers" className="gap-1.5">
+            <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden /> Transfers
+            {pendingItos > 0 && <span className="tabular-nums text-warn-text">{pendingItos}</span>}
+          </TabsTrigger>
+          <TabsTrigger value="adjustments" className="gap-1.5">
+            <ClipboardList className="h-3.5 w-3.5" aria-hidden /> Adjustments
+            {pendingAdjustmentCount > 0 && <span className="tabular-nums text-warn-text">{pendingAdjustmentCount}</span>}
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Stock Alerts panel — KITCHEN items below threshold */}
-          {kitchenAlerts.length > 0 && (
-            <Card className="border-red-500/30 bg-red-500/5">
-              <CardHeader className="px-4 py-3 border-b border-red-500/20 flex-row items-center gap-2 space-y-0">
-                <AlertTriangle className="h-4 w-4 text-danger-text shrink-0" aria-hidden />
-                <CardTitle className="text-sm font-semibold text-danger-text">
-                  Kitchen Stock Alerts
-                </CardTitle>
-                <span className="ml-auto rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-danger-text tabular-nums">
-                  {kitchenAlerts.length}
-                </span>
-              </CardHeader>
-              <CardContent className="p-3 space-y-2">
-                {kitchenAlerts.map(row => (
-                  <div
-                    key={row.ingredientId}
-                    className="flex items-center justify-between rounded-lg bg-red-500/10 px-3 py-2 border border-red-500/20"
+        {/* ── Stock on hand: one tier at a time ── */}
+        <TabsContent value="stock" className="mt-0 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div role="radiogroup" aria-label="Warehouse" className="inline-flex rounded-lg border border-border p-0.5">
+              {(['KITCHEN', 'MAIN'] as const).map(t => {
+                const rows = t === 'MAIN' ? mainStock : kitchenStock
+                const low = t === 'MAIN' ? lowMain : lowKitchen
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={tier === t}
+                    onClick={() => setView({ tier: t === 'KITCHEN' ? null : t })}
+                    className={[
+                      'rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      tier === t ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    ].join(' ')}
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-danger-text truncate">
-                        {row.ingredient.name}
-                      </p>
-                      <p className="text-[11px] text-danger-text tabular-nums">
-                        {formatQty(row.quantity, row.ingredient.unit)} / threshold:{' '}
-                        {row.ingredient.lowStockThreshold}
-                      </p>
-                    </div>
-                    <AlertTriangle className="ml-2 h-4 w-4 shrink-0 text-danger-text" aria-hidden />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                    {t === 'MAIN' ? 'Main warehouse' : 'Kitchen'}
+                    <span className="ml-1.5 tabular-nums text-xs text-muted-foreground">{rows.length}</span>
+                    {low > 0 && <span className="ml-1 tabular-nums text-xs text-danger-text">· {low} low</span>}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="relative min-w-[12rem] flex-1 sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden />
+              <Input
+                value={stockSearch}
+                onChange={e => setStockSearch(e.target.value)}
+                placeholder="Search ingredients"
+                aria-label="Search ingredients"
+                className="pl-8"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Switch checked={lowOnly} onCheckedChange={v => setView({ low: v ? '1' : null })} aria-label="Show low or at-risk items only" />
+              Low or at risk only
+            </label>
+            <Link
+              to="/stock-ledger"
+              className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ScrollText className="h-4 w-4" aria-hidden /> Stock ledger
+            </Link>
+          </div>
 
-          {/* ITO panel */}
+          <StockTable
+            title={tier === 'MAIN' ? 'Main warehouse' : 'Kitchen'}
+            tier={tier}
+            rows={visibleStock}
+            loading={tier === 'MAIN' ? mainLoading : kitchenLoading}
+            error={tier === 'MAIN' ? mainError : kitchenError}
+            alertedIds={alertedIds}
+            canAdjust={canAdjust}
+            onAdjust={row => openAdjust(row, tier)}
+            canEditIngredient={canEditIngredient}
+            onEditIngredient={openEditIngredient}
+          />
+          {(stockSearch || lowOnly) && visibleStock.length < tierRows.length && (
+            <p className="text-xs text-muted-foreground">
+              Showing {visibleStock.length} of {tierRows.length}.{' '}
+              <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => { setStockSearch(''); setView({ low: null }) }}>
+                Clear filters
+              </button>
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Every receipt, transfer, sale and write-off is in the stock ledger. Updates live.
+          </p>
+        </TabsContent>
+
+        {/* ── Transfers (ITO) ── */}
+        <TabsContent value="transfers" className="mt-0">
           <Card className="border-border bg-card">
             <CardHeader className="px-4 py-3 border-b border-border flex-row items-center justify-between space-y-0">
               <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <ArrowLeftRight className="h-4 w-4 text-emerald-500" aria-hidden />
-                Transfer Orders (ITO)
+                <ArrowLeftRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+                Transfer orders, main to kitchen
               </CardTitle>
               {pendingItos > 0 && (
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-warn-text ring-1 ring-inset ring-amber-500/30 tabular-nums">
-                  {pendingItos} pending
-                </span>
+                <span className="text-xs font-medium tabular-nums text-warn-text">{pendingItos} waiting</span>
               )}
             </CardHeader>
             <CardContent className="p-3">
-              {/* Role hint */}
-              {!canConfirmIto && !canRequestIto && (
-                <p className="mb-3 text-xs text-muted-foreground italic">
-                  View only — your role cannot request or confirm ITOs.
-                </p>
-              )}
-              {canRequestIto && !canConfirmIto && (
-                <p className="mb-3 text-xs text-muted-foreground italic">
-                  You can request ITOs. Warehouse personnel confirm them.
-                </p>
-              )}
-              {canConfirmIto && (
-                <p className="mb-3 text-xs text-muted-foreground italic">
-                  Confirming an ITO atomically moves stock MAIN → KITCHEN.
-                </p>
-              )}
-
+              <p className="mb-3 text-xs text-muted-foreground">
+                {canConfirmIto
+                  ? 'Confirming a transfer moves the stock from main to kitchen in one step.'
+                  : canRequestIto
+                    ? 'You can request transfers. Warehouse staff confirm them.'
+                    : 'View only: your role cannot request or confirm transfers.'}
+              </p>
               <ItoList
                 itos={itos}
                 loading={itosLoading}
@@ -1658,19 +1708,21 @@ export default function Inventory() {
               />
             </CardContent>
           </Card>
-        </aside>
-      </div>
+        </TabsContent>
 
-      {/* ── Stock Adjustments (MoM: expiry + negligence write-offs) ── */}
-      <AdjustmentsPanel
-        adjustments={adjustments}
-        loading={adjustmentsLoading}
-        error={adjustmentsError}
-        canDecide={canAdjust}
-        deciding={deciding}
-        onDecide={(id, action, note) => void handleDecideAdjustment(id, action, note)}
-        ingredientsById={ingredientsById}
-      />
+        {/* ── Stock adjustments (write-offs / additions awaiting approval) ── */}
+        <TabsContent value="adjustments" className="mt-0">
+          <AdjustmentsPanel
+            adjustments={adjustments}
+            loading={adjustmentsLoading}
+            error={adjustmentsError}
+            canDecide={canAdjust}
+            deciding={deciding}
+            onDecide={(id, action, note) => void handleDecideAdjustment(id, action, note)}
+            ingredientsById={ingredientsById}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* ── Adjust stock dialog (per stock row) ── */}
       <AdjustmentDialog

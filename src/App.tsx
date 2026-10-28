@@ -29,6 +29,8 @@ const UsersPage = lazyPage('/users')
 const Orders = lazyPage('/orders')
 const Pos = lazyPage('/pos')
 const Brands = lazyPage('/brands')
+const BrandPerformance = lazyPage('/brand-performance')
+const BrandCompare = lazyPage('/brand-compare')
 const Outlets = lazyPage('/outlets')
 const OutletProfile = lazyPage('/outlet-profile')
 const ChannelListings = lazyPage('/channel-listings')
@@ -98,6 +100,10 @@ export default function App() {
                     pathname against page keys the RBAC matrix never stores.
                     See OutletProfile.tsx for the scope-aware gate. */}
                 <Route path="outlets/:id" element={<OutletProfile />} />
+                {/* Brand performance + comparison (D59) — self-gate on '/brands' for the same
+                    raw-pathname reason as employees/:id. 'compare' is matched before ':id'. */}
+                <Route path="brands/compare" element={<BrandCompare />} />
+                <Route path="brands/:id" element={<BrandPerformance />} />
                 <Route element={<RequireAccess />}>
                 <Route index element={<RoleLanding />} />
                 <Route path="orders" element={<Orders />} />

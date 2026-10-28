@@ -1,12 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
-  Activity,
   BadgeCheck,
-  BarChart3,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -15,10 +13,7 @@ import {
   EyeOff,
   History,
   KeyRound,
-  ListChecks,
-  Store,
   UserX,
-  Wallet,
 } from 'lucide-react'
 import { get, post, CKApiError } from '../lib/api'
 import { cn } from '../lib/utils'
@@ -34,6 +29,8 @@ import {
   isValidAccountPassword,
 } from '../lib/accountRoles'
 import PhotoLightbox, { photoThumbUrl, type LightboxPhoto } from '../components/PhotoLightbox'
+import EmployeePerformancePanel from '../components/employees/EmployeePerformancePanel'
+import { LinkLoginButton, UnlinkLoginButton } from '../components/employees/EmployeeAccessActions'
 import PageContainer from '../components/layout/PageContainer'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
@@ -140,21 +137,6 @@ interface Punch {
 }
 
 /** GET /admin/users/:id/performance (OWNER-only) — see UserPerformanceDialog. */
-interface PerformanceReport {
-  user: { id: string; name: string; role: string }
-  period: { from: string; to: string }
-  activity: { total: number; byAction: Array<{ action: string; count: number }> }
-  ordersHandled: number
-  outlet: { locationIds: string[]; orders: number; revenue: number }
-}
-
-interface ActivityRow {
-  id: string
-  action: string
-  description: string | null
-  createdAt: string
-}
-
 // ---------------------------------------------------------------------------
 // Formatting / month helpers
 // ---------------------------------------------------------------------------
@@ -229,9 +211,6 @@ function initials(name: string): string {
     .toUpperCase()
 }
 
-function money(n: number | undefined): string {
-  return `₱${Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
 
 function errMsg(e: unknown, fallback: string): string {
   return e instanceof Error ? e.message : fallback
@@ -501,8 +480,10 @@ export default function EmployeeProfile() {
   const queryClient = useQueryClient()
 
   // OWNER-only (same idiom as Employees.tsx — empty allow-list means only the
-  // OWNER short-circuit passes). Gates the admin performance/activity fetches.
+  // OWNER short-circuit passes): only an owner grants, links or unlinks a login (D58).
   const isOwner = hasRole(user?.role, [])
+  // People managers write performance notes (never about themselves; server enforces both).
+  const canManagePeople = hasRole(user?.role, ['HR', 'OUTLET_MANAGER'])
 
   /**
    * Access gate (T1): this route is registered OUTSIDE <RequireAccess> in
@@ -559,33 +540,6 @@ export default function EmployeeProfile() {
   const punches = punchesQuery.data ?? []
   const punchesMaybeMore = punches.length >= punchLimit && punchLimit < PUNCH_MAX
   const punchesHaveStatus = punches.some((p) => p.status != null)
-
-  // ── Performance + activity (OWNER viewing a linked login only) ────────────
-  const perfRange = useMemo(() => {
-    const [y, m] = month.split('-').map(Number)
-    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
-    const endStr = `${month}-${String(lastDay).padStart(2, '0')}`
-    const todayStr = new Date().toISOString().slice(0, 10)
-    return {
-      from: `${month}-01T00:00:00.000Z`,
-      to: `${endStr < todayStr ? endStr : todayStr}T23:59:59.999Z`,
-    }
-  }, [month])
-
-  const linkedUserId = employee?.userId ?? null
-  const perfQuery = useQuery({
-    queryKey: ['admin', 'users', linkedUserId, 'performance', perfRange.from, perfRange.to],
-    queryFn: async () => {
-      const params = new URLSearchParams({ from: perfRange.from, to: perfRange.to })
-      return (await get<PerformanceReport>(`/admin/users/${linkedUserId}/performance?${params}`)).data
-    },
-    enabled: allowed && isOwner && !!linkedUserId,
-  })
-  const activityQuery = useQuery({
-    queryKey: ['admin', 'users', linkedUserId, 'activity'],
-    queryFn: async () => (await get<ActivityRow[]>(`/admin/users/${linkedUserId}/activity`)).data,
-    enabled: allowed && isOwner && !!linkedUserId,
-  })
 
   // Outlet name lookup for the header chip (T1). Same queryKey as
   // Employees.tsx's outlets query so the two pages share one cached fetch.
@@ -716,22 +670,39 @@ export default function EmployeeProfile() {
               <h2 className="text-xl font-semibold tracking-tight text-foreground">{employee.fullName}</h2>
               <StatusBadge status={employee.status} />
               {employee.userId ? (
-                <Badge variant="outline" className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-ink-accent">
-                  <KeyRound className="h-3 w-3" />
-                  {employee.userEmail ? `Login linked — ${employee.userEmail}` : 'Login linked'}
-                </Badge>
-              ) : isOwner ? (
-                <button
-                  type="button"
-                  onClick={() => setLoginDialogOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-md border border-zinc-500/30 bg-zinc-500/10 px-2.5 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-ink-accent focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <KeyRound className="h-3 w-3" /> Create login
-                </button>
+                <>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-ink-accent">
+                    <KeyRound className="h-3 w-3" aria-hidden />
+                    System user{employee.userEmail ? ` · ${employee.userEmail}` : ''}
+                  </span>
+                  {isOwner && (
+                    <UnlinkLoginButton
+                      employeeId={employee.id}
+                      employeeName={employee.fullName}
+                      userId={employee.userId}
+                      userEmail={employee.userEmail ?? null}
+                    />
+                  )}
+                </>
               ) : (
-                <Badge variant="outline" className="gap-1 border-zinc-500/30 bg-zinc-500/10 text-muted-foreground">
-                  No login account
-                </Badge>
+                <>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" aria-hidden />
+                    Staff only · clocks in at the kiosk
+                  </span>
+                  {isOwner && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setLoginDialogOpen(true)}
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <KeyRound className="h-3 w-3" aria-hidden /> Create login
+                      </button>
+                      <LinkLoginButton employeeId={employee.id} employeeName={employee.fullName} />
+                    </>
+                  )}
+                </>
               )}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -1035,87 +1006,13 @@ export default function EmployeeProfile() {
         )}
       </Card>
 
-      {/* ── Performance (OWNER viewing a linked login) ───────────────────── */}
-      {isOwner && (
-        <Card className="border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border px-5 py-4">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground">Performance &amp; activity</h3>
-            {linkedUserId && (
-              <span className="ml-auto text-xs text-muted-foreground">{monthLabel(month)}</span>
-            )}
-          </div>
-          <div className="p-5">
-            {!linkedUserId ? (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <UserX className="h-4 w-4 shrink-0" />
-                No login account linked — attendance stats above are the full picture for this
-                employee.
-              </p>
-            ) : perfQuery.isPending ? (
-              <p className="text-sm text-muted-foreground">Loading performance…</p>
-            ) : perfQuery.isError ? (
-              <p className="text-sm text-danger-text">
-                {errMsg(perfQuery.error, 'Failed to load performance.')}
-              </p>
-            ) : perfQuery.data ? (
-              <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <MiniStat icon={Activity} label="Activity" value={perfQuery.data.activity.total} hint="audited actions" />
-                  <MiniStat icon={ListChecks} label="Orders handled" value={perfQuery.data.ordersHandled} hint="stages advanced" />
-                  <MiniStat icon={Store} label="Outlet orders" value={perfQuery.data.outlet.orders} hint="excl. cancelled" />
-                  <MiniStat icon={Wallet} label="Outlet revenue" value={money(perfQuery.data.outlet.revenue)} hint="excl. cancelled" />
-                </div>
-
-                {perfQuery.data.activity.byAction.length > 0 && (
-                  <div>
-                    <p className="mb-1.5 text-xs font-medium text-muted-foreground">Top actions</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {perfQuery.data.activity.byAction.slice(0, 6).map((a) => (
-                        <span
-                          key={a.action}
-                          className="inline-flex items-center gap-1.5 rounded bg-secondary px-2 py-1 font-mono text-[11px] text-ink-accent"
-                        >
-                          {a.action}
-                          <span className="text-muted-foreground">×{a.count}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">Recent activity</p>
-                  {activityQuery.isPending ? (
-                    <p className="text-sm text-muted-foreground">Loading…</p>
-                  ) : (activityQuery.data ?? []).length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No audited actions yet.</p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {(activityQuery.data ?? []).slice(0, 8).map((r) => (
-                        <li key={r.id} className="flex items-baseline gap-3 text-sm">
-                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                            {new Date(r.createdAt).toLocaleString([], {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-ink-accent">
-                            {r.action}
-                          </span>
-                          <span className="truncate text-xs text-muted-foreground">{r.description ?? ''}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </Card>
-      )}
+      {/* ── System activity + performance log (D58) ───────────────────────── */}
+      <EmployeePerformancePanel
+        employeeId={employee.id}
+        month={month}
+        monthLabel={monthLabel(month)}
+        canWriteNotes={canManagePeople && employee.userId !== user.id}
+      />
 
       {/* ── Day detail dialog ────────────────────────────────────────────── */}
       <Dialog open={selectedDay != null} onOpenChange={(o) => !o && setSelectedDay(null)}>
@@ -1219,28 +1116,5 @@ function Breadcrumb({ name }: { name: string }) {
       <Crumb className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="font-medium text-foreground">{name}</span>
     </nav>
-  )
-}
-
-function MiniStat({
-  icon: Icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof Activity
-  label: string
-  value: string | number
-  hint?: string
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card/40 p-3">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        {label}
-      </div>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
-    </div>
   )
 }
