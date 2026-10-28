@@ -107,7 +107,9 @@ export const PAGE_ROLES: Record<string, string[]> = {
   // on a page that always 403'd — removed until the backend D31 matrix widens
   // GET /audit. BRAND_MANAGER already matches AuditTrail.tsx's own hasRole
   // gate; OWNER passes via canAccess's short-circuit.
-  '/audit': ['BRAND_MANAGER'],
+  // OUTLET_MANAGER: the Activity Log's Brands tab only (brand activity was a Brands-page popup);
+  // the "All activity" tab and GET /audit stay OWNER + BRAND_MANAGER.
+  '/audit': ['OUTLET_MANAGER', 'BRAND_MANAGER'],
 
   // System
   '/outlets': ['WAREHOUSE_MAIN'],

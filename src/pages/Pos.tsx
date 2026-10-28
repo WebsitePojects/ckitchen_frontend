@@ -26,6 +26,7 @@ import { outletScopedPath } from '../lib/outletScope'
 import { useAuth } from '../auth/AuthContext'
 import { hasRole } from '../auth/access'
 import { useSubmitGuard } from '../hooks/useSubmitGuard'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
@@ -140,6 +141,9 @@ export default function Pos() {
   const [noteFor, setNoteFor] = useState<string | null>(null)
   const [shortfalls, setShortfalls] = useState<StockShortfall[] | null>(null)
   const [cartOpen, setCartOpen] = useState(false) // phone/tablet bottom sheet
+  // At xl the cart is the right-hand column and the sheet's content is hidden; an open sheet
+  // there would still draw its overlay and block the whole page.
+  const cartInColumn = useMediaQuery('(min-width: 1280px)')
   const { pending, guard } = useSubmitGuard()
   const deviceInputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
@@ -460,7 +464,7 @@ export default function Pos() {
           <span className="tabular-nums">{php.format(total)}</span>
         </Button>
       </div>
-      <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+      <Sheet open={cartOpen && !cartInColumn} onOpenChange={setCartOpen}>
         <SheetContent side="bottom" className="flex h-[88dvh] flex-col p-0 xl:hidden">
           <SheetHeader className="sr-only"><SheetTitle>Current order</SheetTitle></SheetHeader>
           <CartPanelSlot inSheet>{cartPanel}</CartPanelSlot>
@@ -647,7 +651,7 @@ function CartPanel(p: CartPanelProps) {
       {p.shortfalls && (
         <div className="mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="alert">
           <p className="flex items-center gap-1.5 font-medium text-warn-text"><AlertTriangle className="h-4 w-4" /> Not enough stock</p>
-          <ul className="mt-1 space-y-0.5 text-amber-100/90">
+          <ul className="mt-1 space-y-0.5 text-foreground">
             {p.shortfalls.map((s) => (
               <li key={s.ingredient_id ?? s.ingredient_name}>{s.ingredient_name}: need {s.required}, have {s.available}</li>
             ))}
@@ -655,7 +659,7 @@ function CartPanel(p: CartPanelProps) {
           {p.canOversell ? (
             <Button size="sm" variant="outline" className="mt-2" onClick={p.sendAnyway} disabled={p.pending}>Send anyway</Button>
           ) : (
-            <p className="mt-1 text-xs text-amber-100/70">Ask a manager to approve, or remove items.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Ask a manager to approve, or remove items.</p>
           )}
         </div>
       )}

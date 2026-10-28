@@ -85,7 +85,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: 'Insights',
     items: [
       { to: '/reports', label: 'Reports', icon: BarChart3 },
-      { to: '/audit', label: 'Audit Log', icon: ScrollText },
+      { to: '/audit', label: 'Activity Log', icon: ScrollText },
     ],
   },
   {

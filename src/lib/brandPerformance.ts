@@ -54,11 +54,19 @@ export const PERIOD_OPTIONS = [3, 6, 12] as const
 /**
  * One cached report per (brand set, period, outlet). The outlet travels as the X-Outlet-Id
  * header (api.ts); it is in the key so switching outlets never shows another outlet's numbers.
+ *
+ * Changing only the period keeps the previous report on screen (`isPlaceholderData`) until the
+ * new one arrives, so the page dims instead of collapsing to a skeleton. A different brand set or
+ * outlet starts empty: showing the old numbers there would put them under the wrong name.
  */
 export function useBrandPerformance(opts: { brandIds?: string[]; months: number; outletId?: string | null; enabled?: boolean }) {
   const ids = opts.brandIds ? [...opts.brandIds].sort() : null
+  const brandKey = ids?.join(',') ?? 'all'
+  const outletKey = opts.outletId ?? 'ALL'
   return useQuery({
-    queryKey: ['analytics', 'brand-performance', ids?.join(',') ?? 'all', opts.months, opts.outletId ?? 'ALL'],
+    queryKey: ['analytics', 'brand-performance', brandKey, opts.months, outletKey],
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[2] === brandKey && previousQuery.queryKey[4] === outletKey ? previous : undefined,
     queryFn: async () => {
       const params = new URLSearchParams({ months: String(opts.months) })
       if (ids && ids.length > 0) params.set('brand_ids', ids.join(','))

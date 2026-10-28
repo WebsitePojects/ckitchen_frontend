@@ -5,7 +5,7 @@
  * discounts + AUTO/SUPERVISOR/ADMIN approval gating) to the Orders page.
  * Controlled component: the parent (Orders.tsx) owns `open`/`order` state —
  * this dialog has no DialogTrigger of its own, matching the
- * WalkInOrderDialog/BrandActivityLog pattern already used on this page.
+ * WalkInOrderDialog pattern already used on this page.
  *
  * Two ways to apply a discount:
  *  - Catalog: pick a pre-seeded `Discount` row (Senior/PWD/promo/etc) by id.

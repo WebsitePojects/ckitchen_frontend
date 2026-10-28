@@ -22,13 +22,12 @@ import {
 import PageContainer from '../components/layout/PageContainer'
 import EmptyState from '../components/common/EmptyState'
 import { useInPageTitle } from '../components/layout/PageHeaderContext'
-import BrandActivityLog from '../components/BrandActivityLog'
 import { Button } from '../components/ui/button'
 
 /**
  * One brand's performance (D59): is it profitable, is it growing, and what next month looks
  * like on the current trend. Replaces the old "activity log" modal as what a brand card
- * opens; the activity log is still one click away from here.
+ * opens; the brand's activity is one click away, on the Activity Log page's Brands tab.
  */
 export default function BrandPerformance() {
   const { id = '' } = useParams<{ id: string }>()
@@ -37,7 +36,6 @@ export default function BrandPerformance() {
   const { selectedOutletId } = useOutlet()
   const navigate = useNavigate()
   const [months, setMonths] = useState<number>(6)
-  const [activityOpen, setActivityOpen] = useState(false)
 
   // Registered outside <RequireAccess> (the guard matches raw '/brands/<uuid>'), so it
   // inherits the Brands page permission itself, like EmployeeProfile does for '/employees'.
@@ -89,26 +87,34 @@ export default function BrandPerformance() {
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(`/brands/compare?ids=${perf.brand.id}`)}>
                 <GitCompareArrows className="h-3.5 w-3.5" /> Compare
               </Button>
-              <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => setActivityOpen(true)}>
-                <History className="h-3.5 w-3.5" /> Activity log
-              </Button>
+              {canAccessPage('/audit') && (
+                <Button variant="ghost" size="sm" className="gap-1.5" asChild>
+                  <Link to={`/audit?tab=brands&brand=${perf.brand.id}`}>
+                    <History className="h-3.5 w-3.5" /> Activity log
+                  </Link>
+                </Button>
+              )}
             </div>
           </header>
 
-          <BrandFigures perf={perf} currentMonth={report.data!.currentMonth} />
-          <TrendChart perf={perf} />
-          <Signals perf={perf} />
-          <MonthlyTable perf={perf} currentMonth={report.data!.currentMonth.month} />
-          <TopProducts perf={perf} />
+          {/* While another period loads, the last one stays visible but dimmed. */}
+          <div
+            className={cn('flex flex-col gap-6 transition-opacity duration-200', report.isPlaceholderData && 'pointer-events-none opacity-50')}
+            aria-busy={report.isPlaceholderData}
+          >
+            <BrandFigures perf={perf} currentMonth={report.data!.currentMonth} />
+            <TrendChart perf={perf} />
+            <Signals perf={perf} />
+            <MonthlyTable perf={perf} currentMonth={report.data!.currentMonth.month} />
+            <TopProducts perf={perf} />
 
-          <p className="flex items-start gap-2 text-xs text-muted-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-            Contribution = net sales − food cost − platform commission and marketing. {report.data!.assumptions.excludes} Projection is a
-            straight-line trend over completed months (needs {report.data!.assumptions.minHistoryMonths}); the range is ± one month of typical
-            variation.
-          </p>
-
-          <BrandActivityLog brand={perf.brand} open={activityOpen} onOpenChange={setActivityOpen} />
+            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+              Contribution = net sales − food cost − platform commission and marketing. {report.data!.assumptions.excludes} Projection is a
+              straight-line trend over completed months (needs {report.data!.assumptions.minHistoryMonths}); the range is ± one month of typical
+              variation.
+            </p>
+          </div>
         </>
       )}
     </PageContainer>

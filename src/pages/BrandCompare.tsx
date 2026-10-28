@@ -132,7 +132,11 @@ export default function BrandCompare() {
           {selected.length < 2 ? (
             <EmptyState icon={GitCompareArrows} title="Pick at least two brands" description="Tap brands above to put them side by side." />
           ) : (
-            <>
+            // While another period loads, the last one stays visible but dimmed.
+            <div
+              className={cn('flex flex-col gap-6 transition-opacity duration-200', report.isPlaceholderData && 'pointer-events-none opacity-50')}
+              aria-busy={report.isPlaceholderData}
+            >
               <Ranking brands={selected} />
               <section className="ledger-section" aria-labelledby="compare-table-title">
                 <h2 id="compare-table-title" className="mb-2 text-ws-section font-semibold text-foreground">
@@ -167,7 +171,7 @@ export default function BrandCompare() {
                 </div>
                 <p className="text-xs text-muted-foreground">The last point is the month in progress. {report.data!.assumptions.excludes}</p>
               </section>
-            </>
+            </div>
           )}
         </>
       )}
