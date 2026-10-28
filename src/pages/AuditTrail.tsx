@@ -9,6 +9,7 @@ import { useBrandPerformance } from '../lib/brandPerformance'
 import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import EmptyState from '../components/common/EmptyState'
+import PendingValue from '../components/common/PendingValue'
 import BrandActivityPanel, { currentMonthKey, isMonthKey } from '../components/BrandActivityPanel'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -321,7 +322,7 @@ function AllActivity() {
           {rangeError && <span className="text-xs text-danger-text">{rangeError}</span>}
         </div>
 
-        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground"><PendingValue loading={loading}>{rows.length} shown</PendingValue></span>
       </div>
 
       {/* Table */}

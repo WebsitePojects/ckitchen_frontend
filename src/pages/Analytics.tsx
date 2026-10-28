@@ -226,18 +226,8 @@ interface KpiData {
 }
 
 function AnalyticsKpiRibbon({ data, loading }: { data: KpiData | null; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-[90px] rounded-xl" />
-        ))}
-      </div>
-    )
-  }
-
   return (
-    <KpiRibbon className="grid-cols-2 sm:grid-cols-4 xl:grid-cols-4">
+    <KpiRibbon loading={loading} className="grid-cols-2 sm:grid-cols-4 xl:grid-cols-4">
       <KpiCard
         icon={DollarSign}
         label="Total Revenue"
@@ -1290,19 +1280,11 @@ function SalesReportSection() {
         </p>
 
         {/* KPI ribbon */}
-        {loading ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-[90px] rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <KpiRibbon className="grid-cols-1 sm:grid-cols-3 xl:grid-cols-3">
-            <KpiCard icon={ReceiptText} label="Orders" value={fmtNum(report?.totals.orders_count)} />
-            <KpiCard icon={DollarSign} label="Gross Sales" value={fmtPHP(report?.totals.gross_sales)} />
-            <KpiCard icon={TrendingUp} label="Net Sales" value={fmtPHP(report?.totals.net_sales)} />
-          </KpiRibbon>
-        )}
+        <KpiRibbon loading={loading} className="grid-cols-1 sm:grid-cols-3 xl:grid-cols-3">
+          <KpiCard icon={ReceiptText} label="Orders" value={fmtNum(report?.totals.orders_count)} />
+          <KpiCard icon={DollarSign} label="Gross Sales" value={fmtPHP(report?.totals.gross_sales)} />
+          <KpiCard icon={TrendingUp} label="Net Sales" value={fmtPHP(report?.totals.net_sales)} />
+        </KpiRibbon>
 
         {/* Sales-over-time — day-grouped only (client req #10); single hue */}
         {appliedGroupBy === 'day' && (

@@ -53,8 +53,18 @@ export interface LowStockAlert {
 export interface StockShortfall {
   ingredient_id: string
   ingredient_name: string
+  /** Stock unit of `required` / `available` (absent from servers before 2026-10-28). */
+  unit?: string
   required: number
   available: number
+  /** Order items that need this ingredient (absent from servers before 2026-10-28). */
+  used_by?: Array<{
+    menu_item_id: string
+    name: string
+    qty: number
+    per_serving: number
+    entered: { quantity: number; unit: string } | null
+  }>
 }
 
 /** `stock.risk` — emitted to the outlet room when an aggregator order was

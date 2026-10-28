@@ -4,6 +4,8 @@ import type { ReactNode } from 'react'
 import { Card, CardContent } from '../ui/card'
 import { cn } from '../../lib/utils'
 import { DELTA_COLOR, deltaDirection } from '../../lib/theme'
+import { Skeleton } from '../ui/skeleton'
+import { useKpiRibbonLoading } from './KpiRibbon'
 
 interface KpiCardProps {
   icon: LucideIcon
@@ -13,6 +15,11 @@ interface KpiCardProps {
   deltaPct?: number
   /** Optional mini chart / sparkline slot rendered below the value. */
   children?: ReactNode
+  /**
+   * Not final yet: show a skeleton, never a provisional number. A "0" while loading reads as a
+   * real zero (no orders, no stock). Defaults to the surrounding <KpiRibbon loading>.
+   */
+  loading?: boolean
   className?: string
 }
 
@@ -24,7 +31,9 @@ const DELTA_CHIP_BG: Record<'up' | 'down' | 'flat', string> = {
 }
 
 /** KPI stat card — tinted icon square, label, big tabular-nums value, optional delta chip + chart slot. */
-export default function KpiCard({ icon: Icon, label, value, deltaPct, children, className }: KpiCardProps) {
+export default function KpiCard({ icon: Icon, label, value, deltaPct, children, loading, className }: KpiCardProps) {
+  const ribbonLoading = useKpiRibbonLoading()
+  const isLoading = loading ?? ribbonLoading
   const direction = deltaPct === undefined ? 'flat' : deltaDirection(deltaPct)
   const DeltaIcon = direction === 'down' ? TrendingDown : TrendingUp
 
@@ -39,8 +48,15 @@ export default function KpiCard({ icon: Icon, label, value, deltaPct, children, 
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl font-bold tabular-nums text-foreground sm:text-3xl">{value}</span>
-          {deltaPct !== undefined && (
+          {isLoading ? (
+            // Same line height as the value, so nothing shifts when the number lands.
+            <span className="flex h-8 items-center sm:h-9" aria-label={`${label} loading`}>
+              <Skeleton className="h-6 w-16 sm:h-7" />
+            </span>
+          ) : (
+            <span className="text-2xl font-bold tabular-nums text-foreground sm:text-3xl">{value}</span>
+          )}
+          {!isLoading && deltaPct !== undefined && (
             <span
               className={cn(
                 'flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
@@ -54,7 +70,7 @@ export default function KpiCard({ icon: Icon, label, value, deltaPct, children, 
           )}
         </div>
 
-        {children && <div className="mt-3">{children}</div>}
+        {children && !isLoading && <div className="mt-3">{children}</div>}
       </CardContent>
     </Card>
   )

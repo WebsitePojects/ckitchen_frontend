@@ -104,7 +104,7 @@ export default function ChannelListings() {
 
       <SalesChannelsPanel canManage={isOwner} />
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={Link2} label="Total Listings" value={listings.length} />
         <KpiCard icon={CheckCircle2} label="Active" value={stats.active} />
         <KpiCard icon={Radio} label="Channels in use" value={stats.channelsInUse} />

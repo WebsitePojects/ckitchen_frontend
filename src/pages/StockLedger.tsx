@@ -5,6 +5,7 @@ import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
+import PendingValue from '../components/common/PendingValue'
 import EmptyState from '../components/common/EmptyState'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -138,7 +139,7 @@ export default function StockLedger() {
     <PageContainer>
       <PageHeader title="Stock Ledger" subtitle="Every inventory movement — the single source of truth" />
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={ListOrdered} label="Total Movements" value={stats.total} />
         <KpiCard icon={ArrowDownToLine} label="IN" value={stats.ins} />
         <KpiCard icon={ArrowUpFromLine} label="OUT" value={stats.outs} />
@@ -164,7 +165,7 @@ export default function StockLedger() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground"><PendingValue loading={loading}>{rows.length} shown</PendingValue></span>
       </div>
 
       <Card className="border-border bg-card">

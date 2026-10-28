@@ -1200,7 +1200,7 @@ export default function Inventory() {
 
   // Ingredients are global master data (no outlet scoping server-side) —
   // shared across every page that reads them (Menu.tsx's add-item form etc).
-  const { data: ingredients = [] } = useQuery({
+  const { data: ingredients = [], isLoading: ingredientsLoading } = useQuery({
     queryKey: ['ingredients'],
     queryFn: async () => (await get<Ingredient[]>('/ingredients')).data,
   })
@@ -1556,7 +1556,7 @@ export default function Inventory() {
       />
 
       {/* ── KPI ribbon ── */}
-      <KpiRibbon>
+      <KpiRibbon loading={ingredientsLoading || mainLoading || kitchenLoading || itosLoading}>
         <KpiCard
           icon={Package}
           label="Ingredients"

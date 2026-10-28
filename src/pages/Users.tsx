@@ -923,7 +923,7 @@ export default function Users() {
         }
       />
 
-      <KpiRibbon>
+      <KpiRibbon loading={isLoading}>
         <KpiCard icon={UsersIcon} label="Total Users" value={kpi.total} />
         <KpiCard icon={Check} label="Active" value={kpi.active} />
         <KpiCard icon={Ban} label="Blocked" value={kpi.blocked} />

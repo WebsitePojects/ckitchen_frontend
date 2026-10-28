@@ -573,7 +573,7 @@ export default function Printers() {
       </div>
 
       {/* KPI ribbon */}
-      <KpiRibbon className="xl:grid-cols-4">
+      <KpiRibbon loading={loading} className="xl:grid-cols-4">
         <KpiCard
           icon={Printer}
           label="Printers"

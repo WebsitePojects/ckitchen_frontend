@@ -17,7 +17,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Minus, Plus, Search, ShoppingBag, StickyNote, Trash2, X } from 'lucide-react'
+import { Minus, Plus, Search, ShoppingBag, StickyNote, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { CKApiError, get, post } from '../lib/api'
 import type { StockShortfall } from '../lib/socket'
@@ -31,6 +31,8 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { useInPageTitle } from '../components/layout/PageHeaderContext'
+import StockShortfallDialog from '../components/StockShortfallDialog'
+import { shortfallSummary } from '../lib/stockShortfall'
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -290,7 +292,7 @@ export default function Pos() {
         toast.success(`Sent to kitchen · ${ref}`, { description: `${brand?.name ?? ''} · ${itemCount} item(s) · ${php.format(total)}` })
         if (data?.stock_risk?.length) {
           toast.warning('Low stock for this order', {
-            description: data.stock_risk.map((s) => `${s.ingredient_name}: need ${s.required}, have ${s.available}`).join(' · '),
+            description: data.stock_risk.map(shortfallSummary).join(' · '),
             duration: 10_000,
           })
         }
@@ -302,8 +304,8 @@ export default function Pos() {
       deviceInputRef.current?.focus()
     } catch (err) {
       if (err instanceof CKApiError && err.code === 'INSUFFICIENT_STOCK') {
+        // A decision, not a notice: StockShortfallDialog blocks until they edit or send anyway.
         setShortfalls(Array.isArray(err.details) ? (err.details as StockShortfall[]) : [])
-        setCartOpen(true)
         return
       }
       toast.error(err instanceof Error ? err.message : 'Could not send the order. Nothing was saved; try again.')
@@ -341,12 +343,9 @@ export default function Pos() {
       changeQty={changeQty}
       setNotes={setNotes}
       clear={() => (cart.length === 0 || window.confirm('Clear this order?')) && resetOrder()}
-      shortfalls={shortfalls}
-      canOversell={canOversell}
       pending={pending}
       canSend={canSend}
       send={() => void sendOrder(false)}
-      sendAnyway={() => void sendOrder(true)}
     />
   )
 
@@ -470,6 +469,13 @@ export default function Pos() {
           <CartPanelSlot inSheet>{cartPanel}</CartPanelSlot>
         </SheetContent>
       </Sheet>
+      <StockShortfallDialog
+        shortfalls={shortfalls}
+        canOversell={canOversell}
+        pending={pending}
+        onSendAnyway={() => void sendOrder(true)}
+        onClose={() => setShortfalls(null)}
+      />
     </div>
   )
 }
@@ -566,12 +572,9 @@ interface CartPanelProps {
   changeQty: (key: string, delta: number) => void
   setNotes: (key: string, notes: string) => void
   clear: () => void
-  shortfalls: StockShortfall[] | null
-  canOversell: boolean
   pending: boolean
   canSend: boolean
   send: () => void
-  sendAnyway: () => void
 }
 
 function CartPanel(p: CartPanelProps) {
@@ -646,23 +649,6 @@ function CartPanel(p: CartPanelProps) {
           </li>
         ))}
       </ul>
-
-      {/* Shortfall (walk-in only) */}
-      {p.shortfalls && (
-        <div className="mx-4 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="alert">
-          <p className="flex items-center gap-1.5 font-medium text-warn-text"><AlertTriangle className="h-4 w-4" /> Not enough stock</p>
-          <ul className="mt-1 space-y-0.5 text-foreground">
-            {p.shortfalls.map((s) => (
-              <li key={s.ingredient_id ?? s.ingredient_name}>{s.ingredient_name}: need {s.required}, have {s.available}</li>
-            ))}
-          </ul>
-          {p.canOversell ? (
-            <Button size="sm" variant="outline" className="mt-2" onClick={p.sendAnyway} disabled={p.pending}>Send anyway</Button>
-          ) : (
-            <p className="mt-1 text-xs text-muted-foreground">Ask a manager to approve, or remove items.</p>
-          )}
-        </div>
-      )}
 
       {/* Total + send */}
       <div className="border-t border-border p-4">

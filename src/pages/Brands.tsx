@@ -83,11 +83,11 @@ export default function Brands() {
         }
       />
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={Tags} label="Brands" value={`${active} active / ${brands.length}`} />
-        <KpiCard icon={CheckCircle2} label="Profitable" value={hasPerf ? counts.profitable : '—'} />
-        <KpiCard icon={TrendingDown} label="Losing money" value={hasPerf ? counts.losing : '—'} />
-        <KpiCard icon={TrendingUp} label="Growing" value={hasPerf ? counts.growing : '—'} />
+        <KpiCard icon={CheckCircle2} label="Profitable" value={hasPerf ? counts.profitable : '—'} loading={loading || performance.isPending} />
+        <KpiCard icon={TrendingDown} label="Losing money" value={hasPerf ? counts.losing : '—'} loading={loading || performance.isPending} />
+        <KpiCard icon={TrendingUp} label="Growing" value={hasPerf ? counts.growing : '—'} loading={loading || performance.isPending} />
       </KpiRibbon>
 
       {loading ? (

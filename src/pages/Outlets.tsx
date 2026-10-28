@@ -327,7 +327,7 @@ export default function Outlets() {
         }
       />
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={Building2} label="Total Outlets" value={outlets.length} />
         <KpiCard icon={CheckCircle2} label="Active" value={stats.active} />
         <KpiCard icon={Warehouse} label="Warehouse Pairs" value={stats.readyWarehousePairs} />

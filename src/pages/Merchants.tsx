@@ -629,31 +629,31 @@ export default function Merchants() {
       />
 
       {/* ── KPI ribbon ─────────────────────────────────────────────────────── */}
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard
           icon={Store}
           label="Total Merchants"
-          value={loading ? '—' : rows.length}
+          value={rows.length}
         />
         <KpiCard
           icon={Tags}
           label="Total Brands"
-          value={loading ? '—' : rows.length}
+          value={rows.length}
         />
         <KpiCard
           icon={Building2}
           label="Total Listings"
-          value={loading ? '—' : totalListings}
+          value={totalListings}
         />
         <KpiCard
           icon={CheckCircle2}
           label="Active Listings"
-          value={loading ? '—' : activeListings}
+          value={activeListings}
         />
         <KpiCard
           icon={ReceiptText}
           label="Total Orders (Today)"
-          value={loading ? '—' : totalOrdersToday}
+          value={totalOrdersToday}
         />
       </KpiRibbon>
 

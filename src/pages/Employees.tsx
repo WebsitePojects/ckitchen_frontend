@@ -36,6 +36,7 @@ import {
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
+import PendingValue from '../components/common/PendingValue'
 import StatusBadge from '../components/common/StatusBadge'
 import EmptyState from '../components/common/EmptyState'
 import PageContainer from '../components/layout/PageContainer'
@@ -840,7 +841,7 @@ export default function Employees() {
         actions={addButton}
       />
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={Users} label="Total" value={totalCount} />
         <KpiCard icon={UserCheck} label="Active" value={activeCount} />
         <KpiCard icon={Monitor} label="System users" value={systemUserCount} />
@@ -881,7 +882,7 @@ export default function Employees() {
             <SelectItem value="STAFF_ONLY">Staff only</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground"><PendingValue loading={loading}>{rows.length} shown</PendingValue></span>
       </div>
 
       {/* Table */}

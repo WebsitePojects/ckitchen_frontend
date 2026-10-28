@@ -1498,7 +1498,7 @@ export default function Menu() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col gap-6">
       {/* ── KPI ribbon ─────────────────────────────────────────────────────── */}
-      <KpiRibbon>
+      <KpiRibbon loading={loadingBrands || loadingMenu}>
         <KpiCard icon={UtensilsCrossed} label="Total Items" value={kpi.total} />
         <KpiCard icon={CheckCircle2} label="Available" value={kpi.available} />
         <KpiCard icon={PauseCircle} label="Paused" value={kpi.paused} />

@@ -23,6 +23,7 @@ import { AlertTriangle, Plus, ShoppingCart, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { CKApiError, get, post } from '../lib/api'
 import type { StockShortfall } from '../lib/socket'
+import { formatStockQty, shortfallSummary } from '../lib/stockShortfall'
 import { useOutlet } from '../context/OutletContext'
 import { outletScopedPath } from '../lib/outletScope'
 import {
@@ -79,10 +80,6 @@ interface WalkInOrderDialogProps {
  *  allow_oversell); shown as a warning toast after creation. */
 interface IngestOrderResponse {
   stock_risk?: StockShortfall[]
-}
-
-function formatShortfall(s: StockShortfall): string {
-  return `${s.ingredient_name}: need ${s.required}, ${s.available} available`
 }
 
 const AVAIL_SUFFIX: Partial<Record<Availability, string>> = {
@@ -214,7 +211,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
       const risk = data?.stock_risk
       if (Array.isArray(risk) && risk.length > 0) {
         toast.warning('Order placed with stock shortfall', {
-          description: risk.map(formatShortfall).join(' · '),
+          description: risk.map(shortfallSummary).join(' · '),
           duration: 10_000,
         })
       }
@@ -406,7 +403,7 @@ export default function WalkInOrderDialog({ open, onOpenChange }: WalkInOrderDia
                   >
                     <span className="min-w-0 flex-1 truncate">{s.ingredient_name}</span>
                     <span className="shrink-0 tabular-nums">
-                      need {s.required} · {s.available} available
+                      need {formatStockQty(s.required, s.unit)} · {formatStockQty(s.available, s.unit)} available
                     </span>
                   </li>
                 ))}

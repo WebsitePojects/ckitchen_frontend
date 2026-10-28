@@ -8,6 +8,7 @@ import PageContainer from '../components/layout/PageContainer'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
+import PendingValue from '../components/common/PendingValue'
 import EmptyState from '../components/common/EmptyState'
 import DepartmentBudgets from '../components/DepartmentBudgets'
 import SupplierDialog, { type Party } from '../components/SupplierDialog'
@@ -114,7 +115,7 @@ export default function MasterData() {
         })}
       </div>
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={kind === 'suppliers' ? Building2 : Users2} label={`Total ${TABS.find((t) => t.key === kind)!.label}`} value={stats.total} />
         <KpiCard icon={CheckCircle2} label="Active" value={stats.active} />
       </KpiRibbon>
@@ -136,7 +137,7 @@ export default function MasterData() {
             Add {singular}
           </Button>
         )}
-        <span className="text-sm text-muted-foreground">{filtered.length} shown</span>
+        <span className="text-sm text-muted-foreground"><PendingValue loading={loading}>{filtered.length} shown</PendingValue></span>
       </div>
 
       <Card className="border-border bg-card">

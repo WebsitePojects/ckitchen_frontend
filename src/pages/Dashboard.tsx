@@ -57,6 +57,7 @@ import { Skeleton } from '../components/ui/skeleton'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
+import PendingValue from '../components/common/PendingValue'
 import DataTable from '../components/common/DataTable'
 import StatusBadge from '../components/common/StatusBadge'
 import AggregatorBadge from '../components/common/AggregatorBadge'
@@ -650,7 +651,7 @@ export default function Dashboard() {
       />
 
       {/* ── KPI ribbon ─────────────────────────────────────────────────────── */}
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard
           icon={ReceiptText}
           label="Total Orders"
@@ -692,7 +693,12 @@ export default function Dashboard() {
             <p className="mt-0.5 text-xs text-muted-foreground">Hourly order volume by brand, today</p>
           </CardHeader>
           <CardContent>
-            <OrdersByHourByBrandChart brands={brands} buckets={hourBrandData} />
+            {/* Derived from the order list: until it loads, "no orders" would be a guess. */}
+            {loading ? (
+              <Skeleton className="h-[240px] w-full rounded-xl" />
+            ) : (
+              <OrdersByHourByBrandChart brands={brands} buckets={hourBrandData} />
+            )}
           </CardContent>
         </Card>
 
@@ -887,8 +893,10 @@ export default function Dashboard() {
 
             {/* Count */}
             <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-              {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-              {filteredOrders.length !== orders.length ? ` of ${orders.length}` : ''}
+              <PendingValue loading={loading}>
+                {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+                {filteredOrders.length !== orders.length ? ` of ${orders.length}` : ''}
+              </PendingValue>
             </span>
           </div>
 

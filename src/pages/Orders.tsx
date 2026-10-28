@@ -17,6 +17,7 @@ import { hasRole } from '../auth/access'
 import PageHeader from '../components/common/PageHeader'
 import KpiCard from '../components/common/KpiCard'
 import KpiRibbon from '../components/common/KpiRibbon'
+import PendingValue from '../components/common/PendingValue'
 import StatusBadge from '../components/common/StatusBadge'
 import AggregatorBadge from '../components/common/AggregatorBadge'
 import BrandChip from '../components/common/BrandChip'
@@ -303,7 +304,7 @@ export default function Orders() {
         }
       />
 
-      <KpiRibbon>
+      <KpiRibbon loading={loading}>
         <KpiCard icon={ReceiptText} label="Total Orders" value={orders.length} />
         <KpiCard icon={Clock} label="New" value={counts.NEW ?? 0} />
         <KpiCard icon={Flame} label="Preparing" value={counts.PREPARING ?? 0} />
@@ -334,7 +335,7 @@ export default function Orders() {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-sm text-muted-foreground">{rows.length} shown</span>
+        <span className="text-sm text-muted-foreground"><PendingValue loading={loading}>{rows.length} shown</PendingValue></span>
       </div>
 
       <Card className="border-border bg-card">
