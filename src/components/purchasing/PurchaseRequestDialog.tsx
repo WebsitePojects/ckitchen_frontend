@@ -13,7 +13,7 @@
  * the requester can adjust it. The PR lands as DRAFT — submitting for
  * approval (and the budget warning) happens from the table row action.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import type { FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Plus, X } from 'lucide-react'
@@ -109,9 +109,15 @@ export default function PurchaseRequestDialog({
     return sum + q * c
   }, 0)
 
+  // One key per intent (rule: duplicate-safe creates). Kept across a failed or timed-out try,
+  // so pressing Save again replays the same document instead of creating a second one;
+  // cleared only once a save is confirmed.
+  const requestIdRef = useRef<string | null>(null)
+  const savingRef = useRef(false)
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (saving) return
+    if (saving || savingRef.current) return
     if (!department) {
       toast.error('Select a department.')
       return
@@ -137,9 +143,12 @@ export default function PurchaseRequestDialog({
         return
       }
     }
+    requestIdRef.current ??= crypto.randomUUID()
+    savingRef.current = true
     setSaving(true)
     try {
       const res = await post<PurchaseRequest>('/purchase-requests', {
+        client_request_id: requestIdRef.current,
         department,
         notes: notes.trim() || undefined,
         lines: filled.map((l) => ({
@@ -152,10 +161,12 @@ export default function PurchaseRequestDialog({
       toast.success(`${res.data.prNo} created as DRAFT — submit it for approval when ready.`)
       void queryClient.invalidateQueries({ queryKey: ['purchase-requests'] })
       void queryClient.invalidateQueries({ queryKey: ['pr-detail'] })
+      requestIdRef.current = null
       onOpenChange(false)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create purchase request.')
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
